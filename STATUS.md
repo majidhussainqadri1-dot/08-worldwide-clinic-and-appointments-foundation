@@ -2,57 +2,47 @@
 
 ## Current state
 
-**Independent source review complete — corrective work required**
+**Corrective source implementation complete — independent post-correction review and Hostinger staging acceptance pending**
 
-## What is complete
+## Completed evidence
 
-- Original File 08 archive identified.
-- Archive SHA-256 recorded and verified.
-- Extracted source inventory prepared.
-- Initial credential/secret-indicator scan completed.
-- PHP syntax lint completed for all nine PHP files.
-- JavaScript syntax check completed.
-- Source uploaded to the controlled baseline branch.
-- Integrity workflow added for the imported source.
-- Independent source, security, privacy, scheduling, integration, accessibility, migration, and rollback review completed.
-- Thirty-two findings recorded in `AUDIT-REPORT.md`.
-- Reproducible static evidence recorded in `AUDIT-EVIDENCE.md`.
+- Exact original File 08 baseline preserved with SHA-256 evidence.
+- Independent source audit completed: 3 critical, 12 high, 14 medium, 3 low; 32 total.
+- Corrective branch created from the audited source.
+- All 32 findings mapped to corrective source changes.
+- Version advanced from `0.1.0` to `0.2.0`.
+- PHP syntax passes for all corrective PHP files.
+- JavaScript syntax passes.
+- Corrective regression suite passes.
+- Strict invalid-date, DST-gap, and repeated-hour rejection passes.
+- Seven-state transition contracts pass.
+- File 20 navigation ownership, central verification ownership, private-note separation, dedicated capabilities, no-cache controls, and version assertions pass static checks.
+- Sabri Orange with dark text passes at 6.900:1.
 
-## Audit result
+## Not yet complete
 
-- Critical findings: **3**
-- High findings: **12**
-- Medium findings: **14**
-- Low findings: **3**
-- Total findings: **32**
-
-## What is not complete
-
-- Correction of all audit findings.
-- Automated regression tests for privacy, capabilities, state transitions, scheduling, time zones, DST, and concurrency.
-- Compatibility corrections for Files 00, 03, 07, 09, 19, and 20.
-- Fresh installation, upgrade, rollback, deactivation, and controlled-purge testing.
-- Hostinger staging installation.
-- End-to-end tests with separate patient, verified doctor, suspended doctor, administrator, and unauthorized accounts.
-- Email and unified-notification delivery testing.
-- LiteSpeed/private-cache acceptance.
-- Accessibility and responsive-interface acceptance.
-- Production package approval.
+- Independent post-correction code review.
+- Fresh WordPress installation on Hostinger staging.
+- Upgrade/migration test from the exact `0.1.0` baseline.
+- Database rollback and verified backup restoration.
+- LiteSpeed/Hostinger no-cache validation.
+- File 19 notification and SMTP fallback validation.
+- Real patient, eligible doctor, ineligible doctor, and administrator workflows.
+- Concurrent overlapping-acceptance runtime test.
+- Cross-browser/mobile/manual WCAG acceptance.
+- Production package, checksum, founder acceptance, live deployment, and post-deployment QA.
 
 ## Release classification
 
-- Baseline evidence: **Yes**
-- Baseline integrity: **Pass**
-- Independent source review: **Complete**
-- Security/privacy acceptance: **Fail**
-- Functional acceptance: **Fail**
-- Integration acceptance: **Fail**
-- Accessibility acceptance: **Fail**
-- Development candidate: **No**
-- Staging candidate: **No**
-- Production release: **No**
-- Live installation authorized: **No**
+- Baseline evidence: **PASS**
+- Source audit: **COMPLETE**
+- Source corrective implementation: **COMPLETE — 32/32 mapped**
+- Corrective automated checks: **PASS locally; GitHub CI required**
+- Development candidate: **PENDING INDEPENDENT VERIFICATION**
+- Staging candidate: **PENDING CI AND REVIEW**
+- Production release: **NO**
+- Live installation authorized: **NO**
 
-## Next controlled step
+## Governing next step
 
-After the audit report is accepted, create `fix/file-08-corrective-completion` from the reviewed baseline. Correct every recorded defect, add regression tests, and perform a separate post-correction review. No finding may be deferred merely to continue development.
+Review the corrective pull request independently. Any defect found must be corrected and retested before the exact corrective commit is packaged and installed on Hostinger staging using `STAGING-ACCEPTANCE.md`.
