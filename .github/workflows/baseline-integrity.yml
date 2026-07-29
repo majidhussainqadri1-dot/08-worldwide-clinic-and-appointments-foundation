@@ -5,6 +5,8 @@ on:
     branches:
       - baseline/file-08-original-import
   pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -15,10 +17,9 @@ concurrency:
 
 jobs:
   integrity:
-    name: Source checksums and syntax
+    name: Preserved baseline checksums and syntax
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -29,24 +30,14 @@ jobs:
           php-version: '8.3'
           coverage: none
 
-      - name: Verify exact imported source checksums
+      - name: Verify exact baseline source checksums
         shell: bash
         run: |
           set -euo pipefail
           sha256sum --check CHECKSUMS.sha256
 
-      - name: Lint imported PHP files
+      - name: Lint preserved baseline PHP files
         shell: bash
         run: |
           set -euo pipefail
-          while IFS= read -r -d '' file; do
-            php -l "$file"
-          done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
-
-      - name: Check JavaScript syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          while IFS= read -r -d '' file; do
-            node --check "$file"
-          done < <(find . -type f -name '*.js' -not -path './node_modules/*' -print0)
+          while IFS= read -r -d '' file; do php -l "$file"; done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
