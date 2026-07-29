@@ -2,7 +2,7 @@
 
 ## Current state
 
-**Baseline imported — independent audit pending**
+**Independent source review complete — corrective work required**
 
 ## What is complete
 
@@ -14,26 +14,40 @@
 - JavaScript syntax check completed.
 - Source uploaded to the controlled baseline branch.
 - Integrity workflow added for the imported source.
+- Independent source, security, privacy, scheduling, integration, accessibility, migration, and rollback review completed.
+- Thirty-two findings recorded in `AUDIT-REPORT.md`.
+- Reproducible static evidence recorded in `AUDIT-EVIDENCE.md`.
+
+## Audit result
+
+- Critical findings: **3**
+- High findings: **12**
+- Medium findings: **14**
+- Low findings: **3**
+- Total findings: **32**
 
 ## What is not complete
 
-- Architectural review.
-- WordPress runtime testing.
-- Security and privacy review.
-- Appointment ownership and IDOR review.
-- Role, capability, and doctor-verification review.
-- Time-zone and daylight-saving behavior review.
-- Email delivery and privacy-content review.
-- Accessibility and responsive-interface review.
-- Compatibility review with Files 00, 01, 02, 03, 07, 09, 19, 20, 21, and 22.
-- Fresh installation, upgrade, rollback, and uninstall tests.
+- Correction of all audit findings.
+- Automated regression tests for privacy, capabilities, state transitions, scheduling, time zones, DST, and concurrency.
+- Compatibility corrections for Files 00, 03, 07, 09, 19, and 20.
+- Fresh installation, upgrade, rollback, deactivation, and controlled-purge testing.
 - Hostinger staging installation.
-- End-to-end tests with separate patient, verified doctor, and administrator accounts.
+- End-to-end tests with separate patient, verified doctor, suspended doctor, administrator, and unauthorized accounts.
+- Email and unified-notification delivery testing.
+- LiteSpeed/private-cache acceptance.
+- Accessibility and responsive-interface acceptance.
 - Production package approval.
 
 ## Release classification
 
 - Baseline evidence: **Yes**
+- Baseline integrity: **Pass**
+- Independent source review: **Complete**
+- Security/privacy acceptance: **Fail**
+- Functional acceptance: **Fail**
+- Integration acceptance: **Fail**
+- Accessibility acceptance: **Fail**
 - Development candidate: **No**
 - Staging candidate: **No**
 - Production release: **No**
@@ -41,4 +55,4 @@
 
 ## Next controlled step
 
-Create `audit/file-08-source-review` from the accepted baseline and perform a separate review for omissions, defects, conflicts, privacy risks, security weaknesses, outdated contracts, integration gaps, and required corrections.
+After the audit report is accepted, create `fix/file-08-corrective-completion` from the reviewed baseline. Correct every recorded defect, add regression tests, and perform a separate post-correction review. No finding may be deferred merely to continue development.
