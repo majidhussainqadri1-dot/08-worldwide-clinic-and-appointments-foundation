@@ -14,7 +14,6 @@ concurrency:
 
 jobs:
   import:
-    if: ${{ hashFiles('.source-import/READY') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -25,13 +24,25 @@ jobs:
           fetch-depth: 0
           ref: baseline/file-08-original-import
 
+      - name: Detect import marker
+        id: marker
+        shell: bash
+        run: |
+          if [[ -f .source-import/READY ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up PHP
+        if: steps.marker.outputs.run == 'true'
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2.37.1
         with:
           php-version: '8.3'
           coverage: none
 
       - name: Decode and extract exact source archive
+        if: steps.marker.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -45,6 +56,7 @@ jobs:
           cp -a /tmp/file08-extract/worldwide-clinic/. ./
 
       - name: Validate imported source
+        if: steps.marker.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -52,6 +64,7 @@ jobs:
           while IFS= read -r -d '' file; do node --check "$file"; done < <(find . -type f -name '*.js' -print0)
 
       - name: Commit exact source baseline
+        if: steps.marker.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
