@@ -48,7 +48,7 @@ final class SWC_Helpers {
 			'phone' => '+923001234567',
 		),
 		8 => array( 'clinic_name' => 'Private Clinic' ),
-		9 => array(),
+		9 => array( 'address' => 'Private residential address' ),
 	);
 	public static $availability = array(
 		7 => array(
@@ -89,7 +89,7 @@ SWC_Helpers::$verified[7] = false;
 swc_contract_assert( array() === swc_get_public_clinic_projection( 7 ), 'unverified doctor fails closed' );
 SWC_Helpers::$verified[7] = true;
 swc_contract_assert( array() === swc_get_public_clinic_projection( 8 ), 'private doctor fails closed' );
-swc_contract_assert( array() === swc_get_public_clinic_projection( 9 ), 'empty clinic data does not fabricate a section' );
+swc_contract_assert( array() === swc_get_public_clinic_projection( 9 ), 'generic private address does not fabricate a clinic section' );
 
 $projection = swc_get_public_clinic_projection( 7 );
 swc_contract_assert( '1.0.0' === $projection['contract_version'], 'contract version is exact' );
@@ -109,7 +109,7 @@ $GLOBALS['swc_filter'] = function ( $hook, $value ) {
 	return $value;
 };
 $filtered = swc_get_public_clinic_projection( 7 );
-swc_contract_assert( 'Filtered Clinic' === $filtered['clinic']['name'], 'filters may alter bounded presentation text' );
+swc_contract_assert( 'Global Clinic' === $filtered['clinic']['name'], 'filters cannot replace canonical presentation values' );
 swc_contract_assert( ! isset( $filtered['clinic']['address'] ), 'filters may revoke a canonical field' );
 swc_contract_assert( ! isset( $filtered['clinic']['phone'] ) && ! isset( $filtered['clinic']['native_id'] ), 'filters cannot add forbidden fields' );
 
