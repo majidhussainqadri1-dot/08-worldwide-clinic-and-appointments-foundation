@@ -21,6 +21,7 @@ define( 'SWC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SWC_URL', plugin_dir_url( __FILE__ ) );
 
 require_once SWC_DIR . 'includes/class-swc-helpers.php';
+require_once SWC_DIR . 'includes/class-swc-doctor-authority.php';
 require_once SWC_DIR . 'includes/class-swc-public-clinic.php';
 require_once SWC_DIR . 'includes/class-swc-activator.php';
 require_once SWC_DIR . 'includes/class-swc-appointments.php';
