@@ -54,6 +54,9 @@ jobs:
       - name: Verify accessible primary contrast
         run: php tests/check-contrast.php
 
+      - name: Record governed source digests
+        run: sha256sum includes/class-swc-doctor-authority.php includes/class-swc-public-clinic.php tests/doctor-authority.php tests/public-clinic-projection.php tools/build-development-candidate.php tools/verify-development-candidate.php worldwide-clinic.php
+
       - name: Verify corrective checksums
         run: sha256sum --check CORRECTIVE-CHECKSUMS.sha256
 
