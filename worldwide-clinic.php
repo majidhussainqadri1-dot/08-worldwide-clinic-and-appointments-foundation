@@ -3,7 +3,7 @@
  * Plugin Name: Worldwide Clinic and Appointments Foundation
  * Plugin URI: https://www.sabrihomeopathy.com/
  * Description: Privacy-safe worldwide clinic discovery, enforceable doctor availability, appointment requests, role-based dashboards, audited scheduling, and unified notifications.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
@@ -14,12 +14,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'SWC_VERSION', '0.2.0' );
+define( 'SWC_VERSION', '0.2.1' );
+define( 'SWC_PUBLIC_CLINIC_CONTRACT_VERSION', '1.0.0' );
 define( 'SWC_FILE', __FILE__ );
 define( 'SWC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SWC_URL', plugin_dir_url( __FILE__ ) );
 
 require_once SWC_DIR . 'includes/class-swc-helpers.php';
+require_once SWC_DIR . 'includes/class-swc-public-clinic.php';
 require_once SWC_DIR . 'includes/class-swc-activator.php';
 require_once SWC_DIR . 'includes/class-swc-appointments.php';
 require_once SWC_DIR . 'includes/class-swc-frontend.php';
