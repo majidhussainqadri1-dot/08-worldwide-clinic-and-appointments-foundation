@@ -30,7 +30,7 @@ final class SWC_Public_Clinic {
 		$availability = SWC_Helpers::availability( $user_id );
 		$valid_hours  = SWC_Helpers::availability_is_valid( $availability );
 		$name         = self::first_profile_value( $user_id, array( 'clinic_name', 'clinic' ) );
-		$address      = self::first_profile_value( $user_id, array( 'clinic_address', 'address' ) );
+		$address      = self::first_profile_value( $user_id, array( 'clinic_address' ) );
 		$country      = SWC_Helpers::profile_value( $user_id, 'country', '' );
 		$city         = SWC_Helpers::profile_value( $user_id, 'city', '' );
 
@@ -65,8 +65,8 @@ final class SWC_Public_Clinic {
 		);
 
 		/**
-		 * Filters presentation values only. Canonical visibility cannot be widened,
-		 * and fields absent from the authoritative projection cannot be created.
+		 * Filters may revoke canonical fields only. Canonical visibility cannot be
+		 * widened, fields cannot be created, and canonical values cannot be replaced.
 		 *
 		 * @param array<string,string> $clinic  Canonical bounded clinic fields.
 		 * @param int                  $user_id Doctor user ID.
@@ -82,9 +82,9 @@ final class SWC_Public_Clinic {
 			if ( ! array_key_exists( $field, $clinic ) || ! array_key_exists( $field, $filtered ) || ! is_scalar( $filtered[ $field ] ) ) {
 				continue;
 			}
-			$value = self::plain_text( (string) $filtered[ $field ], $limit );
-			if ( '' !== $value ) {
-				$public[ $field ] = $value;
+			$allow = (bool) $filtered[ $field ];
+			if ( $allow ) {
+				$public[ $field ] = $clinic[ $field ];
 			}
 		}
 
