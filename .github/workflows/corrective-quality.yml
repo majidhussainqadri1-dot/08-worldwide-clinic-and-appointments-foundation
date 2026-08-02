@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   quality:
-    name: PHP, JavaScript, privacy, lifecycle, and accessibility checks
+    name: PHP, JavaScript, privacy, lifecycle, public projection, and accessibility checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -44,6 +44,9 @@ jobs:
 
       - name: Run corrective regression checks
         run: php tests/run.php
+
+      - name: Verify File 08 public clinic projection contract
+        run: php tests/public-clinic-projection.php
 
       - name: Verify accessible primary contrast
         run: php tests/check-contrast.php
