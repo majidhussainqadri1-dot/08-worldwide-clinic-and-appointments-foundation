@@ -37,8 +37,13 @@ final class SDD_Helpers {
 	public static function is_founder( $user_id ) { return false; }
 }
 
+final class SWC_Doctor_Authority {
+	public static $eligible = array( 7 => true, 8 => true, 9 => true );
+	public static function is_eligible( $user_id ) { return ! empty( self::$eligible[ $user_id ] ); }
+	public static function contract() { return array( 'contract_version' => '1.0.0', 'owner' => 'file-08' ); }
+}
+
 final class SWC_Helpers {
-	public static $verified = array( 7 => true, 8 => true, 9 => true );
 	public static $profiles = array(
 		7 => array(
 			'clinic_name' => '<b>Global Clinic</b>',
@@ -60,7 +65,6 @@ final class SWC_Helpers {
 		8 => array(),
 		9 => array(),
 	);
-	public static function is_verified_doctor( $user_id ) { return ! empty( self::$verified[ $user_id ] ); }
 	public static function profile_value( $user_id, $key, $default = '' ) {
 		return isset( self::$profiles[ $user_id ][ $key ] ) ? self::$profiles[ $user_id ][ $key ] : $default;
 	}
@@ -85,10 +89,10 @@ function swc_contract_assert( $condition, $message ) {
 }
 
 swc_contract_assert( array() === swc_get_public_clinic_projection( 0 ), 'invalid user fails closed' );
-SWC_Helpers::$verified[7] = false;
-swc_contract_assert( array() === swc_get_public_clinic_projection( 7 ), 'unverified doctor fails closed' );
-SWC_Helpers::$verified[7] = true;
-swc_contract_assert( array() === swc_get_public_clinic_projection( 8 ), 'private doctor fails closed' );
+SWC_Doctor_Authority::$eligible[7] = false;
+swc_contract_assert( array() === swc_get_public_clinic_projection( 7 ), 'ineligible practitioner fails closed' );
+SWC_Doctor_Authority::$eligible[7] = true;
+swc_contract_assert( array() === swc_get_public_clinic_projection( 8 ), 'private practitioner fails closed' );
 swc_contract_assert( array() === swc_get_public_clinic_projection( 9 ), 'generic private address does not fabricate a clinic section' );
 
 $projection = swc_get_public_clinic_projection( 7 );
@@ -115,6 +119,7 @@ swc_contract_assert( ! isset( $filtered['clinic']['phone'] ) && ! isset( $filter
 
 $contract = swc_public_clinic_projection_contract();
 swc_contract_assert( 'file-08' === $contract['owner'], 'contract owner is File 08' );
+swc_contract_assert( '1.0.0' === $contract['authority_contract']['contract_version'], 'authority contract is exposed without private state' );
 swc_contract_assert( false === $contract['writes_data'], 'public projection is read-only' );
 swc_contract_assert( in_array( 'patient_data', $contract['excludes'], true ), 'patient data exclusion is explicit' );
 
