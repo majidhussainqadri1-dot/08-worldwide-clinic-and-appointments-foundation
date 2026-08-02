@@ -27,7 +27,7 @@ array(
 )
 ```
 
-Fields without authoritative public values are omitted. If no truthful clinic or availability data exists, the response is empty.
+Fields without authoritative public values are omitted. A generic account/address field is never treated as a public clinic address; only the dedicated clinic-address field is eligible. If no truthful clinic or availability data exists, the response is empty.
 
 ## Eligibility
 
@@ -64,7 +64,7 @@ File 03 remains the owner of profile contact values and public-contact consent. 
 
 ## Extension law
 
-`swc_public_clinic_projection` may alter or remove already-authorized presentation values. It cannot create fields absent from the canonical projection and cannot add non-allow-listed fields.
+`swc_public_clinic_projection` may revoke already-authorized fields only. It cannot replace canonical values, create fields absent from the canonical projection, or add non-allow-listed fields.
 
 `swc_public_clinic_is_public` is monotonic: an extension may revoke public eligibility, but it cannot grant eligibility denied by the authoritative native visibility decision.
 
