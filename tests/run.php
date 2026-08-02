@@ -42,6 +42,7 @@ $frontend = file_get_contents( $root . '/includes/class-swc-frontend.php' );
 $activator = file_get_contents( $root . '/includes/class-swc-activator.php' );
 $plugin = file_get_contents( $root . '/includes/class-swc-plugin.php' );
 $appointments = file_get_contents( $root . '/includes/class-swc-appointments.php' );
+$public_clinic = file_get_contents( $root . '/includes/class-swc-public-clinic.php' );
 $css = file_get_contents( $root . '/assets/css/clinic.css' );
 $main = file_get_contents( $root . '/worldwide-clinic.php' );
 
@@ -54,6 +55,9 @@ swc_assert( false !== strpos( $frontend, "'doctor' === \$role && SWC_Helpers::me
 swc_assert( false !== strpos( $appointments, "'patient_user_id'" ), 'appointment records preserve explicit patient ownership' );
 swc_assert( false !== strpos( $plugin, 'DONOTCACHEPAGE' ) && false !== strpos( $plugin, 'litespeed_control_set_nocache' ), 'private cache exclusions include WordPress and LiteSpeed controls' );
 swc_assert( false === strpos( $css, 'color:#fff!important' ), 'primary controls do not use failing white-on-orange text' );
-swc_assert( false !== strpos( $main, 'Version: 0.2.0' ), 'corrective plugin version is 0.2.0' );
+swc_assert( false !== strpos( $main, 'Version: 0.2.1' ) && false !== strpos( $main, "SWC_PUBLIC_CLINIC_CONTRACT_VERSION', '1.0.0" ), 'plugin and public clinic contract versions are current' );
+swc_assert( false !== strpos( $main, 'class-swc-public-clinic.php' ), 'public clinic contract is loaded by the plugin bootstrap' );
+swc_assert( false !== strpos( $public_clinic, 'swc_get_public_clinic_projection' ), 'owner-executed public clinic projection API exists' );
+swc_assert( false === strpos( $public_clinic, "'phone' =>" ) && false === strpos( $public_clinic, "'whatsapp' =>" ), 'public clinic projection does not emit contact fields' );
 
 echo "All {$tests} corrective checks passed.\n";
