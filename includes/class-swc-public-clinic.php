@@ -11,19 +11,20 @@ final class SWC_Public_Clinic {
 	const CONTRACT_VERSION = '1.0.0';
 
 	/**
-	 * Return the bounded public clinic projection for a verified public doctor.
+	 * Return the bounded public clinic projection for an authoritative public
+	 * Doctor or Founder.
 	 *
 	 * File 08 owns this projection contract. Identity and profile values remain
 	 * authoritative in their native modules, while File 08 owns availability,
 	 * clinic presentation assembly, and the decision to expose a clinic section.
 	 *
-	 * @param int $user_id Doctor user ID.
+	 * @param int $user_id WordPress user ID.
 	 * @return array<string,mixed>
 	 */
 	public static function get( $user_id ) {
 		$user_id = absint( $user_id );
 		$user    = $user_id ? get_userdata( $user_id ) : false;
-		if ( ! $user || ! SWC_Helpers::is_verified_doctor( $user_id ) || ! self::is_public_doctor( $user_id ) ) {
+		if ( ! $user || ! SWC_Doctor_Authority::is_eligible( $user_id ) || ! self::is_public_practitioner( $user_id ) ) {
 			return array();
 		}
 
@@ -69,7 +70,7 @@ final class SWC_Public_Clinic {
 		 * widened, fields cannot be created, and canonical values cannot be replaced.
 		 *
 		 * @param array<string,string> $clinic  Canonical bounded clinic fields.
-		 * @param int                  $user_id Doctor user ID.
+		 * @param int                  $user_id WordPress user ID.
 		 */
 		$filtered = apply_filters( 'swc_public_clinic_projection', $clinic, $user_id );
 		$filtered = is_array( $filtered ) ? $filtered : array();
@@ -82,8 +83,7 @@ final class SWC_Public_Clinic {
 			if ( ! array_key_exists( $field, $clinic ) || ! array_key_exists( $field, $filtered ) || ! is_scalar( $filtered[ $field ] ) ) {
 				continue;
 			}
-			$allow = (bool) $filtered[ $field ];
-			if ( $allow ) {
+			if ( (bool) $filtered[ $field ] ) {
 				$public[ $field ] = $clinic[ $field ];
 			}
 		}
@@ -99,16 +99,17 @@ final class SWC_Public_Clinic {
 	/** @return array<string,mixed> */
 	public static function contract() {
 		return array(
-			'contract_version' => self::CONTRACT_VERSION,
-			'owner'            => 'file-08',
-			'visibility'       => 'verified-public-doctor-only',
-			'fields'           => array( 'name', 'address', 'country', 'city', 'hours', 'timezone' ),
-			'excludes'         => array( 'phone', 'whatsapp', 'email', 'user_id', 'native_id', 'appointments', 'patient_data' ),
-			'writes_data'      => false,
+			'contract_version'  => self::CONTRACT_VERSION,
+			'owner'             => 'file-08',
+			'visibility'        => 'authoritative-public-practitioner-only',
+			'authority_contract'=> SWC_Doctor_Authority::contract(),
+			'fields'            => array( 'name', 'address', 'country', 'city', 'hours', 'timezone' ),
+			'excludes'          => array( 'phone', 'whatsapp', 'email', 'user_id', 'native_id', 'appointments', 'patient_data' ),
+			'writes_data'       => false,
 		);
 	}
 
-	private static function is_public_doctor( $user_id ) {
+	private static function is_public_practitioner( $user_id ) {
 		if ( ! class_exists( 'SDD_Helpers' ) || ! method_exists( 'SDD_Helpers', 'is_public' ) || ! method_exists( 'SDD_Helpers', 'is_founder' ) ) {
 			return false;
 		}
