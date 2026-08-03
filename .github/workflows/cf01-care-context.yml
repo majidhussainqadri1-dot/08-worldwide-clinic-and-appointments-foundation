@@ -1,0 +1,165 @@
+name: File 08 CF-01 Care Context Integrity
+
+on:
+  pull_request:
+  push:
+    branches:
+      - codex/**
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: file08-cf01-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: PHP ${{ matrix.php }} source, contract and regression suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - '7.4'
+          - '8.3'
+    steps:
+      - name: Checkout exact immutable head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: none
+
+      - name: Public repository and Git integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test ! -f .gitmodules
+          if git ls-files -s | awk '$1 == "120000" { found=1 } END { exit !found }'; then
+            echo 'Symbolic links are prohibited.' >&2
+            exit 1
+          fi
+          if grep -RIl --exclude-dir=.git '^version https://git-lfs.github.com/spec/v1$' . | grep -q .; then
+            echo 'Git LFS pointer files are prohibited.' >&2
+            exit 1
+          fi
+          test -z "$(find . -type f \( -name '*.zip' -o -name '*.b64' -o -name '*.pem' -o -name '*.key' -o -name '.env' \) -not -path './.git/*' -not -path './build/*' -print -quit)"
+          python3 - <<'PY'
+          import pathlib, re, sys
+          patterns = {
+              'private key': rb'-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----',
+              'GitHub token': rb'\bgh[pousr]_[A-Za-z0-9]{20,}\b',
+              'AWS access key': rb'\bAKIA[0-9A-Z]{16}\b',
+              'JWT-like token': rb'\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b',
+          }
+          for path in pathlib.Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts or 'build' in path.parts:
+                  continue
+              data = path.read_bytes()
+              for label, pattern in patterns.items():
+                  if re.search(pattern, data):
+                      print(f'possible {label}: {path}', file=sys.stderr)
+                      raise SystemExit(1)
+          PY
+
+      - name: Verify release and bootstrap parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'Version: 0.2.2' worldwide-clinic.php
+          grep -q "define( 'SWC_VERSION', '0.2.2' )" worldwide-clinic.php
+          grep -q 'Stable tag: 0.2.2' readme.txt
+          grep -q "define( 'SWC_CF01_CARE_CONTEXT_VERSION', '1.0.0' )" worldwide-clinic.php
+          grep -q "class-swc-cf01-care-context.php" worldwide-clinic.php
+
+      - name: Lint plugin and runtime-test PHP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find . -type f -name '*.php' -not -path './build/*' -not -path './vendor/*' -print | sort)
+          test "${#files[@]}" -ge 18
+          for file in "${files[@]}"; do php -l "$file"; done
+
+      - name: Run inherited corrective suites
+        run: |
+          php tests/run.php
+          php tests/doctor-authority.php
+          php tests/public-clinic-projection.php
+          php tests/check-contrast.php
+
+      - name: Run CF-01 care-context suites
+        run: |
+          php tests/cf01-care-context-contract.php
+          php tests/cf01-care-context.php
+
+      - name: Record exact source evidence
+        run: sha256sum worldwide-clinic.php includes/class-swc-cf01-care-context.php CF01-CARE-CONTEXT-AND-EXTRACTION-INVENTORY.md tests/cf01-care-context-contract.php tests/cf01-care-context.php tools/build-development-candidate.php
+
+  package:
+    name: Deterministic File 08 0.2.2 candidate
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact immutable head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up PHP 8.3 with ZIP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: none
+          extensions: zip
+
+      - name: Resolve immutable source inputs
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "source_date_epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+          echo 'version=0.2.2' >> "$GITHUB_OUTPUT"
+
+      - name: Build candidate twice
+        run: |
+          php tools/build-development-candidate.php --output-dir=build/a --commit='${{ steps.source.outputs.commit_sha }}' --source-date-epoch='${{ steps.source.outputs.source_date_epoch }}'
+          php tools/build-development-candidate.php --output-dir=build/b --commit='${{ steps.source.outputs.commit_sha }}' --source-date-epoch='${{ steps.source.outputs.source_date_epoch }}'
+
+      - name: Verify reproducible package and manifest contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='08-worldwide-clinic-and-appointments-foundation-0.2.2-candidate'
+          cmp "build/a/${BASE}.zip" "build/b/${BASE}.zip"
+          cmp "build/a/${BASE}.sha256" "build/b/${BASE}.sha256"
+          cmp "build/a/${BASE}-manifest.json" "build/b/${BASE}-manifest.json"
+          grep -q '"cf01_care_context_contract": "1.0.0"' "build/a/${BASE}-manifest.json"
+          grep -q '"includes/class-swc-cf01-care-context.php"' "build/a/${BASE}-manifest.json"
+          cd build/a
+          sha256sum --check "${BASE}.sha256"
+
+      - name: Independently verify candidate
+        run: php tools/verify-development-candidate.php --artifact=build/a
+
+      - name: Upload governed candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: file-08-0.2.2-candidate-${{ steps.source.outputs.commit_sha }}
+          path: build/a/
+          if-no-files-found: error
+          retention-days: 14
