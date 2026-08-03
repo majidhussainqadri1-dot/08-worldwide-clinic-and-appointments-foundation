@@ -40,14 +40,15 @@ final class SWC_CF01_Care_Context {
 		$purpose        = sanitize_key( $purpose );
 		$now            = time();
 		$envelope       = array(
-			'contract'         => self::CONTRACT_NAME,
-			'contract_version' => self::CONTRACT_VERSION,
-			'producer_version' => defined( 'SWC_VERSION' ) ? SWC_VERSION : '',
-			'issued_at'        => gmdate( 'c', $now ),
-			'expires_at'       => gmdate( 'c', $now + self::ASSERTION_TTL ),
-			'purpose'          => $purpose,
-			'result'           => 'unknown',
-			'reason_code'      => 'context_unresolved',
+			'contract'          => self::CONTRACT_NAME,
+			'contract_version'  => self::CONTRACT_VERSION,
+			'producer_version'  => defined( 'SWC_VERSION' ) ? SWC_VERSION : '',
+			'issued_at'         => gmdate( 'c', $now ),
+			'expires_at'        => gmdate( 'c', $now + self::ASSERTION_TTL ),
+			'purpose'           => $purpose,
+			'actor_subject_uuid'=> '',
+			'result'            => 'unknown',
+			'reason_code'       => 'context_unresolved',
 		);
 
 		if ( ! in_array( $purpose, self::$purposes, true ) ) {
@@ -79,6 +80,7 @@ final class SWC_CF01_Care_Context {
 			$envelope['reason_code'] = 'actor_membership_not_eligible';
 			return $envelope;
 		}
+		$envelope['actor_subject_uuid'] = (string) $actor['subject']['platform_uuid'];
 
 		$record_version = SWC_Helpers::record_version( $appointment_id );
 		if ( $expected_version && $record_version !== absint( $expected_version ) ) {
@@ -157,7 +159,7 @@ final class SWC_CF01_Care_Context {
 		return defined( 'SMC_VERSION' )
 			&& version_compare( (string) SMC_VERSION, self::FILE_00_MIN_VERSION, '>=' )
 			&& defined( 'SMC_CF01_CONTRACT_VERSION' )
-			&& version_compare( (string) SMC_CF01_CONTRACT_VERSION, self::FILE_00_CONTRACT, '>=' )
+			&& 0 === version_compare( (string) SMC_CF01_CONTRACT_VERSION, self::FILE_00_CONTRACT )
 			&& class_exists( 'SMC_CF01_Contract' )
 			&& is_callable( array( 'SMC_CF01_Contract', 'membership_assertion' ) );
 	}
@@ -183,7 +185,7 @@ final class SWC_CF01_Care_Context {
 	private static function valid_subject_assertion( $assertion ) {
 		return is_array( $assertion )
 			&& 'smc.cf01.membership-assurance' === ( $assertion['contract'] ?? '' )
-			&& version_compare( (string) ( $assertion['contract_version'] ?? '' ), self::FILE_00_CONTRACT, '>=' )
+			&& 0 === version_compare( (string) ( $assertion['contract_version'] ?? '' ), self::FILE_00_CONTRACT )
 			&& in_array( $assertion['result'] ?? '', array( 'allow', 'deny' ), true )
 			&& self::valid_uuid( $assertion['subject']['platform_uuid'] ?? '' );
 	}
