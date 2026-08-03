@@ -69,6 +69,17 @@ final class SWC_CF01_Care_Context {
 			return $envelope;
 		}
 
+		$actor = self::subject_assertion( $actor_id );
+		if ( ! self::valid_subject_assertion( $actor ) ) {
+			$envelope['reason_code'] = 'actor_identity_assertion_unavailable';
+			return $envelope;
+		}
+		if ( 'allow' !== $actor['result'] ) {
+			$envelope['result'] = 'deny';
+			$envelope['reason_code'] = 'actor_membership_not_eligible';
+			return $envelope;
+		}
+
 		$record_version = SWC_Helpers::record_version( $appointment_id );
 		if ( $expected_version && $record_version !== absint( $expected_version ) ) {
 			$envelope['result'] = 'deny';
@@ -132,13 +143,13 @@ final class SWC_CF01_Care_Context {
 	/** @return array<string,mixed> */
 	public static function contract() {
 		return array(
-			'contract'                   => self::CONTRACT_NAME,
-			'contract_version'           => self::CONTRACT_VERSION,
-			'owner'                      => 'File 08',
-			'appointment_is_relationship'=> false,
-			'appointment_consent_scope'  => 'appointment_processing_only',
-			'clinical_narrative_returned'=> false,
-			'fail_closed'                => true,
+			'contract'                    => self::CONTRACT_NAME,
+			'contract_version'            => self::CONTRACT_VERSION,
+			'owner'                       => 'File 08',
+			'appointment_is_relationship' => false,
+			'appointment_consent_scope'   => 'appointment_processing_only',
+			'clinical_narrative_returned' => false,
+			'fail_closed'                 => true,
 		);
 	}
 
