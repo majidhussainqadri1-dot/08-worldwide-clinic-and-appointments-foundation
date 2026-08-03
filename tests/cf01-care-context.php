@@ -37,8 +37,9 @@ $GLOBALS['swc_test_meta']         = array(
 		'preferred_at_utc'  => '2026-08-01 09:00:00',
 	),
 );
-$GLOBALS['swc_test_post_author'] = array( 100 => 10, 101 => 10 );
-$GLOBALS['swc_test_users']       = array( 10 => true, 20 => true, 30 => true );
+$GLOBALS['swc_test_post_author']  = array( 100 => 10, 101 => 10 );
+$GLOBALS['swc_test_users']        = array( 10 => true, 20 => true, 30 => true );
+$GLOBALS['swc_test_denied_users'] = array();
 
 function absint( $value ) { return abs( (int) $value ); }
 function sanitize_key( $value ) { return strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', (string) $value ) ); }
@@ -70,7 +71,7 @@ final class SMC_CF01_Contract {
 		return array(
 			'contract'         => 'smc.cf01.membership-assurance',
 			'contract_version' => '1.0.0',
-			'result'           => 'allow',
+			'result'           => in_array( (int) $user_id, $GLOBALS['swc_test_denied_users'], true ) ? 'deny' : 'allow',
 			'reason_code'      => 'capability_allowed',
 			'subject'          => array( 'platform_uuid' => $uuid ),
 		);
@@ -106,9 +107,14 @@ swc_expect( 'deny' === $clinical['result'] && 'appointment_is_not_treating_relat
 $stale = SWC_CF01_Care_Context::assertion( 100, 10, 'appointment_context_read', 6 );
 swc_expect( 'deny' === $stale['result'] && 'stale_record_version' === $stale['reason_code'], 'Stale record version must fail closed.' );
 
+$GLOBALS['swc_test_denied_users'] = array( 10 );
+$suspended = SWC_CF01_Care_Context::assertion( 100, 10, 'appointment_context_read', 7 );
+swc_expect( 'deny' === $suspended['result'] && 'actor_membership_not_eligible' === $suspended['reason_code'], 'Current actor eligibility must be revalidated.' );
+$GLOBALS['swc_test_denied_users'] = array();
+
 $GLOBALS['swc_test_current_user'] = 30;
-$wrong_actor = SWC_CF01_Care_Context::assertion( 100, 30, 'appointment_context_read', 7 );
-swc_expect( 'allow' === $wrong_actor['result'], 'Authorized clinic administrator must receive scheduling context.' );
+$admin = SWC_CF01_Care_Context::assertion( 100, 30, 'appointment_context_read', 7 );
+swc_expect( 'allow' === $admin['result'], 'Authorized eligible clinic administrator must receive scheduling context.' );
 $GLOBALS['swc_test_current_user'] = 99;
 $unauthorized = SWC_CF01_Care_Context::assertion( 100, 99, 'appointment_context_read', 7 );
 swc_expect( 'deny' === $unauthorized['result'] && 'context_not_available' === $unauthorized['reason_code'], 'Unauthorized actor must fail without object detail.' );
@@ -123,6 +129,6 @@ swc_expect( 'unknown' === $unsupported['result'] && 'unsupported_purpose' === $u
 
 SMC_CF01_Contract::$available = false;
 $identity_missing = SWC_CF01_Care_Context::assertion( 100, 10, 'appointment_context_read', 7 );
-swc_expect( 'unknown' === $identity_missing['result'] && 'identity_assertion_unavailable' === $identity_missing['reason_code'], 'Unavailable identity assertion must fail unknown.' );
+swc_expect( 'unknown' === $identity_missing['result'] && 'actor_identity_assertion_unavailable' === $identity_missing['reason_code'], 'Unavailable actor identity assertion must fail unknown.' );
 
 echo "File 08 CF-01 care-context checks: 22 PASS, 0 FAIL\n";
