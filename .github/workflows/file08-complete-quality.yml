@@ -49,8 +49,11 @@ jobs:
       - id: source
         shell: bash
         run: |
+          set -euo pipefail
+          version=$(php -r '$source=file_get_contents("worldwide-clinic.php"); if(!is_string($source)||preg_match("/^\\s*\\* Version:\\s*([^\\s]+)/m",$source,$m)!==1){exit(1);} echo $m[1];')
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Build twice
         run: |
           php tools/build-candidate.php --output-dir=build/a --commit='${{ steps.source.outputs.sha }}' --source-date-epoch='${{ steps.source.outputs.epoch }}'
@@ -62,7 +65,7 @@ jobs:
         run: php tools/verify-candidate.php --artifact=build/a
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: file-08-1.0.0-candidate-${{ steps.source.outputs.sha }}
+          name: file-08-${{ steps.source.outputs.version }}-candidate-${{ steps.source.outputs.sha }}
           path: build/a/
           if-no-files-found: error
           retention-days: 30
