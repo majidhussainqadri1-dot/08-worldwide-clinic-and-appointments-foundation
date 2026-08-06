@@ -46,12 +46,33 @@ jobs:
       - name: Verify corrected source before commit
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           rm -rf .codex
-          find . -type f -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
-          node --check assets/js/clinic.js
-          php tests/run-all.php
-          git diff --check
+          mkdir -p four-review-diagnostics
+          status=0
+          find . -type f -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l > four-review-diagnostics/php-lint.log 2>&1 || status=$?
+          node --check assets/js/clinic.js > four-review-diagnostics/javascript.log 2>&1 || status=$?
+          php tests/contracts.php > four-review-diagnostics/contracts.log 2>&1 || status=$?
+          php tests/master-plan-contract.php > four-review-diagnostics/master-plan.log 2>&1 || status=$?
+          php tests/security-static.php > four-review-diagnostics/security.log 2>&1 || status=$?
+          php tests/four-review-regressions.php > four-review-diagnostics/four-review.log 2>&1 || status=$?
+          git diff --check > four-review-diagnostics/git-diff.log 2>&1 || status=$?
+          for file in four-review-diagnostics/*.log; do echo "===== ${file} ====="; cat "$file"; done
+          exit "$status"
+
+      - name: Upload verification diagnostic
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: file08-four-review-verification-diagnostic-${{ github.sha }}
+          path: four-review-diagnostics/
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Remove verification diagnostics
+        if: success()
+        shell: bash
+        run: rm -rf four-review-diagnostics
 
       - name: Commit corrected source
         shell: bash
