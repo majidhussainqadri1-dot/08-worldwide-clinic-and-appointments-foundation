@@ -38,12 +38,17 @@ jobs:
           cat /tmp/apply-four-reviews.log
           exit "$code"
 
+      - name: Stage transformer diagnostic
+        if: failure()
+        shell: bash
+        run: cp /tmp/apply-four-reviews.log ./apply-four-reviews.log
+
       - name: Upload transformer diagnostic
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: file08-four-review-transformer-diagnostic-${{ github.sha }}
-          path: /tmp/apply-four-reviews.log
+          path: apply-four-reviews.log
           if-no-files-found: error
           retention-days: 3
 
