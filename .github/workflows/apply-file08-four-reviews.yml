@@ -42,12 +42,14 @@ jobs:
               path.write_text(path.read_text().replace('1.0.0', '1.0.1'))
           path = Path('tests/four-review-regressions.php')
           lines = path.read_text().splitlines()
-          lines = [
-              "wca4_not_contains( 'includes/class-wca-service.php', \"'id'             => absint(\", 'no public clinic native ID' );"
-              if 'no public clinic native ID' in line else line
-              for line in lines
-          ]
-          path.write_text('\n'.join(lines) + '\n')
+          corrected = []
+          for line in lines:
+              if 'compensation-safe reschedule' in line:
+                  line = "wca4_contains( 'includes/class-wca-service.php', 'release_appointment_slot( $appointment_id, \\'released\\', $token )', 'compensation-safe reschedule' );"
+              elif 'no public clinic native ID' in line:
+                  line = "wca4_not_contains( 'includes/class-wca-service.php', \"'id'             => absint(\", 'no public clinic native ID' );"
+              corrected.append(line)
+          path.write_text('\n'.join(corrected) + '\n')
           PY
 
       - name: Set up PHP
