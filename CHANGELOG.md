@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — 2026-08-06
+
+- Completed four fresh review-and-correction rounds against the Definitive Master Plan 2026 v3.0, Comprehensive Master Plan 2026 v2.0 and File 08 Complete Master Plan 2026 v1.0.
+- Corrected clinic review/activation governance, actor and guardian authorization, cross-clinic scope, opaque public identifiers, atomic slot integrity, compensation-safe rescheduling and expiring review eligibility.
+- Added the plan guard, four-round regression evidence, schema `3.1.0` and deterministic runtime `1.0.1` release parity.
+
 ## 1.0.0 — 2026-08-06
 
 - Harmonized File 08 with the Complete Master Plan 2026 v1.0.
@@ -21,9 +27,3 @@
 ## 0.1.0
 
 - Original imported foundation preserved as baseline evidence.
-
-## 1.0.1 — 2026-08-06
-
-- Four complete review-and-correction rounds against all three governing plans and later superseding directives.
-- Corrected clinic review/activation governance, actor and guardian authorization, cross-clinic scope, opaque public IDs, atomic slot integrity, safe rescheduling and expiring review eligibility.
-- Added plan guard, regression evidence and deterministic 1.0.1 release parity.
