@@ -30,27 +30,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .codex/apply-four-reviews.py.gz.b64 | gzip -d > /tmp/apply-four-reviews.py
-          set +e
-          python3 /tmp/apply-four-reviews.py > /tmp/apply-four-reviews.log 2>&1
-          code=$?
-          set -e
-          cat /tmp/apply-four-reviews.log
-          exit "$code"
-
-      - name: Stage transformer diagnostic
-        if: failure()
-        shell: bash
-        run: cp /tmp/apply-four-reviews.log ./apply-four-reviews.log
-
-      - name: Upload transformer diagnostic
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: file08-four-review-transformer-diagnostic-${{ github.sha }}
-          path: apply-four-reviews.log
-          if-no-files-found: error
-          retention-days: 3
+          cat .codex/rev-part-* > /tmp/apply-four-reviews.b64
+          test "$(wc -c < /tmp/apply-four-reviews.b64)" -eq 15120
+          base64 -d /tmp/apply-four-reviews.b64 | gzip -d > /tmp/apply-four-reviews.py
+          python3 -m py_compile /tmp/apply-four-reviews.py
+          python3 /tmp/apply-four-reviews.py
 
       - name: Set up PHP
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
