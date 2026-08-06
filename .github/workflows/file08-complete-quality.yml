@@ -1,0 +1,68 @@
+name: File 08 Complete Master Plan Quality
+on:
+  push:
+    branches: [codex/file08-complete-master-plan-1.0.0]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: file08-complete-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    name: PHP ${{ matrix.php }} and source contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.3']
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '${{ matrix.php }}', coverage: none, extensions: zip}
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Master-plan, security and state tests
+        run: php tests/run-all.php
+      - name: JavaScript syntax
+        run: node --check assets/js/clinic.js
+      - name: Repository hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+  candidate:
+    name: Reproducible candidate package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: quality
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - id: source
+        shell: bash
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Build twice
+        run: |
+          php tools/build-candidate.php --output-dir=build/a --commit='${{ steps.source.outputs.sha }}' --source-date-epoch='${{ steps.source.outputs.epoch }}'
+          php tools/build-candidate.php --output-dir=build/b --commit='${{ steps.source.outputs.sha }}' --source-date-epoch='${{ steps.source.outputs.epoch }}'
+          cmp build/a/*-candidate.zip build/b/*-candidate.zip
+          cmp build/a/*-candidate-manifest.json build/b/*-candidate-manifest.json
+          cmp build/a/*-candidate.sha256 build/b/*-candidate.sha256
+      - name: Independent verification
+        run: php tools/verify-candidate.php --artifact=build/a
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: file-08-1.0.0-candidate-${{ steps.source.outputs.sha }}
+          path: build/a/
+          if-no-files-found: error
+          retention-days: 30
