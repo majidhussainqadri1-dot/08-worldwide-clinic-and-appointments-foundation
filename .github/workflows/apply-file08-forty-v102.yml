@@ -1,0 +1,66 @@
+name: Apply File 08 Forty Review Corrections
+
+on:
+  push:
+    branches:
+      - codex/file08-complete-master-plan-1.0.0
+    paths:
+      - .codex/forty-v102-trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: file08-forty-v102-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact completion branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-complete-master-plan-1.0.0
+          fetch-depth: 0
+
+      - name: Reconstruct and apply overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .codex/forty-v102/part-* > /tmp/file08-forty-v102.b64
+          test "$(wc -c < /tmp/file08-forty-v102.b64)" -eq 129396
+          base64 -d /tmp/file08-forty-v102.b64 > /tmp/file08-forty-v102.tar.gz
+          echo "0ab00935349f2deee02390a28dadde3a9a18e1e9f5ad02808e101eff6cea6944  /tmp/file08-forty-v102.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/file08-forty-v102.tar.gz -C .
+          rm -rf .codex
+          rm -f .github/workflows/apply-file08-forty-v102.yml
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          extensions: zip
+          coverage: none
+
+      - name: Verify corrected source
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+          node --check assets/js/clinic.js
+          php tests/run-all.php
+          git diff --check
+          test ! -e WCA-CANDIDATE-MANIFEST.json
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(file-08): complete forty sequential review and correction rounds"
+          git push origin HEAD:codex/file08-complete-master-plan-1.0.0
