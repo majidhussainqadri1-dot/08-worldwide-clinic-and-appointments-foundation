@@ -12,7 +12,7 @@ final class SWC_Plugin {
 	 * Register the complete runtime without taking ownership of File 20 navigation.
 	 */
 	public function run() {
-		load_plugin_textdomain( 'worldwide-clinic', false, dirname( plugin_basename( SWC_FILE ) ) . '/languages' );
+		load_plugin_textdomain( 'worldwide-clinic-appointments', false, dirname( plugin_basename( SWC_FILE ) ) . '/languages' );
 		SWC_Activator::maybe_upgrade();
 
 		( new SWC_Appointments() )->hooks();
@@ -44,7 +44,7 @@ final class SWC_Plugin {
 			'swcClinic',
 			array(
 				'browserTimezone' => wp_timezone_string(),
-				'reschedule'      => __( 'Reschedule fields are required for this status.', 'worldwide-clinic' ),
+				'reschedule'      => __( 'Reschedule fields are required for this status.', 'worldwide-clinic-appointments' ),
 			)
 		);
 	}

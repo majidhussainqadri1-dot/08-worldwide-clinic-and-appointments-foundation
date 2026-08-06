@@ -1,53 +1,163 @@
 (function () {
 	'use strict';
 
-	function toggleReschedule(form) {
-		var status = form.querySelector('select[name="status"]');
-		var box = form.querySelector('.swc-reschedule, .swc-admin-reschedule');
-		if (!status || !box) return;
-		var active = status.value === 'reschedule-requested';
-		box.hidden = !active;
-		box.querySelectorAll('input,select').forEach(function (field) {
-			field.required = active;
+	var runtime = window.wcaRuntime || window.swcClinic || {};
+	var restUrl = String(runtime.restUrl || '/wp-json/wca/v1/').replace(/\/?$/, '/');
+	var nonce = runtime.nonce || '';
+
+	function uuid() {
+		if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+			var r = Math.random() * 16 | 0;
+			return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
 		});
 	}
 
-	function syncConsultationModes() {
-		var doctor = document.getElementById('swc-doctor-select');
-		var mode = document.getElementById('swc-consultation-type');
-		if (!doctor || !mode) return;
-		var selected = doctor.options[doctor.selectedIndex];
-		var previous = mode.value;
-		Array.prototype.forEach.call(mode.options, function (option) {
-			if (!option.value) return;
-			var enabled = option.value === 'online' ? selected && selected.dataset.online === '1' : selected && selected.dataset.inPerson === '1';
-			option.disabled = !enabled;
-			option.hidden = !enabled;
-		});
-		if (!mode.querySelector('option[value="' + previous + '"]:not([disabled])')) mode.value = '';
-	}
-
-	function useBrowserTimezone() {
-		var select = document.getElementById('swc-patient-timezone');
-		if (!select || typeof Intl === 'undefined' || !Intl.DateTimeFormat) return;
-		try {
-			var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-			if (zone && select.querySelector('option[value="' + CSS.escape(zone) + '"]')) select.value = zone;
-		} catch (error) {
-			// Keep the server-selected safe fallback.
+	async function api(path, options) {
+		options = options || {};
+		var headers = Object.assign({'Accept': 'application/json'}, options.headers || {});
+		if (nonce) headers['X-WP-Nonce'] = nonce;
+		if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+		var response = await fetch(restUrl + String(path).replace(/^\//, ''), Object.assign({credentials: 'same-origin', headers: headers}, options));
+		var type = response.headers.get('content-type') || '';
+		var data = type.indexOf('json') !== -1 ? await response.json() : await response.text();
+		if (!response.ok) {
+			var message = data && data.message ? data.message : (runtime.i18n && runtime.i18n.error) || 'The request could not be completed.';
+			var error = new Error(message);
+			error.status = response.status;
+			error.data = data;
+			throw error;
 		}
+		return data;
+	}
+
+	function setStatus(root, message, isError) {
+		var node = root.querySelector('[data-wca-status]');
+		if (!node) return;
+		node.textContent = message || '';
+		node.classList.toggle('is-error', !!isError);
+		node.classList.toggle('is-success', !!message && !isError);
+	}
+
+	function query(form, name) {
+		var el = form.elements[name];
+		return el ? String(el.value || '').trim() : '';
+	}
+
+	function initBooking(root) {
+		var form = root.querySelector('[data-wca-booking-form]');
+		var searchButton = root.querySelector('[data-wca-search-slots]');
+		var slotsNode = root.querySelector('[data-wca-slots]');
+		if (!form || !searchButton || !slotsNode) return;
+		var selectedHold = null;
+
+		var tz = form.elements.timezone;
+		if (tz && (!tz.value || tz.value === 'UTC')) {
+			try { tz.value = Intl.DateTimeFormat().resolvedOptions().timeZone || tz.value; } catch (e) {}
+		}
+
+		searchButton.addEventListener('click', async function () {
+			setStatus(root, (runtime.i18n && runtime.i18n.loading) || 'Loading…', false);
+			slotsNode.replaceChildren();
+			selectedHold = null;
+			try {
+				var params = new URLSearchParams({
+					doctor_user_id: query(form, 'doctor_user_id'),
+					service_id: query(form, 'service_id'),
+					date_from: query(form, 'date_from'),
+					date_to: query(form, 'date_from'),
+					timezone: query(form, 'timezone'),
+					limit: '48'
+				});
+				var result = await api('slots?' + params.toString());
+				if (!result.slots || !result.slots.length) {
+					slotsNode.textContent = 'No available times were found.';
+					setStatus(root, '', false);
+					return;
+				}
+				result.slots.forEach(function (slot) {
+					var button = document.createElement('button');
+					button.type = 'button';
+					button.className = 'wca-slot';
+					button.textContent = slot.display_start || slot.start_local || slot.start_utc;
+					button.setAttribute('aria-pressed', 'false');
+					button.addEventListener('click', async function () {
+						Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) { item.setAttribute('aria-pressed', 'false'); });
+						button.disabled = true;
+						try {
+							selectedHold = await api('slot-holds', {method: 'POST', body: JSON.stringify({
+								clinic_id: Number(root.dataset.clinicId || 0),
+								service_id: Number(query(form, 'service_id') || 0),
+								doctor_user_id: Number(query(form, 'doctor_user_id') || 0),
+								start_utc: slot.start_utc,
+								end_utc: slot.end_utc,
+								idempotency_key: uuid()
+							})});
+							button.setAttribute('aria-pressed', 'true');
+							setStatus(root, 'Time reserved temporarily. Complete your request now.', false);
+						} catch (error) {
+							setStatus(root, error.message, true);
+						} finally { button.disabled = false; }
+					});
+					slotsNode.appendChild(button);
+				});
+				setStatus(root, 'Choose an available time.', false);
+			} catch (error) { setStatus(root, error.message, true); }
+		});
+
+		form.addEventListener('submit', async function (event) {
+			event.preventDefault();
+			if (!form.reportValidity()) return;
+			if (!selectedHold || !selectedHold.hold_token) {
+				setStatus(root, 'Choose and reserve an available time first.', true);
+				return;
+			}
+			var submit = form.querySelector('[type="submit"]');
+			submit.disabled = true;
+			try {
+				var result = await api('appointments', {method: 'POST', body: JSON.stringify({
+					hold_token: selectedHold.hold_token,
+					idempotency_key: uuid(),
+					timezone: query(form, 'timezone'),
+					category: query(form, 'category'),
+					reason: query(form, 'reason'),
+					telehealth_consent: true,
+					privacy_consent: true,
+					emergency_acknowledged: true
+				})});
+				setStatus(root, 'Appointment request submitted. Reference: ' + result.public_ref, false);
+				form.reset();
+				slotsNode.replaceChildren();
+				selectedHold = null;
+			} catch (error) { setStatus(root, error.message, true); }
+			finally { submit.disabled = false; }
+		});
+	}
+
+	function initAppointment(card) {
+		Array.prototype.forEach.call(card.querySelectorAll('[data-wca-transition]'), function (button) {
+			button.addEventListener('click', async function () {
+				var next = button.dataset.wcaTransition;
+				if (!window.confirm('Continue with “' + next.replace(/_/g, ' ') + '”?')) return;
+				button.disabled = true;
+				try {
+					var result = await api('appointments/' + encodeURIComponent(card.dataset.wcaAppointmentId) + '/transitions', {method: 'POST', body: JSON.stringify({
+						next_status: next,
+						expected_status: card.dataset.wcaStatus,
+						expected_version: Number(card.dataset.wcaVersion || 0),
+						reason_code: 'user_action'
+					})});
+					card.dataset.wcaStatus = result.status;
+					card.dataset.wcaVersion = result.version;
+					setStatus(card, 'Appointment updated to ' + result.status.replace(/_/g, ' ') + '.', false);
+					window.setTimeout(function () { window.location.reload(); }, 700);
+				} catch (error) { setStatus(card, error.message, true); button.disabled = false; }
+			});
+		});
 	}
 
 	document.addEventListener('DOMContentLoaded', function () {
-		document.querySelectorAll('.swc-doctor-form, .swc-admin td form').forEach(function (form) {
-			var status = form.querySelector('select[name="status"]');
-			if (!status) return;
-			status.addEventListener('change', function () { toggleReschedule(form); });
-			toggleReschedule(form);
-		});
-		var doctor = document.getElementById('swc-doctor-select');
-		if (doctor) doctor.addEventListener('change', syncConsultationModes);
-		syncConsultationModes();
-		useBrowserTimezone();
+		Array.prototype.forEach.call(document.querySelectorAll('[data-wca-booking]'), initBooking);
+		Array.prototype.forEach.call(document.querySelectorAll('[data-wca-appointment-id]'), initAppointment);
 	});
 }());

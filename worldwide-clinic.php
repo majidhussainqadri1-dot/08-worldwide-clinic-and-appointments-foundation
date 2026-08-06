@@ -1,52 +1,83 @@
 <?php
 /**
- * Plugin Name: Worldwide Clinic and Appointments Foundation
+ * Plugin Name: Worldwide Clinic and Appointments
  * Plugin URI: https://www.sabrihomeopathy.com/
- * Description: Privacy-safe worldwide clinic discovery, enforceable doctor availability, appointment requests, role-based dashboards, audited scheduling, unified notifications, and a versioned CF-01 scheduling-context contract.
- * Version: 0.2.2
- * Requires at least: 6.0
+ * Description: Canonical worldwide clinic identity, branches, services, fees, availability, slot holds, appointments, consent, lifecycle, notifications, calendar, complaints, review eligibility, privacy, observability, migration and secure clinical boundaries for the Sabri Social Homeopathy Platform.
+ * Version: 1.0.0
+ * Requires at least: 6.6
  * Requires PHP: 7.4
  * Author: Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
  * License: GPL-2.0-or-later
- * Text Domain: worldwide-clinic
+ * Text Domain: worldwide-clinic-appointments
  * Domain Path: /languages
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'SWC_VERSION', '0.2.2' );
-define( 'SWC_PUBLIC_CLINIC_CONTRACT_VERSION', '1.0.0' );
-define( 'SWC_CF01_CARE_CONTEXT_VERSION', '1.0.0' );
-define( 'SWC_FILE', __FILE__ );
-define( 'SWC_DIR', plugin_dir_path( __FILE__ ) );
-define( 'SWC_URL', plugin_dir_url( __FILE__ ) );
+define( 'WCA_VERSION', '1.0.0' );
+define( 'WCA_FILE', __FILE__ );
+define( 'WCA_DIR', plugin_dir_path( __FILE__ ) );
+define( 'WCA_URL', plugin_dir_url( __FILE__ ) );
 
-require_once SWC_DIR . 'includes/class-swc-helpers.php';
-require_once SWC_DIR . 'includes/class-swc-doctor-authority.php';
-require_once SWC_DIR . 'includes/class-swc-public-clinic.php';
-require_once SWC_DIR . 'includes/class-swc-cf01-care-context.php';
-require_once SWC_DIR . 'includes/class-swc-activator.php';
-require_once SWC_DIR . 'includes/class-swc-appointments.php';
-require_once SWC_DIR . 'includes/class-swc-frontend.php';
-require_once SWC_DIR . 'includes/class-swc-admin.php';
-require_once SWC_DIR . 'includes/class-swc-privacy.php';
-require_once SWC_DIR . 'includes/class-swc-plugin.php';
+// Stable compatibility aliases for the audited 0.2.x foundation.
+define( 'SWC_VERSION', WCA_VERSION );
+define( 'SWC_PUBLIC_CLINIC_CONTRACT_VERSION', '1.1.0' );
+define( 'SWC_CF01_CARE_CONTEXT_VERSION', '1.1.0' );
+define( 'SWC_FILE', WCA_FILE );
+define( 'SWC_DIR', WCA_DIR );
+define( 'SWC_URL', WCA_URL );
 
-register_activation_hook( SWC_FILE, array( 'SWC_Activator', 'activate' ) );
-register_deactivation_hook( SWC_FILE, array( 'SWC_Activator', 'deactivate' ) );
+$wca_files = array(
+	'includes/class-wca-contracts.php',
+	'includes/class-wca-schema.php',
+	'includes/class-wca-observability.php',
+	'includes/class-swc-helpers.php',
+	'includes/class-swc-doctor-authority.php',
+	'includes/class-wca-authorization.php',
+	'includes/class-wca-repository.php',
+	'includes/class-wca-service.php',
+	'includes/class-wca-compatibility.php',
+	'includes/class-wca-outbox.php',
+	'includes/class-wca-privacy.php',
+	'includes/class-wca-rest.php',
+	'includes/class-wca-routes.php',
+	'includes/class-wca-frontend.php',
+	'includes/class-wca-admin.php',
+	'includes/class-wca-cli.php',
+	'includes/class-wca-plugin.php',
+	'includes/class-swc-public-clinic.php',
+	'includes/class-swc-cf01-care-context.php',
+	'includes/class-swc-activator.php',
+	'includes/class-swc-appointments.php',
+	'includes/class-swc-frontend.php',
+	'includes/class-swc-admin.php',
+	'includes/class-swc-privacy.php',
+	'includes/class-swc-plugin.php',
+);
+foreach ( $wca_files as $wca_relative_file ) {
+	require_once WCA_DIR . $wca_relative_file;
+}
+unset( $wca_files, $wca_relative_file );
 
-function swc_start_plugin() {
-	if ( SWC_Activator::dependencies_ready() ) {
-		( new SWC_Plugin() )->run();
+register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) );
+register_deactivation_hook( WCA_FILE, array( 'SWC_Activator', 'deactivate' ) );
+
+function wca_start_plugin() {
+	if ( ! SWC_Activator::dependencies_ready() ) {
+		add_action( 'admin_notices', function () {
+			if ( current_user_can( 'activate_plugins' ) ) {
+				echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic:', 'worldwide-clinic-appointments' ) . '</strong> ' . esc_html( SWC_Activator::dependency_message() ) . '</p></div>';
+			}
+		} );
 		return;
 	}
-	add_action(
-		'admin_notices',
-		function () {
-			if ( current_user_can( 'activate_plugins' ) ) {
-				echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic:', 'worldwide-clinic' ) . '</strong> ' . esc_html( SWC_Activator::dependency_message() ) . '</p></div>';
-			}
-		}
-	);
+	SWC_Activator::maybe_upgrade();
+	WCA_Plugin::boot();
+	( new SWC_Plugin() )->run();
 }
-add_action( 'plugins_loaded', 'swc_start_plugin', 30 );
+add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
+
+/** Canonical public contract helpers for cross-file consumers. */
+function wca_contract_manifest() { return WCA_Contracts::contract_manifest(); }
+function wca_get_public_clinic_projection( $id_or_slug ) { return WCA_Service::public_clinic_projection( $id_or_slug ); }
+function wca_get_cf01_scheduling_context( $appointment_id, $actor_user_id = 0 ) { return swc_get_cf01_care_context( $appointment_id, $actor_user_id ); }

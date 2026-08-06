@@ -17,8 +17,8 @@ final class SWC_Privacy {
 	}
 
 	public function exporters( $exporters ) {
-		$exporters['worldwide-clinic'] = array(
-			'exporter_friendly_name' => __( 'Worldwide Clinic Appointments', 'worldwide-clinic' ),
+		$exporters['worldwide-clinic-appointments'] = array(
+			'exporter_friendly_name' => __( 'Worldwide Clinic Appointments', 'worldwide-clinic-appointments' ),
 			'callback'               => array( $this, 'export' ),
 		);
 		return $exporters;
@@ -37,34 +37,34 @@ final class SWC_Privacy {
 			$is_patient = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ) === $user->ID;
 			$is_doctor  = absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) === $user->ID;
 			$fields     = array(
-				__( 'Appointment reference', 'worldwide-clinic' )      => $appointment_id,
-				__( 'Relationship', 'worldwide-clinic' )               => $is_patient ? __( 'Patient', 'worldwide-clinic' ) : ( $is_doctor ? __( 'Doctor', 'worldwide-clinic' ) : __( 'Proposed doctor', 'worldwide-clinic' ) ),
-				__( 'Status', 'worldwide-clinic' )                     => SWC_Helpers::statuses()[ SWC_Helpers::status( $appointment_id ) ],
-				__( 'Patient user ID', 'worldwide-clinic' )            => SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ),
-				__( 'Doctor user ID', 'worldwide-clinic' )             => SWC_Helpers::meta( $appointment_id, 'doctor_id' ),
-				__( 'Proposed doctor user ID', 'worldwide-clinic' )    => SWC_Helpers::meta( $appointment_id, 'proposed_doctor_id' ),
-				__( 'Consultation type', 'worldwide-clinic' )          => SWC_Helpers::meta( $appointment_id, 'consultation_type' ),
-				__( 'Appointment time UTC', 'worldwide-clinic' )       => SWC_Helpers::meta( $appointment_id, 'preferred_at_utc' ),
-				__( 'Patient time zone', 'worldwide-clinic' )          => SWC_Helpers::meta( $appointment_id, 'patient_timezone' ),
-				__( 'Proposed time UTC', 'worldwide-clinic' )          => SWC_Helpers::meta( $appointment_id, 'proposed_at_utc' ),
-				__( 'Proposed time zone', 'worldwide-clinic' )         => SWC_Helpers::meta( $appointment_id, 'proposed_timezone' ),
-				__( 'Proposal expiry UTC', 'worldwide-clinic' )        => SWC_Helpers::meta( $appointment_id, 'proposed_expires_at' ),
-				__( 'Reassignment expiry UTC', 'worldwide-clinic' )    => SWC_Helpers::meta( $appointment_id, 'reassignment_expires_at' ),
-				__( 'Country', 'worldwide-clinic' )                    => SWC_Helpers::meta( $appointment_id, 'country' ),
-				__( 'City', 'worldwide-clinic' )                       => SWC_Helpers::meta( $appointment_id, 'city' ),
-				__( 'Phone', 'worldwide-clinic' )                      => SWC_Helpers::meta( $appointment_id, 'phone' ),
-				__( 'WhatsApp', 'worldwide-clinic' )                   => SWC_Helpers::meta( $appointment_id, 'whatsapp' ),
-				__( 'Reason', 'worldwide-clinic' )                     => SWC_Helpers::meta( $appointment_id, 'reason' ),
-				__( 'Duration of concern', 'worldwide-clinic' )        => SWC_Helpers::meta( $appointment_id, 'concern_duration' ),
-				__( 'Appointment duration minutes', 'worldwide-clinic' ) => SWC_Helpers::meta( $appointment_id, 'appointment_duration' ),
-				__( 'Consent recorded UTC', 'worldwide-clinic' )       => SWC_Helpers::meta( $appointment_id, 'consent_at' ),
-				__( 'Consent version', 'worldwide-clinic' )            => SWC_Helpers::meta( $appointment_id, 'consent_version' ),
-				__( 'Patient-visible message', 'worldwide-clinic' )    => SWC_Helpers::meta( $appointment_id, 'patient_message' ),
-				__( 'Reassignment reason', 'worldwide-clinic' )        => SWC_Helpers::meta( $appointment_id, 'reassignment_reason' ),
-				__( 'Record version', 'worldwide-clinic' )             => SWC_Helpers::record_version( $appointment_id ),
+				__( 'Appointment reference', 'worldwide-clinic-appointments' )      => $appointment_id,
+				__( 'Relationship', 'worldwide-clinic-appointments' )               => $is_patient ? __( 'Patient', 'worldwide-clinic-appointments' ) : ( $is_doctor ? __( 'Doctor', 'worldwide-clinic-appointments' ) : __( 'Proposed doctor', 'worldwide-clinic-appointments' ) ),
+				__( 'Status', 'worldwide-clinic-appointments' )                     => SWC_Helpers::statuses()[ SWC_Helpers::status( $appointment_id ) ],
+				__( 'Patient user ID', 'worldwide-clinic-appointments' )            => SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ),
+				__( 'Doctor user ID', 'worldwide-clinic-appointments' )             => SWC_Helpers::meta( $appointment_id, 'doctor_id' ),
+				__( 'Proposed doctor user ID', 'worldwide-clinic-appointments' )    => SWC_Helpers::meta( $appointment_id, 'proposed_doctor_id' ),
+				__( 'Consultation type', 'worldwide-clinic-appointments' )          => SWC_Helpers::meta( $appointment_id, 'consultation_type' ),
+				__( 'Appointment time UTC', 'worldwide-clinic-appointments' )       => SWC_Helpers::meta( $appointment_id, 'preferred_at_utc' ),
+				__( 'Patient time zone', 'worldwide-clinic-appointments' )          => SWC_Helpers::meta( $appointment_id, 'patient_timezone' ),
+				__( 'Proposed time UTC', 'worldwide-clinic-appointments' )          => SWC_Helpers::meta( $appointment_id, 'proposed_at_utc' ),
+				__( 'Proposed time zone', 'worldwide-clinic-appointments' )         => SWC_Helpers::meta( $appointment_id, 'proposed_timezone' ),
+				__( 'Proposal expiry UTC', 'worldwide-clinic-appointments' )        => SWC_Helpers::meta( $appointment_id, 'proposed_expires_at' ),
+				__( 'Reassignment expiry UTC', 'worldwide-clinic-appointments' )    => SWC_Helpers::meta( $appointment_id, 'reassignment_expires_at' ),
+				__( 'Country', 'worldwide-clinic-appointments' )                    => SWC_Helpers::meta( $appointment_id, 'country' ),
+				__( 'City', 'worldwide-clinic-appointments' )                       => SWC_Helpers::meta( $appointment_id, 'city' ),
+				__( 'Phone', 'worldwide-clinic-appointments' )                      => SWC_Helpers::meta( $appointment_id, 'phone' ),
+				__( 'WhatsApp', 'worldwide-clinic-appointments' )                   => SWC_Helpers::meta( $appointment_id, 'whatsapp' ),
+				__( 'Reason', 'worldwide-clinic-appointments' )                     => SWC_Helpers::meta( $appointment_id, 'reason' ),
+				__( 'Duration of concern', 'worldwide-clinic-appointments' )        => SWC_Helpers::meta( $appointment_id, 'concern_duration' ),
+				__( 'Appointment duration minutes', 'worldwide-clinic-appointments' ) => SWC_Helpers::meta( $appointment_id, 'appointment_duration' ),
+				__( 'Consent recorded UTC', 'worldwide-clinic-appointments' )       => SWC_Helpers::meta( $appointment_id, 'consent_at' ),
+				__( 'Consent version', 'worldwide-clinic-appointments' )            => SWC_Helpers::meta( $appointment_id, 'consent_version' ),
+				__( 'Patient-visible message', 'worldwide-clinic-appointments' )    => SWC_Helpers::meta( $appointment_id, 'patient_message' ),
+				__( 'Reassignment reason', 'worldwide-clinic-appointments' )        => SWC_Helpers::meta( $appointment_id, 'reassignment_reason' ),
+				__( 'Record version', 'worldwide-clinic-appointments' )             => SWC_Helpers::record_version( $appointment_id ),
 			);
 			if ( $is_doctor ) {
-				$fields[ __( 'Private doctor/administrator note', 'worldwide-clinic' ) ] = SWC_Helpers::meta( $appointment_id, 'doctor_private_note' );
+				$fields[ __( 'Private doctor/administrator note', 'worldwide-clinic-appointments' ) ] = SWC_Helpers::meta( $appointment_id, 'doctor_private_note' );
 			}
 			$audit = array();
 			foreach ( SWC_Helpers::audit_rows( $appointment_id ) as $row ) {
@@ -78,14 +78,14 @@ final class SWC_Privacy {
 					'reason'         => absint( $row->actor_id ) === $user->ID ? $row->reason : '',
 				);
 			}
-			$fields[ __( 'Audit history', 'worldwide-clinic' ) ] = wp_json_encode( $audit, JSON_PRETTY_PRINT );
+			$fields[ __( 'Audit history', 'worldwide-clinic-appointments' ) ] = wp_json_encode( $audit, JSON_PRETTY_PRINT );
 			$rows = array();
 			foreach ( $fields as $name => $value ) {
 				$rows[] = array( 'name' => (string) $name, 'value' => is_scalar( $value ) ? (string) $value : wp_json_encode( $value ) );
 			}
 			$data[] = array(
-				'group_id'    => 'worldwide-clinic',
-				'group_label' => __( 'Worldwide Clinic Appointments', 'worldwide-clinic' ),
+				'group_id'    => 'worldwide-clinic-appointments',
+				'group_label' => __( 'Worldwide Clinic Appointments', 'worldwide-clinic-appointments' ),
 				'item_id'     => 'appointment-' . $appointment_id,
 				'data'        => $rows,
 			);
@@ -94,8 +94,8 @@ final class SWC_Privacy {
 	}
 
 	public function erasers( $erasers ) {
-		$erasers['worldwide-clinic'] = array(
-			'eraser_friendly_name' => __( 'Worldwide Clinic Appointments', 'worldwide-clinic' ),
+		$erasers['worldwide-clinic-appointments'] = array(
+			'eraser_friendly_name' => __( 'Worldwide Clinic Appointments', 'worldwide-clinic-appointments' ),
 			'callback'             => array( $this, 'erase' ),
 		);
 		return $erasers;
@@ -155,7 +155,7 @@ final class SWC_Privacy {
 		return array(
 			'items_removed'  => $removed,
 			'items_retained' => $retained,
-			'messages'       => $retained ? array( __( 'A minimal anonymized appointment and status record was retained for integrity, security, and accountability. Direct identifiers, contact details, private notes, consent details, scheduling times, and user-linked audit content were removed.', 'worldwide-clinic' ) ) : array(),
+			'messages'       => $retained ? array( __( 'A minimal anonymized appointment and status record was retained for integrity, security, and accountability. Direct identifiers, contact details, private notes, consent details, scheduling times, and user-linked audit content were removed.', 'worldwide-clinic-appointments' ) ) : array(),
 			'done'           => $done,
 		);
 	}
@@ -198,8 +198,8 @@ final class SWC_Privacy {
 	public function policy() {
 		if ( function_exists( 'wp_add_privacy_policy_content' ) ) {
 			wp_add_privacy_policy_content(
-				__( 'Worldwide Clinic', 'worldwide-clinic' ),
-				'<p class="privacy-policy-tutorial">' . esc_html__( 'The clinic module processes a selected doctor, appointment time, time zone, consultation method, location, phone and WhatsApp details, a brief consultation reason, consent records, status transitions, patient-visible messages, private doctor/administrator notes, reassignment proposals, notification delivery state, and structured audit history. Access is limited by ownership and dedicated capabilities. Private notes are never shown to patients. Privacy requests remove direct identifiers and sensitive scheduling content while retaining only a minimal anonymized integrity record when required.', 'worldwide-clinic' ) . '</p>'
+				__( 'Worldwide Clinic', 'worldwide-clinic-appointments' ),
+				'<p class="privacy-policy-tutorial">' . esc_html__( 'The clinic module processes a selected doctor, appointment time, time zone, consultation method, location, phone and WhatsApp details, a brief consultation reason, consent records, status transitions, patient-visible messages, private doctor/administrator notes, reassignment proposals, notification delivery state, and structured audit history. Access is limited by ownership and dedicated capabilities. Private notes are never shown to patients. Privacy requests remove direct identifiers and sensitive scheduling content while retaining only a minimal anonymized integrity record when required.', 'worldwide-clinic-appointments' ) . '</p>'
 			);
 		}
 	}

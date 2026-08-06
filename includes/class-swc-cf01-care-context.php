@@ -204,10 +204,10 @@ final class SWC_CF01_Care_Context {
 	}
 
 	private static function context_state( $status ) {
-		if ( in_array( $status, array( 'requested', 'under-review', 'reschedule-requested' ), true ) ) {
+		if ( in_array( $status, array( 'requested', 'requested', 'reschedule_pending' ), true ) ) {
 			return 'proposed';
 		}
-		if ( 'accepted' === $status ) {
+		if ( 'confirmed' === $status ) {
 			return 'scheduled';
 		}
 		if ( 'completed' === $status ) {
@@ -217,7 +217,7 @@ final class SWC_CF01_Care_Context {
 	}
 
 	private static function relationship_state( $status ) {
-		if ( 'accepted' === $status ) {
+		if ( 'confirmed' === $status ) {
 			return 'scheduled_contact';
 		}
 		if ( 'completed' === $status ) {
@@ -230,7 +230,7 @@ final class SWC_CF01_Care_Context {
 	}
 
 	private static function scheduled_time( $appointment_id, $status ) {
-		if ( ! in_array( $status, array( 'accepted', 'completed' ), true ) ) {
+		if ( ! in_array( $status, array( 'confirmed', 'completed' ), true ) ) {
 			return '';
 		}
 		$value = (string) SWC_Helpers::meta( $appointment_id, 'preferred_at_utc' );

@@ -16,59 +16,29 @@ final class SWC_Helpers {
 	 * @return array<string,string>
 	 */
 	public static function statuses() {
-		return array(
-			'requested'            => __( 'Requested', 'worldwide-clinic' ),
-			'under-review'         => __( 'Under Review', 'worldwide-clinic' ),
-			'accepted'             => __( 'Accepted', 'worldwide-clinic' ),
-			'reschedule-requested' => __( 'Reschedule Requested', 'worldwide-clinic' ),
-			'declined'             => __( 'Declined', 'worldwide-clinic' ),
-			'cancelled'            => __( 'Cancelled', 'worldwide-clinic' ),
-			'completed'            => __( 'Completed', 'worldwide-clinic' ),
-		);
+		$labels = WCA_Contracts::appointment_statuses();
+		foreach ( $labels as $key => $label ) {
+			$labels[ $key ] = __( $label, 'worldwide-clinic-appointments' );
+		}
+		return apply_filters( 'swc_statuses', $labels );
 	}
 
-	/**
-	 * Actor-specific state transition matrix.
-	 * Terminal states are intentionally immutable.
-	 *
-	 * @return array<string,array<string,array<int,string>>>
-	 */
+	/** Canonical actor-specific state law. */
 	public static function transition_matrix() {
-		return array(
-			'patient' => array(
-				'requested'            => array( 'cancelled' ),
-				'under-review'         => array( 'cancelled' ),
-				'accepted'             => array( 'cancelled' ),
-				'reschedule-requested' => array( 'accepted', 'cancelled' ),
-			),
-			'doctor'  => array(
-				'requested'            => array( 'under-review', 'accepted', 'reschedule-requested', 'declined' ),
-				'under-review'         => array( 'accepted', 'reschedule-requested', 'declined' ),
-				'accepted'             => array( 'reschedule-requested', 'completed' ),
-				'reschedule-requested' => array( 'reschedule-requested', 'declined' ),
-			),
-			'admin'   => array(
-				'requested'            => array( 'under-review', 'accepted', 'reschedule-requested', 'declined', 'cancelled' ),
-				'under-review'         => array( 'accepted', 'reschedule-requested', 'declined', 'cancelled' ),
-				'accepted'             => array( 'reschedule-requested', 'completed', 'cancelled' ),
-				'reschedule-requested' => array( 'accepted', 'reschedule-requested', 'declined', 'cancelled' ),
-			),
-		);
+		return apply_filters( 'swc_status_transition_matrix', WCA_Contracts::transition_matrix() );
 	}
 
 	public static function allowed_transitions( $actor, $current ) {
-		$matrix = self::transition_matrix();
-		return isset( $matrix[ $actor ][ $current ] ) ? $matrix[ $actor ][ $current ] : array();
+		return WCA_Contracts::allowed_transitions( $actor, $current );
 	}
 
 	public static function can_transition( $actor, $current, $next ) {
-		return in_array( $next, self::allowed_transitions( $actor, $current ), true );
+		return WCA_Contracts::can_transition( $actor, $current, $next );
 	}
 
 	public static function status( $id ) {
-		$status = get_post_meta( absint( $id ), '_swc_status', true );
-		$all    = self::statuses();
-		return isset( $all[ $status ] ) ? $status : 'requested';
+		$status = (string) get_post_meta( absint( $id ), '_swc_status', true );
+		return WCA_Contracts::normalize_appointment_status( $status );
 	}
 
 	public static function meta( $id, $key, $default = '' ) {
@@ -235,17 +205,17 @@ final class SWC_Helpers {
 
 	public static function display_time( $utc, $timezone ) {
 		if ( ! $utc || ! self::valid_timezone( $timezone ) ) {
-			return __( 'Not scheduled', 'worldwide-clinic' );
+			return __( 'Not scheduled', 'worldwide-clinic-appointments' );
 		}
 		try {
 			$dt = DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', (string) $utc, new DateTimeZone( 'UTC' ) );
 			$er = DateTimeImmutable::getLastErrors();
 			if ( ! $dt || ( is_array( $er ) && ( $er['warning_count'] || $er['error_count'] ) ) ) {
-				return __( 'Time unavailable', 'worldwide-clinic' );
+				return __( 'Time unavailable', 'worldwide-clinic-appointments' );
 			}
 			return $dt->setTimezone( new DateTimeZone( $timezone ) )->format( 'M j, Y · g:i A' ) . ' (' . $timezone . ')';
 		} catch ( Exception $e ) {
-			return __( 'Time unavailable', 'worldwide-clinic' );
+			return __( 'Time unavailable', 'worldwide-clinic-appointments' );
 		}
 	}
 
@@ -410,7 +380,7 @@ final class SWC_Helpers {
 		}
 		$sql = "SELECT p.ID, t.meta_value AS appointment_time, d.meta_value AS appointment_duration
 			FROM {$wpdb->posts} p
-			INNER JOIN {$wpdb->postmeta} s ON s.post_id=p.ID AND s.meta_key='_swc_status' AND s.meta_value='accepted'
+			INNER JOIN {$wpdb->postmeta} s ON s.post_id=p.ID AND s.meta_key='_swc_status' AND s.meta_value IN ('confirmed','checked_in','reschedule_pending')
 			INNER JOIN {$wpdb->postmeta} doc ON doc.post_id=p.ID AND doc.meta_key='_swc_doctor_id' AND doc.meta_value=%d
 			INNER JOIN {$wpdb->postmeta} t ON t.post_id=p.ID AND t.meta_key='_swc_preferred_at_utc' AND t.meta_value BETWEEN %s AND %s
 			LEFT JOIN {$wpdb->postmeta} d ON d.post_id=p.ID AND d.meta_key='_swc_appointment_duration'
@@ -479,7 +449,7 @@ final class SWC_Helpers {
 			}
 		}
 		if ( (string) get_option( $key, '' ) !== $value ) {
-			return new WP_Error( 'swc_locked', __( 'This scheduling resource is being updated. Refresh and try again.', 'worldwide-clinic' ) );
+			return new WP_Error( 'swc_locked', __( 'This scheduling resource is being updated. Refresh and try again.', 'worldwide-clinic-appointments' ) );
 		}
 		try {
 			return call_user_func( $callback );
@@ -492,7 +462,7 @@ final class SWC_Helpers {
 
 	public static function assert_expected( $id, $expected_status, $expected_version ) {
 		if ( self::status( $id ) !== $expected_status || self::record_version( $id ) !== absint( $expected_version ) ) {
-			return new WP_Error( 'swc_stale', __( 'This appointment changed after the form was opened. Refresh before saving.', 'worldwide-clinic' ) );
+			return new WP_Error( 'swc_stale', __( 'This appointment changed after the form was opened. Refresh before saving.', 'worldwide-clinic-appointments' ) );
 		}
 		return true;
 	}
@@ -563,7 +533,7 @@ final class SWC_Helpers {
 	}
 
 	public static function emergency_notice() {
-		$default = __( 'If you may be experiencing a medical emergency, contact your local emergency services immediately. Do not wait for an online appointment.', 'worldwide-clinic' );
+		$default = __( 'If you may be experiencing a medical emergency, contact your local emergency services immediately. Do not wait for an online appointment.', 'worldwide-clinic-appointments' );
 		$notice  = get_option( 'swc_emergency_notice', $default );
 		return trim( (string) $notice ) ? (string) $notice : $default;
 	}
@@ -600,8 +570,8 @@ final class SWC_Helpers {
 			do_action( 'sabri_notify', $args );
 			return true;
 		}
-		$subject = __( 'Worldwide Clinic Appointment Update', 'worldwide-clinic' );
-		$message = sanitize_textarea_field( $body ) . "\n\n" . sprintf( __( 'Appointment reference: %d', 'worldwide-clinic' ), absint( $appointment_id ) ) . "\n" . __( 'Do not send sensitive medical information by email.', 'worldwide-clinic' );
+		$subject = __( 'Worldwide Clinic Appointment Update', 'worldwide-clinic-appointments' );
+		$message = sanitize_textarea_field( $body ) . "\n\n" . sprintf( __( 'Appointment reference: %d', 'worldwide-clinic-appointments' ), absint( $appointment_id ) ) . "\n" . __( 'Do not send sensitive medical information by email.', 'worldwide-clinic-appointments' );
 		$sent    = is_email( $user->user_email ) && wp_mail( $user->user_email, $subject, $message );
 		if ( ! $sent ) {
 			update_option(
@@ -622,21 +592,31 @@ final class SWC_Helpers {
 	/**
 	 * Atomic per-user/per-IP rate counter.
 	 */
-	public static function rate_limit_hit( $user_id, $limit = 5, $window = HOUR_IN_SECONDS ) {
+	public static function rate_limit_hit( $scope_or_user, $user_or_limit = 5, $limit_or_window = HOUR_IN_SECONDS, $window = null ) {
 		global $wpdb;
-		$bucket = floor( time() / max( 60, absint( $window ) ) );
+		if ( null === $window ) {
+			$scope   = 'legacy';
+			$user_id = absint( $scope_or_user );
+			$limit   = absint( $user_or_limit );
+			$window  = absint( $limit_or_window );
+		} else {
+			$scope   = sanitize_key( $scope_or_user );
+			$user_id = absint( $user_or_limit );
+			$limit   = absint( $limit_or_window );
+			$window  = absint( $window );
+		}
+		$window = max( 60, $window );
+		$bucket = floor( time() / $window );
 		$ip     = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-		$key    = hash( 'sha256', absint( $user_id ) . '|' . $ip . '|' . $bucket );
+		$key    = hash( 'sha256', $scope . '|' . $user_id . '|' . $ip . '|' . $bucket );
 		$table  = $wpdb->prefix . 'swc_rate_limits';
 		$now    = current_time( 'mysql', true );
-		$expiry = gmdate( 'Y-m-d H:i:s', time() + max( 60, absint( $window ) ) );
+		$expiry = gmdate( 'Y-m-d H:i:s', time() + $window );
 		$sql    = "INSERT INTO {$table} (key_hash,hits,window_started,expires_at) VALUES (%s,1,%s,%s)
 			ON DUPLICATE KEY UPDATE hits=LAST_INSERT_ID(hits+1), expires_at=VALUES(expires_at)";
 		$result = $wpdb->query( $wpdb->prepare( $sql, $key, $now, $expiry ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( false === $result ) {
-			return true;
-		}
+		if ( false === $result ) { return true; }
 		$hits = 1 === (int) $result ? 1 : (int) $wpdb->get_var( 'SELECT LAST_INSERT_ID()' ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		return $hits > absint( $limit );
+		return $hits > max( 1, $limit );
 	}
 }

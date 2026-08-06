@@ -8,7 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 final class SWC_Activator {
-	const DB_VERSION = '2.0.0';
+	const DB_VERSION = '3.0.0';
 
 	public static function dependencies_ready() {
 		return class_exists( 'SPD_Helpers' )
@@ -19,7 +19,7 @@ final class SWC_Activator {
 	}
 
 	public static function dependency_message() {
-		return __( 'Activate Files 00, 03, 07, and 09 before activating Worldwide Clinic. File 08 consumes their identity and verification contracts and does not create verification itself.', 'worldwide-clinic' );
+		return __( 'Activate Files 00, 03, 07, and 09 before activating Worldwide Clinic. File 08 consumes their identity and verification contracts and does not create verification itself.', 'worldwide-clinic-appointments' );
 	}
 
 	public static function activate() {
@@ -33,17 +33,20 @@ final class SWC_Activator {
 			self::add_capabilities();
 			self::register_type();
 			self::install_schema();
+			WCA_Schema::install();
+			WCA_Routes::register();
+			WCA_Outbox::schedule();
 			self::repair_pages();
 			self::migrate_existing_records();
 			update_option( 'swc_version', SWC_VERSION, false );
 			update_option( 'swc_db_version', self::DB_VERSION, false );
 			set_transient( 'swc_activation_notice', '1', 120 );
 			flush_rewrite_rules();
-		} catch ( Exception $e ) {
+		} catch ( Throwable $e ) {
 			self::rollback_activation();
 			deactivate_plugins( plugin_basename( SWC_FILE ) );
 			wp_die(
-				esc_html( sprintf( __( 'Worldwide Clinic activation was rolled back: %s', 'worldwide-clinic' ), $e->getMessage() ) ),
+				esc_html( sprintf( __( 'Worldwide Clinic activation was rolled back: %s', 'worldwide-clinic-appointments' ), $e->getMessage() ) ),
 				'',
 				array( 'back_link' => true )
 			);
@@ -51,8 +54,9 @@ final class SWC_Activator {
 	}
 
 	public static function deactivate() {
-		self::rollback_pages();
+		WCA_Outbox::unschedule();
 		self::remove_capabilities();
+		// Data, owned pages, audit evidence, and migration snapshots are preserved.
 		flush_rewrite_rules();
 	}
 
@@ -61,6 +65,9 @@ final class SWC_Activator {
 			return;
 		}
 		self::register_type();
+		WCA_Routes::register();
+		WCA_Schema::maybe_upgrade();
+		WCA_Outbox::schedule();
 		if ( self::DB_VERSION !== (string) get_option( 'swc_db_version', '' ) ) {
 			self::install_schema();
 			self::migrate_existing_records();
@@ -92,8 +99,8 @@ final class SWC_Activator {
 			SWC_Helpers::TYPE,
 			array(
 				'labels'              => array(
-					'name'          => __( 'Clinic Appointments', 'worldwide-clinic' ),
-					'singular_name' => __( 'Clinic Appointment', 'worldwide-clinic' ),
+					'name'          => __( 'Clinic Appointments', 'worldwide-clinic-appointments' ),
+					'singular_name' => __( 'Clinic Appointment', 'worldwide-clinic-appointments' ),
 				),
 				'public'              => false,
 				'publicly_queryable'  => false,
@@ -134,6 +141,9 @@ final class SWC_Activator {
 	private static function capabilities() {
 		return array(
 			'manage_worldwide_clinic',
+			'manage_wca_clinics',
+			'manage_wca_complaints',
+			'manage_wca_operations',
 			'edit_swc_appointment',
 			'read_swc_appointment',
 			'delete_swc_appointment',
@@ -239,7 +249,7 @@ final class SWC_Activator {
 		$spf = (array) get_option( 'spf_page_map', array() );
 		$map = (array) get_option( 'swc_page_map', array() );
 
-		$map['clinic']       = self::ensure_page( ! empty( $spf['clinic'] ) ? absint( $spf['clinic'] ) : absint( $map['clinic'] ?? 0 ), 'Worldwide Clinic', 'worldwide-clinic', '[swc_worldwide_clinic]', true );
+		$map['clinic']       = self::ensure_page( ! empty( $spf['clinic'] ) ? absint( $spf['clinic'] ) : absint( $map['clinic'] ?? 0 ), 'Worldwide Clinic', 'worldwide-clinic-appointments', '[swc_worldwide_clinic]', true );
 		$map['request']      = self::ensure_page( absint( $map['request'] ?? 0 ), 'Request an Appointment', 'request-appointment', '[swc_request_appointment]' );
 		$map['patient']      = self::ensure_page( absint( $map['patient'] ?? 0 ), 'My Appointments', 'my-appointments', '[swc_my_appointments]' );
 		$map['doctor']       = self::ensure_page( absint( $map['doctor'] ?? 0 ), 'Doctor Appointments', 'doctor-appointments', '[swc_doctor_appointments]' );
@@ -388,15 +398,15 @@ final class SWC_Activator {
 		global $wpdb;
 		$map = SWC_Helpers::pages();
 		return array(
-			__( 'Required dependencies', 'worldwide-clinic' ) => self::dependencies_ready(),
-			__( 'Audit table', 'worldwide-clinic' )          => self::table_exists( $wpdb->prefix . 'swc_audit_log' ),
-			__( 'Rate-limit table', 'worldwide-clinic' )     => self::table_exists( $wpdb->prefix . 'swc_rate_limits' ),
-			__( 'Database version', 'worldwide-clinic' )     => self::DB_VERSION === (string) get_option( 'swc_db_version', '' ),
-			__( 'Clinic page', 'worldwide-clinic' )          => ! empty( $map['clinic'] ),
-			__( 'Request page', 'worldwide-clinic' )         => ! empty( $map['request'] ),
-			__( 'Patient dashboard', 'worldwide-clinic' )    => ! empty( $map['patient'] ),
-			__( 'Doctor dashboard', 'worldwide-clinic' )     => ! empty( $map['doctor'] ),
-			__( 'Availability page', 'worldwide-clinic' )    => ! empty( $map['availability'] ),
+			__( 'Required dependencies', 'worldwide-clinic-appointments' ) => self::dependencies_ready(),
+			__( 'Audit table', 'worldwide-clinic-appointments' )          => self::table_exists( $wpdb->prefix . 'swc_audit_log' ),
+			__( 'Rate-limit table', 'worldwide-clinic-appointments' )     => self::table_exists( $wpdb->prefix . 'swc_rate_limits' ),
+			__( 'Database version', 'worldwide-clinic-appointments' )     => self::DB_VERSION === (string) get_option( 'swc_db_version', '' ),
+			__( 'Clinic page', 'worldwide-clinic-appointments' )          => ! empty( $map['clinic'] ),
+			__( 'Request page', 'worldwide-clinic-appointments' )         => ! empty( $map['request'] ),
+			__( 'Patient dashboard', 'worldwide-clinic-appointments' )    => ! empty( $map['patient'] ),
+			__( 'Doctor dashboard', 'worldwide-clinic-appointments' )     => ! empty( $map['doctor'] ),
+			__( 'Availability page', 'worldwide-clinic-appointments' )    => ! empty( $map['availability'] ),
 		);
 	}
 

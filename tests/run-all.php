@@ -1,0 +1,8 @@
+<?php
+$tests = array( 'contracts.php', 'master-plan-contract.php', 'security-static.php' );
+foreach ( $tests as $test ) {
+	$command = escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/' . $test );
+	passthru( $command, $code );
+	if ( 0 !== $code ) { exit( $code ); }
+}
+echo "All File 08 source-level test suites passed.\n";
