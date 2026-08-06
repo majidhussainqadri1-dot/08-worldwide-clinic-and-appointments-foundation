@@ -8,7 +8,7 @@ $commit = preg_replace( '/[^0-9a-f]/i', '', (string) ( $options['commit'] ?? '' 
 $epoch = (int) ( $options['source-date-epoch'] ?? 0 );
 if ( ! $root || strlen( $commit ) < 7 || $epoch < 1 ) { fwrite( STDERR, "Valid root, commit and source-date-epoch are required.\n" ); exit( 2 ); }
 @mkdir( $out, 0775, true );
-$version = '1.0.0';
+$version = '1.0.1';
 $base = '08-worldwide-clinic-and-appointments-' . $version . '-candidate';
 $zipPath = rtrim( $out, '/' ) . '/' . $base . '.zip';
 $manifestPath = rtrim( $out, '/' ) . '/' . $base . '-manifest.json';

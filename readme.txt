@@ -3,7 +3,7 @@ Contributors: majidhussainqadri1-dot
 Tags: clinic, appointments, doctors, scheduling, privacy, accessibility
 Requires at least: 6.6
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 
 Canonical File 08 clinic and appointment runtime for the Sabri Social Homeopathy Platform.
@@ -26,6 +26,9 @@ Platform commission is always 0%. Donations are optional and never affect visibi
 Protected routes use no-store/noindex controls. Public clinic output is allow-listed. Appointment, patient, contact, clinical-like and private-note data are excluded. Export, erasure, retention and legal-hold controls are provided. Uninstall is non-destructive by default.
 
 == Changelog ==
+
+= 1.0.1 =
+* Four-plan-governed review rounds: clinic approval gate, actor/guardian binding, opaque public scheduling references, server-authoritative slot holds, purpose-limited administrative access, cross-clinic ownership checks, atomic rescheduling, expiring review eligibility, and expanded regression evidence.
 
 = 1.0.0 =
 * Complete master-plan source candidate and deterministic release engineering.

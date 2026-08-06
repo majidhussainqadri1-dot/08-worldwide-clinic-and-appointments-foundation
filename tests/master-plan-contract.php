@@ -12,7 +12,7 @@ $schema = file_get_contents( $root . '/includes/class-wca-schema.php' );
 $service = file_get_contents( $root . '/includes/class-wca-service.php' );
 $rest = file_get_contents( $root . '/includes/class-wca-rest.php' );
 
-wca_test_assert( false !== strpos( $main, 'Version: 1.0.0' ), 'plugin version is 1.0.0' );
+wca_test_assert( false !== strpos( $main, 'Version: 1.0.1' ), 'plugin version is 1.0.1' );
 wca_test_assert( false !== strpos( $main, 'Text Domain: worldwide-clinic-appointments' ), 'canonical text domain is used' );
 wca_test_assert( false === strpos( $main, "Text Domain: worldwide-clinic\n" ), 'legacy text domain is not declared' );
 foreach ( range( 1, 18 ) as $n ) { wca_test_assert( false !== strpos( $contracts, sprintf( 'F08-FR-%03d', $n ) ), sprintf( 'FR-%03d is traceable', $n ) ); }

@@ -30,6 +30,11 @@ final class WCA_REST {
 			'callback' => array( __CLASS__, 'clinic' ),
 			'permission_callback' => '__return_true',
 		) );
+		register_rest_route( self::NAMESPACE, '/clinics/(?P<id>\d+)/submit-review', array(
+			'methods' => WP_REST_Server::CREATABLE,
+			'callback' => array( __CLASS__, 'submit_clinic_review' ),
+			'permission_callback' => array( __CLASS__, 'authenticated' ),
+		) );
 		register_rest_route( self::NAMESPACE, '/clinics/(?P<id>\d+)/activate', array(
 			'methods' => WP_REST_Server::CREATABLE,
 			'callback' => array( __CLASS__, 'activate_clinic' ),
@@ -162,6 +167,10 @@ final class WCA_REST {
 		return self::respond( WCA_Service::create_clinic( self::data( $request ) ), 201 );
 	}
 
+	public static function submit_clinic_review( WP_REST_Request $request ) {
+		return self::respond( WCA_Service::submit_clinic_for_review( absint( $request['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
+	}
+
 	public static function activate_clinic( WP_REST_Request $request ) {
 		return self::respond( WCA_Service::activate_clinic( absint( $request['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
 	}
@@ -188,7 +197,8 @@ final class WCA_REST {
 	public static function slots( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'slot_search', 120, 60 );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		return self::respond( WCA_Service::search_slots( array_map( 'sanitize_text_field', $request->get_params() ) ) );
+		$query = WCA_Plan_Guard::resolve_public_slot_query( array_map( 'sanitize_text_field', $request->get_params() ) );
+		return is_wp_error( $query ) ? $query : self::respond( WCA_Service::search_slots( $query ) );
 	}
 
 	public static function hold_slot( WP_REST_Request $request ) {
@@ -205,7 +215,7 @@ final class WCA_REST {
 
 	public static function appointment( WP_REST_Request $request ) {
 		$id = absint( $request['id'] );
-		$access = WCA_Authorization::can_view_appointment( $id );
+		$access = WCA_Authorization::can_view_appointment( $id, 0, sanitize_key( $request->get_header( 'X-WCA-Access-Purpose' ) ) );
 		if ( is_wp_error( $access ) ) { return $access; }
 		return self::respond( self::appointment_projection( $id ) );
 	}

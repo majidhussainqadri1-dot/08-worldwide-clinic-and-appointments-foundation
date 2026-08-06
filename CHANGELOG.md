@@ -21,3 +21,9 @@
 ## 0.1.0
 
 - Original imported foundation preserved as baseline evidence.
+
+## 1.0.1 — 2026-08-06
+
+- Four complete review-and-correction rounds against all three governing plans and later superseding directives.
+- Corrected clinic review/activation governance, actor and guardian authorization, cross-clinic scope, opaque public IDs, atomic slot integrity, safe rescheduling and expiring review eligibility.
+- Added plan guard, regression evidence and deterministic 1.0.1 release parity.

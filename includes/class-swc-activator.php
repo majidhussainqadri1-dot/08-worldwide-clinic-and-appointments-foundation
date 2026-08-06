@@ -8,7 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 final class SWC_Activator {
-	const DB_VERSION = '3.0.0';
+	const DB_VERSION = '3.1.0';
 
 	public static function dependencies_ready() {
 		return class_exists( 'SPD_Helpers' )

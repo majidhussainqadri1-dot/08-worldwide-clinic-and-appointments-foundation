@@ -9,14 +9,14 @@ defined( 'ABSPATH' ) || exit;
 
 final class WCA_Contracts {
 	const PLAN_ID                         = 'SSH-F08-PLAN-2026-v1.0';
-	const RUNTIME_VERSION                 = '1.0.0';
+	const RUNTIME_VERSION                 = '1.0.1';
 	const API_VERSION                     = '1.0.0';
 	const PUBLIC_CLINIC_CONTRACT_VERSION  = '1.1.0';
 	const CF01_CONTEXT_CONTRACT_VERSION   = '1.1.0';
 	const FILE17_CONTEXT_CONTRACT_VERSION = '1.0.0';
 	const FILE19_EVENT_CONTRACT_VERSION   = '1.0.0';
 	const ASSURANCE_CONTRACT_VERSION      = '1.0.0';
-	const SCHEMA_VERSION                  = '3.0.0';
+	const SCHEMA_VERSION                  = '3.1.0';
 
 	/** @return array<string,string> */
 	public static function appointment_statuses() {

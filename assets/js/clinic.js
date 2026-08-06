@@ -61,9 +61,13 @@
 			slotsNode.replaceChildren();
 			selectedHold = null;
 			try {
+				var serviceSelect = form.elements.service_ref;
+				var selectedOption = serviceSelect && serviceSelect.options[serviceSelect.selectedIndex];
+				var practitionerRef = selectedOption ? String(selectedOption.dataset.practitionerRef || '') : '';
 				var params = new URLSearchParams({
-					doctor_user_id: query(form, 'doctor_user_id'),
-					service_id: query(form, 'service_id'),
+					clinic_ref: String(root.dataset.clinicRef || ''),
+					service_ref: query(form, 'service_ref'),
+					practitioner_ref: practitionerRef,
 					date_from: query(form, 'date_from'),
 					date_to: query(form, 'date_from'),
 					timezone: query(form, 'timezone'),
@@ -86,9 +90,12 @@
 						button.disabled = true;
 						try {
 							selectedHold = await api('slot-holds', {method: 'POST', body: JSON.stringify({
-								clinic_id: Number(root.dataset.clinicId || 0),
-								service_id: Number(query(form, 'service_id') || 0),
-								doctor_user_id: Number(query(form, 'doctor_user_id') || 0),
+								clinic_ref: slot.clinic_ref,
+								service_ref: slot.service_ref,
+								practitioner_ref: slot.practitioner_ref,
+								rule_ref: slot.rule_ref,
+								slot_ref: slot.slot_ref,
+								freshness_version: slot.freshness_version,
 								start_utc: slot.start_utc,
 								end_utc: slot.end_utc,
 								idempotency_key: uuid()

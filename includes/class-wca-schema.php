@@ -206,13 +206,15 @@ final class WCA_Schema {
 				status varchar(20) NOT NULL DEFAULT 'eligible',
 				eligibility_hash char(64) NOT NULL,
 				granted_at datetime NOT NULL,
+				expires_at datetime NOT NULL,
 				used_at datetime NULL,
 				revoked_at datetime NULL,
 				revocation_reason varchar(191) NOT NULL DEFAULT '',
 				PRIMARY KEY  (id),
 				UNIQUE KEY public_ref (public_ref),
 				UNIQUE KEY appointment_reviewer (appointment_id,reviewer_user_id),
-				KEY doctor_status (doctor_user_id,status)
+				KEY doctor_status (doctor_user_id,status),
+				KEY expiry_status (expires_at,status)
 			) {$collate};",
 			"CREATE TABLE {$tables['clinical_context']} (
 				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

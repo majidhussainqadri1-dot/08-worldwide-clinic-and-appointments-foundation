@@ -13,7 +13,7 @@ $line=trim(file_get_contents($checksumPath));
 list($expected,$name)=preg_split('/\s+/', $line, 2);
 if ( basename($zipPath)!==trim($name) || !hash_equals($expected,hash_file('sha256',$zipPath)) ) { fwrite(STDERR,"Checksum mismatch.\n"); exit(4); }
 $manifest=json_decode(file_get_contents($manifestPath),true);
-if(!is_array($manifest)||'1.0.0'!==($manifest['version']??'')||0!==($manifest['commission_percent']??-1)||!empty($manifest['staging_accepted'])||!empty($manifest['production_accepted'])){fwrite(STDERR,"Manifest policy mismatch.\n");exit(5);}
+if(!is_array($manifest)||'1.0.1'!==($manifest['version']??'')||0!==($manifest['commission_percent']??-1)||!empty($manifest['staging_accepted'])||!empty($manifest['production_accepted'])){fwrite(STDERR,"Manifest policy mismatch.\n");exit(5);}
 $zip=new ZipArchive(); if(true!==$zip->open($zipPath)){fwrite(STDERR,"ZIP open failed.\n");exit(6);}
 $prefix='08-worldwide-clinic-and-appointments/'; $seen=array();
 for($i=0;$i<$zip->numFiles;$i++){

@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime: `1.0.0`
+- Runtime: `1.0.1`
 - Text domain: `worldwide-clinic-appointments`
 - Canonical PHP namespace prefix: `WCA_`
 - Legacy compatibility prefix: `SWC_`
@@ -40,4 +40,4 @@ GitHub Actions repeats these checks on PHP 7.4 and 8.3, builds the candidate twi
 
 ## Acceptance classification
 
-`1.0.0` is a **source-complete, automatically verified candidate**. It is not marked staging-accepted or production-accepted by source code. Hostinger staging, exact dependency packages, real accounts, backup restoration, rollback rehearsal, browser/mobile/Urdu RTL/manual accessibility, privacy/security/professional review, Founder acceptance and live deployment require external evidence under `docs/STAGING-ACCEPTANCE-1.0.0.md`.
+`1.0.1` is a **source-complete, automatically verified candidate** after four fresh review-and-correction rounds. It is not marked staging-accepted or production-accepted by source code. Hostinger staging, exact dependency packages, real accounts, backup restoration, rollback rehearsal, browser/mobile/Urdu RTL/manual accessibility, privacy/security/professional review, Founder acceptance and live deployment require external evidence under `docs/STAGING-ACCEPTANCE-1.0.0.md`.

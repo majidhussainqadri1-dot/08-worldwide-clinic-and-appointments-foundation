@@ -181,12 +181,23 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['branches'];
 		$sql = "SELECT * FROM {$table} WHERE clinic_id=%d" . ( $public_only ? " AND status='active' AND visibility='public'" : '' ) . ' ORDER BY name ASC,id ASC';
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, absint( $clinic_id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, absint( $clinic_id ) ), ARRAY_A );
 		return array_map( static function ( $row ) use ( $public_only ) {
 			$row['contacts'] = self::decode( $row['contacts_json'] );
 			unset( $row['contacts_json'] );
-			if ( $public_only ) { unset( $row['address_private'] ); }
-			return $row;
+			if ( ! $public_only ) { return $row; }
+			return array(
+				'public_ref'     => (string) $row['public_ref'],
+				'name'           => (string) $row['name'],
+				'country_code'   => (string) $row['country_code'],
+				'region'         => (string) $row['region'],
+				'city'           => (string) $row['city'],
+				'address_public' => (string) $row['address_public'],
+				'timezone'       => (string) $row['timezone'],
+				'contacts'       => array_intersect_key( (array) $row['contacts'], array_flip( array( 'public_phone', 'public_email', 'public_website', 'public_whatsapp' ) ) ),
+				'updated_at'     => (string) $row['updated_at'],
+				'record_version' => absint( $row['version'] ),
+			);
 		}, $rows );
 	}
 
@@ -255,7 +266,29 @@ final class WCA_Repository {
 		if ( $public_only ) { $where[] = "status='active'"; }
 		if ( $doctor_user_id ) { $where[] = '(doctor_user_id=0 OR doctor_user_id=%d)'; $params[] = absint( $doctor_user_id ); }
 		$sql = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY name ASC,id ASC';
-		return (array) $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( ! $public_only ) { return $rows; }
+		$clinic = self::get_clinic( $clinic_id, false );
+		return array_values( array_filter( array_map( static function ( $row ) use ( $clinic ) {
+			$doctor_id = absint( $row['doctor_user_id'] ) ?: absint( $clinic['owner_user_id'] ?? 0 );
+			$practitioner_ref = WCA_Plan_Guard::practitioner_ref( $doctor_id );
+			if ( ! $practitioner_ref ) { return null; }
+			return array(
+				'public_ref'          => (string) $row['public_ref'],
+				'practitioner_ref'    => $practitioner_ref,
+				'name'                => (string) $row['name'],
+				'consultation_type'   => (string) $row['consultation_type'],
+				'duration_minutes'    => absint( $row['duration_minutes'] ),
+				'currency'            => (string) $row['currency'],
+				'fee_minor'           => absint( $row['fee_minor'] ),
+				'fee_max_minor'       => absint( $row['fee_max_minor'] ),
+				'tax_policy'          => (string) $row['tax_policy'],
+				'refund_policy'       => (string) $row['refund_policy'],
+				'cancellation_policy' => (string) $row['cancellation_policy'],
+				'updated_at'          => (string) $row['updated_at'],
+				'record_version'      => absint( $row['version'] ),
+			);
+		}, $rows ) ) );
 	}
 
 	/** @return array<string,mixed>|WP_Error */
@@ -325,44 +358,85 @@ final class WCA_Repository {
 		}, $rows );
 	}
 
+
+	/** @return array<string,mixed>|null */
+	public static function get_branch_by_ref( $ref, $public_only = false ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['branches'];
+		$sql = "SELECT * FROM {$table} WHERE public_ref=%s" . ( $public_only ? " AND status='active' AND visibility='public'" : '' ) . ' LIMIT 1';
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, sanitize_text_field( $ref ) ), ARRAY_A );
+		return $row ?: null;
+	}
+
+	/** @return array<string,mixed>|null */
+	public static function get_service_by_ref( $ref, $public_only = true ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['services'];
+		$sql = "SELECT * FROM {$table} WHERE public_ref=%s" . ( $public_only ? " AND status='active'" : '' ) . ' LIMIT 1';
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, sanitize_text_field( $ref ) ), ARRAY_A );
+		return $row ?: null;
+	}
+
+	/** @return array<string,mixed>|null */
+	public static function get_availability_rule_by_ref( $ref, $active_only = false ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['availability'];
+		$sql = "SELECT * FROM {$table} WHERE public_ref=%s" . ( $active_only ? " AND status='active'" : '' ) . ' LIMIT 1';
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, sanitize_text_field( $ref ) ), ARRAY_A );
+		if ( ! $row ) { return null; }
+		foreach ( array( 'rrule', 'breaks', 'exceptions' ) as $key ) { $row[ $key ] = self::decode( $row[ $key . '_json' ] ); unset( $row[ $key . '_json' ] ); }
+		return $row;
+	}
+
 	/** @return array<string,mixed>|WP_Error */
 	public static function hold_slot( $data ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['slot_holds'];
 		self::expire_slot_holds();
-		$start = gmdate( 'Y-m-d H:i:s', strtotime( (string) ( $data['start_utc'] ?? '' ) . ' UTC' ) );
-		$end   = gmdate( 'Y-m-d H:i:s', strtotime( (string) ( $data['end_utc'] ?? '' ) . ' UTC' ) );
-		if ( ! $start || ! $end || strtotime( $end . ' UTC' ) <= strtotime( $start . ' UTC' ) ) {
-			return new WP_Error( 'wca_slot_time', __( 'Invalid slot time.', 'worldwide-clinic-appointments' ) );
-		}
+		$start = WCA_Plan_Guard::strict_utc( $data['start_utc'] ?? '' );
+		$end   = WCA_Plan_Guard::strict_utc( $data['end_utc'] ?? '' );
 		$doctor_id = absint( $data['doctor_user_id'] ?? 0 );
-		$conflict = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1",
-			$doctor_id, self::now(), $end, $start
-		) );
-		if ( $conflict ) {
-			return new WP_Error( 'wca_slot_conflict', __( 'The selected slot is no longer available.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		$patient_id = absint( $data['patient_user_id'] ?? 0 );
+		if ( ! $start || ! $end || ! $doctor_id || ! $patient_id || strtotime( $end . ' UTC' ) <= strtotime( $start . ' UTC' ) ) {
+			return new WP_Error( 'wca_slot_time', __( 'Invalid canonical slot request.', 'worldwide-clinic-appointments' ) );
 		}
-		$hold_token = hash( 'sha256', self::uuid() . '|' . wp_salt( 'nonce' ) . '|' . microtime( true ) );
-		$row = array(
-			'hold_token'      => $hold_token,
-			'idempotency_key' => hash( 'sha256', (string) ( $data['idempotency_key'] ?? self::uuid() ) ),
-			'clinic_id'       => absint( $data['clinic_id'] ?? 0 ),
-			'service_id'      => absint( $data['service_id'] ?? 0 ),
-			'doctor_user_id'  => $doctor_id,
-			'patient_user_id' => absint( $data['patient_user_id'] ?? 0 ),
-			'start_utc'       => $start,
-			'end_utc'         => $end,
-			'status'          => 'held',
-			'appointment_id'  => 0,
-			'expires_at'      => gmdate( 'Y-m-d H:i:s', time() + min( 1800, max( 300, absint( $data['ttl'] ?? 600 ) ) ) ),
-			'created_at'      => self::now(),
-			'updated_at'      => self::now(),
-		);
-		if ( false === $wpdb->insert( $table, $row ) ) {
-			return new WP_Error( 'wca_slot_hold', __( 'The slot could not be held.', 'worldwide-clinic-appointments' ) );
+		$lock_name = 'wca-slot-' . substr( hash( 'sha256', $doctor_id . '|' . substr( $start, 0, 10 ) ), 0, 48 );
+		$locked = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,5)', $lock_name ) );
+		if ( 1 !== $locked ) {
+			return new WP_Error( 'wca_slot_lock', __( 'The scheduling resource is busy. Please try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
-		return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
+		try {
+			$conflict = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1",
+				$doctor_id, self::now(), $end, $start
+			) );
+			$duration = max( 1, (int) round( ( strtotime( $end . ' UTC' ) - strtotime( $start . ' UTC' ) ) / 60 ) );
+			if ( $conflict || SWC_Helpers::has_conflict( $doctor_id, $start, $duration, 0 ) ) {
+				return new WP_Error( 'wca_slot_conflict', __( 'The selected slot is no longer available.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+			}
+			$hold_token = hash( 'sha256', self::uuid() . '|' . wp_salt( 'nonce' ) . '|' . microtime( true ) );
+			$row = array(
+				'hold_token'      => $hold_token,
+				'idempotency_key' => hash( 'sha256', (string) ( $data['idempotency_key'] ?? self::uuid() ) ),
+				'clinic_id'       => absint( $data['clinic_id'] ?? 0 ),
+				'service_id'      => absint( $data['service_id'] ?? 0 ),
+				'doctor_user_id'  => $doctor_id,
+				'patient_user_id' => $patient_id,
+				'start_utc'       => $start,
+				'end_utc'         => $end,
+				'status'          => 'held',
+				'appointment_id'  => 0,
+				'expires_at'      => gmdate( 'Y-m-d H:i:s', time() + min( 1800, max( 300, absint( $data['ttl'] ?? 600 ) ) ) ),
+				'created_at'      => self::now(),
+				'updated_at'      => self::now(),
+			);
+			if ( false === $wpdb->insert( $table, $row ) ) {
+				return new WP_Error( 'wca_slot_hold', __( 'The slot could not be held.', 'worldwide-clinic-appointments' ) );
+			}
+			return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
+		} finally {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+		}
 	}
 
 	/** @return array<string,mixed>|null */
@@ -377,19 +451,22 @@ final class WCA_Repository {
 	public static function book_slot( $token, $appointment_id ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['slot_holds'];
-		$hold = self::get_slot_hold( $token );
-		if ( ! $hold || 'held' !== $hold['status'] || strtotime( $hold['expires_at'] . ' UTC' ) <= time() ) {
-			return new WP_Error( 'wca_hold_expired', __( 'The slot hold expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
-		}
-		$updated = $wpdb->update( $table, array( 'status' => 'booked', 'appointment_id' => absint( $appointment_id ), 'updated_at' => self::now(), 'expires_at' => gmdate( 'Y-m-d H:i:s', time() + YEAR_IN_SECONDS ) ), array( 'id' => absint( $hold['id'] ), 'status' => 'held' ) );
-		return $updated ? true : new WP_Error( 'wca_hold_stale', __( 'The slot hold changed before booking.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		$updated = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$table} SET status='booked',appointment_id=%d,updated_at=%s,expires_at=%s WHERE hold_token=%s AND status='held' AND appointment_id=0 AND expires_at>%s",
+			absint( $appointment_id ), self::now(), gmdate( 'Y-m-d H:i:s', time() + YEAR_IN_SECONDS ), sanitize_text_field( $token ), self::now()
+		) );
+		return 1 === (int) $updated ? true : new WP_Error( 'wca_hold_stale', __( 'The slot hold changed or expired before booking.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 	}
 
-	public static function release_appointment_slot( $appointment_id, $status = 'released' ) {
+	public static function release_appointment_slot( $appointment_id, $status = 'released', $except_hold_token = '' ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['slot_holds'];
 		$status = in_array( $status, array( 'released', 'expired' ), true ) ? $status : 'released';
-		return false !== $wpdb->update( $table, array( 'status' => $status, 'updated_at' => self::now() ), array( 'appointment_id' => absint( $appointment_id ) ) );
+		$where = array( 'appointment_id' => absint( $appointment_id ) );
+		if ( ! $except_hold_token ) {
+			return false !== $wpdb->update( $table, array( 'status' => $status, 'updated_at' => self::now() ), $where );
+		}
+		return false !== $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status=%s,updated_at=%s WHERE appointment_id=%d AND hold_token<>%s", $status, self::now(), absint( $appointment_id ), sanitize_text_field( $except_hold_token ) ) );
 	}
 
 	public static function expire_slot_holds() {
@@ -470,6 +547,7 @@ final class WCA_Repository {
 			'status'           => 'eligible',
 			'eligibility_hash' => hash_hmac( 'sha256', absint( $appointment_id ) . '|' . absint( $reviewer_user_id ) . '|' . absint( $doctor_user_id ), wp_salt( 'auth' ) ),
 			'granted_at'       => self::now(),
+			'expires_at'       => gmdate( 'Y-m-d H:i:s', time() + WCA_Plan_Guard::REVIEW_ELIGIBILITY_DAYS * DAY_IN_SECONDS ),
 		);
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			return new WP_Error( 'wca_review_eligibility', __( 'Review eligibility could not be granted.', 'worldwide-clinic-appointments' ) );
@@ -481,7 +559,10 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['review_eligibility'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s AND reviewer_user_id=%d LIMIT 1", sanitize_text_field( $public_ref ), absint( $reviewer_user_id ) ), ARRAY_A );
-		if ( ! $row || 'eligible' !== $row['status'] ) { return new WP_Error( 'wca_review_not_eligible', __( 'Review eligibility is unavailable.', 'worldwide-clinic-appointments' ) ); }
+		if ( ! $row || 'eligible' !== $row['status'] || strtotime( (string) $row['expires_at'] . ' UTC' ) <= time() ) {
+			if ( $row && 'eligible' === $row['status'] ) { $wpdb->update( $table, array( 'status' => 'revoked', 'revoked_at' => self::now(), 'revocation_reason' => 'expired' ), array( 'id' => absint( $row['id'] ), 'status' => 'eligible' ) ); }
+			return new WP_Error( 'wca_review_not_eligible', __( 'Review eligibility is unavailable or expired.', 'worldwide-clinic-appointments' ) );
+		}
 		$ok = $wpdb->update( $table, array( 'status' => 'used', 'used_at' => self::now() ), array( 'id' => absint( $row['id'] ), 'status' => 'eligible' ) );
 		return $ok ? true : new WP_Error( 'wca_review_stale', __( 'Review eligibility changed before use.', 'worldwide-clinic-appointments' ) );
 	}

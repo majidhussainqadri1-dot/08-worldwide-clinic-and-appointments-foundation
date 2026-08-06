@@ -54,7 +54,7 @@ final class WCA_Frontend {
 						<h3><?php echo esc_html( $service['name'] ); ?></h3>
 						<p><?php echo esc_html( sprintf( __( '%1$d minutes · %2$s', 'worldwide-clinic-appointments' ), absint( $service['duration_minutes'] ), ucfirst( $service['consultation_type'] ) ) ); ?></p>
 						<p class="wca-price"><?php echo esc_html( self::money( $service['fee_minor'], $service['currency'] ) ); ?></p>
-						<a class="wca-button" href="<?php echo esc_url( home_url( '/appointments/book/' . rawurlencode( $clinic['public_ref'] ) . '/?service=' . absint( $service['id'] ) ) ); ?>"><?php esc_html_e( 'Choose appointment', 'worldwide-clinic-appointments' ); ?></a>
+						<a class="wca-button" href="<?php echo esc_url( home_url( '/appointments/book/' . rawurlencode( $clinic['public_ref'] ) . '/?service=' . rawurlencode( $service['public_ref'] ) ) ); ?>"><?php esc_html_e( 'Choose appointment', 'worldwide-clinic-appointments' ); ?></a>
 					</article>
 				<?php endforeach; ?>
 				</div>
@@ -75,15 +75,14 @@ final class WCA_Frontend {
 		if ( ! is_user_logged_in() ) { return self::notice( __( 'Sign in to book an appointment.', 'worldwide-clinic-appointments' ), 'warning' ); }
 		$clinic = WCA_Service::public_clinic_projection( $clinic_ref );
 		if ( ! $clinic ) { return self::notice( __( 'Clinic is unavailable.', 'worldwide-clinic-appointments' ), 'error' ); }
-		$service_id = absint( $_GET['service'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only route choice.
+		$service_ref = sanitize_text_field( wp_unslash( $_GET['service'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only route choice.
 		ob_start();
 		?>
-		<main class="wca-shell" aria-labelledby="wca-book-title" data-wca-booking data-clinic-id="<?php echo esc_attr( $clinic['id'] ?? 0 ); ?>" data-service-id="<?php echo esc_attr( $service_id ); ?>">
+		<main class="wca-shell" aria-labelledby="wca-book-title" data-wca-booking data-clinic-ref="<?php echo esc_attr( $clinic['public_ref'] ); ?>" data-service-ref="<?php echo esc_attr( $service_ref ); ?>">
 			<h1 id="wca-book-title"><?php echo esc_html( sprintf( __( 'Book with %s', 'worldwide-clinic-appointments' ), $clinic['name'] ) ); ?></h1>
 			<div class="wca-alert" role="alert"><strong><?php esc_html_e( 'Emergency warning:', 'worldwide-clinic-appointments' ); ?></strong> <?php esc_html_e( 'This booking service cannot provide emergency care. Contact local emergency services for urgent danger.', 'worldwide-clinic-appointments' ); ?></div>
 			<form class="wca-form" data-wca-booking-form novalidate>
-				<label><?php esc_html_e( 'Service', 'worldwide-clinic-appointments' ); ?><select name="service_id" required><?php foreach ( (array) $clinic['services'] as $service ) : ?><option value="<?php echo esc_attr( $service['id'] ); ?>" <?php selected( $service_id, $service['id'] ); ?>><?php echo esc_html( $service['name'] ); ?></option><?php endforeach; ?></select></label>
-				<label><?php esc_html_e( 'Doctor', 'worldwide-clinic-appointments' ); ?><input name="doctor_user_id" type="number" min="1" required inputmode="numeric"></label>
+				<label><?php esc_html_e( 'Service and verified practitioner', 'worldwide-clinic-appointments' ); ?><select name="service_ref" required><?php foreach ( (array) $clinic['services'] as $service ) : ?><option value="<?php echo esc_attr( $service['public_ref'] ); ?>" data-practitioner-ref="<?php echo esc_attr( $service['practitioner_ref'] ); ?>" <?php selected( $service_ref, $service['public_ref'] ); ?>><?php echo esc_html( $service['name'] ); ?></option><?php endforeach; ?></select></label>
 				<label><?php esc_html_e( 'Date from', 'worldwide-clinic-appointments' ); ?><input name="date_from" type="date" required value="<?php echo esc_attr( wp_date( 'Y-m-d' ) ); ?>"></label>
 				<label><?php esc_html_e( 'Your time zone', 'worldwide-clinic-appointments' ); ?><input name="timezone" required value="<?php echo esc_attr( wp_timezone_string() ); ?>"></label>
 				<button class="wca-button" type="button" data-wca-search-slots><?php esc_html_e( 'Find available times', 'worldwide-clinic-appointments' ); ?></button>

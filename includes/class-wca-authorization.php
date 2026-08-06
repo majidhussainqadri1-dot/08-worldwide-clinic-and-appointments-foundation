@@ -20,6 +20,7 @@ final class WCA_Authorization {
 		$eligible = $founder || 'approved' === $status;
 		$suspended = in_array( $status, array( 'suspended', 'revoked', 'rejected', 'expired', 'blocked' ), true );
 		$doctor = class_exists( 'SWC_Doctor_Authority' ) ? SWC_Doctor_Authority::is_eligible( $user_id ) : false;
+		$role = $founder ? 'founder' : ( $doctor ? 'doctor' : ( user_can( $user_id, 'manage_worldwide_clinic' ) ? 'administrator' : 'member' ) );
 
 		$claims = array(
 			'contract'      => 'wca.identity-claims',
@@ -29,6 +30,7 @@ final class WCA_Authorization {
 			'approved'      => $eligible && ! $suspended,
 			'founder'       => (bool) $founder,
 			'doctor'        => (bool) $doctor,
+			'role'          => $role,
 			'suspended'     => (bool) $suspended,
 			'guardian'      => self::is_guardian( $user_id ),
 			'capabilities'  => self::capabilities( $user_id ),
@@ -107,14 +109,26 @@ final class WCA_Authorization {
 	}
 
 	/** @return true|WP_Error */
-	public static function can_view_appointment( $appointment_id, $user_id = 0 ) {
+	public static function can_view_appointment( $appointment_id, $user_id = 0, $purpose = '' ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
 		$claims = self::claims( $user_id );
 		if ( is_wp_error( $claims ) ) { return $claims; }
-		if ( user_can( $user_id, 'manage_worldwide_clinic' ) ) { return true; }
 		if ( SWC_Helpers::can_patient_manage( $appointment_id, $user_id ) || SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) { return true; }
 		$guardian_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );
 		if ( $guardian_id === $user_id && ! empty( $claims['guardian'] ) ) { return true; }
+		if ( user_can( $user_id, 'manage_worldwide_clinic' ) || user_can( $user_id, 'manage_wca_operations' ) ) {
+			$purpose = sanitize_key( $purpose );
+			$allowed = array( 'operations', 'complaint', 'privacy_request', 'incident', 'support_case' );
+			if ( ! in_array( $purpose, $allowed, true ) ) {
+				return new WP_Error( 'wca_admin_purpose_required', __( 'A permitted administrative access purpose is required.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
+			}
+			$step = self::require_step_up( 'appointment_' . $purpose, $user_id );
+			if ( is_wp_error( $step ) ) {
+				return new WP_Error( 'wca_admin_step_up', __( 'Recent security verification is required for this purpose-limited access.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
+			}
+			SWC_Helpers::audit( $appointment_id, 'purpose-limited-admin-access', array( 'reason' => $purpose, 'source' => 'authorization' ) );
+			return true;
+		}
 		return new WP_Error( 'wca_appointment_forbidden', __( 'You cannot access this appointment.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 	}
 
@@ -137,14 +151,18 @@ final class WCA_Authorization {
 	}
 
 	/** @return true|WP_Error */
-	public static function guardian_context( $patient_user_id, $guardian_user_id ) {
+	public static function guardian_context( $patient_user_id, $guardian_user_id, $actor_user_id = 0 ) {
 		$patient_user_id  = absint( $patient_user_id );
 		$guardian_user_id = absint( $guardian_user_id );
-		if ( ! $guardian_user_id ) {
-			return true;
+		$actor_user_id    = absint( $actor_user_id ?: get_current_user_id() );
+		if ( ! $patient_user_id || ! $actor_user_id ) {
+			return new WP_Error( 'wca_patient_actor', __( 'A valid patient and current actor are required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
-		if ( ! self::is_guardian( $guardian_user_id ) ) {
-			return new WP_Error( 'wca_guardian_unverified', __( 'Verified guardian authority is required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+		if ( ! $guardian_user_id ) {
+			return $patient_user_id === $actor_user_id ? true : new WP_Error( 'wca_patient_actor_mismatch', __( 'A user may only make a personal request or act through a verified guardian relationship.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+		}
+		if ( $guardian_user_id !== $actor_user_id || ! self::is_guardian( $guardian_user_id ) ) {
+			return new WP_Error( 'wca_guardian_unverified', __( 'The current actor must be the verified guardian.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		$allowed = (bool) apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
 		if ( function_exists( 'smc_guardian_may_act_for' ) ) {

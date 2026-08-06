@@ -79,3 +79,7 @@ A passing workflow proves repository source and package reproducibility only; it
 ## Governing next step
 
 Install only the exact CI-generated candidate and immutable reviewed dependency packages on canonical Hostinger staging, then execute `docs/STAGING-ACCEPTANCE-1.0.0.md`. Every discovered defect must be corrected, followed by fresh exact-head regression, package, migration, restore, rollback and integration verification before production authorization.
+
+## Four-round corrective completion — 1.0.1
+
+Four fresh plan-governed reviews corrected institutional clinic approval, cross-tenant ownership, guardian/current-actor binding, purpose-limited administrative access, opaque public scheduling references, server-authoritative/atomic slot holds, compensation-safe rescheduling and expiring review eligibility. See `FOUR-ROUND-REVIEW-AND-CORRECTION-1.0.1.md`. External staging and production gates remain unclaimed.
