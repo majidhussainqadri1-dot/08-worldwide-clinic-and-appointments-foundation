@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - codex/file08-complete-master-plan-1.0.0
+    paths:
+      - .codex/apply-trigger
 
 permissions:
   contents: write
@@ -32,7 +34,6 @@ jobs:
           base64 -d /tmp/file08.b64 > /tmp/file08.tar.gz
           tar -xzf /tmp/file08.tar.gz -C .
           rm -rf .codex
-          rm -f .github/workflows/apply-file08-completion.yml
 
       - name: Set up PHP
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
