@@ -38,6 +38,15 @@ jobs:
           cat /tmp/apply-four-reviews.log
           exit "$code"
 
+      - name: Upload transformer diagnostic
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: file08-four-review-transformer-diagnostic-${{ github.sha }}
+          path: /tmp/apply-four-reviews.log
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Set up PHP
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with:
@@ -54,19 +63,6 @@ jobs:
           node --check assets/js/clinic.js
           php tests/run-all.php
           git diff --check
-
-      - name: Preserve diagnostic on failure
-        if: failure()
-        shell: bash
-        run: |
-          set -euo pipefail
-          git reset --hard HEAD
-          cp /tmp/apply-four-reviews.log .codex/apply-error.log
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .codex/apply-error.log
-          git commit -m "ci: record four-review applicator diagnostic"
-          git push origin HEAD:codex/file08-complete-master-plan-1.0.0
 
       - name: Commit corrected source
         shell: bash
