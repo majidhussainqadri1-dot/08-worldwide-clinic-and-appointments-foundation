@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Worldwide Clinic and Appointments
  * Plugin URI: https://www.sabrihomeopathy.com/
- * Description: Canonical worldwide clinic identity, branches, services, fees, availability, slot holds, appointments, consent, lifecycle, notifications, calendar, complaints, review eligibility, privacy, observability, migration, secure clinical boundaries, pre-visit intake and follow-up continuity for the Sabri Social Homeopathy Platform.
- * Version: 1.0.1
+ * Description: Canonical worldwide clinic identity, branches, services, fees, availability, slot holds, appointments, consent, lifecycle, calendar, complaints, review eligibility, privacy, observability, migration, secure continuity, and Future Clinic Intelligence & Interoperability 24 for the Sabri Social Homeopathy Platform.
+ * Version: 1.2.0
  * Requires at least: 6.6
  * Requires PHP: 7.4
  * Author: Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
@@ -14,12 +14,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WCA_VERSION', '1.0.1' );
+define( 'WCA_VERSION', '1.2.0' );
 define( 'WCA_FILE', __FILE__ );
 define( 'WCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WCA_URL', plugin_dir_url( __FILE__ ) );
 
-// Stable compatibility aliases for the audited 0.2.x foundation.
+// Stable compatibility aliases for the audited foundation.
 define( 'SWC_VERSION', WCA_VERSION );
 define( 'SWC_PUBLIC_CLINIC_CONTRACT_VERSION', '1.1.0' );
 define( 'SWC_CF01_CARE_CONTEXT_VERSION', '1.1.0' );
@@ -47,6 +47,8 @@ $wca_files = array(
 	'includes/class-wca-privacy.php',
 	'includes/class-wca-rest.php',
 	'includes/class-wca-opaque-api.php',
+	'includes/class-wca-calendar-link.php',
+	'includes/class-wca-future24.php',
 	'includes/class-wca-routes.php',
 	'includes/class-wca-frontend.php',
 	'includes/class-wca-admin.php',
@@ -68,6 +70,7 @@ unset( $wca_files, $wca_relative_file );
 
 register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) );
 register_activation_hook( WCA_FILE, array( 'WCA_Continuity', 'activate' ) );
+register_activation_hook( WCA_FILE, array( 'WCA_Future24', 'activate' ) );
 register_deactivation_hook( WCA_FILE, array( 'SWC_Activator', 'deactivate' ) );
 
 function wca_start_plugin() {
@@ -86,7 +89,9 @@ function wca_start_plugin() {
 	WCA_Continuity_Guards::boot();
 	WCA_Verification_Reconciliation::boot();
 	WCA_Opaque_API::boot();
+	WCA_Calendar_Link::boot();
 	WCA_Appointment_Command::boot();
+	WCA_Future24::boot();
 	( new SWC_Plugin() )->run();
 }
 add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
