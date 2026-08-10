@@ -1,7 +1,9 @@
 name: File 08 Complete Master Plan Quality
 on:
   push:
-    branches: [codex/file08-complete-master-plan-1.0.0]
+    branches:
+      - codex/file08-complete-master-plan-1.0.0
+      - codex/file08-new-governing-plans-completion-2026
   pull_request:
     branches: [main]
 permissions:
@@ -27,7 +29,9 @@ jobs:
       - name: Master-plan, security and state tests
         run: php tests/run-all.php
       - name: JavaScript syntax
-        run: node --check assets/js/clinic.js
+        run: |
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
       - name: Repository hygiene
         shell: bash
         run: |
