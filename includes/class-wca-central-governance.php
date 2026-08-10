@@ -12,10 +12,10 @@
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Central_Governance {
-	const CONTRACT_VERSION = '1.0.0';
+	const CONTRACT_VERSION = '1.1.0';
 	const GOVERNING_ADDENDUM = 'SSH-F08-CEN-2026-08-07';
 	const SABRI_GREEN = '#087A4E';
-	const FILE26_PROJECTION_VERSION = '1.0.0';
+	const FILE26_PROJECTION_VERSION = '1.1.0';
 	const AGE_CLAIM_VERSION = '1.0.0';
 
 	public static function boot() {
@@ -27,23 +27,23 @@ final class WCA_Central_Governance {
 	/** @return array<string,mixed> */
 	public static function manifest() {
 		return array(
-			'contract'              => 'wca.central-governance',
-			'version'               => self::CONTRACT_VERSION,
-			'governing_addendum'     => self::GOVERNING_ADDENDUM,
-			'file_plan'              => 'SSH-F08-PLAN-2026-v1.0',
-			'canonical_owner'        => 'File 08 — Worldwide Clinic and Appointments',
-			'brand_primary'          => self::SABRI_GREEN,
-			'platform_commission_bps'=> 0,
-			'paid_or_donor_boost'    => false,
-			'navigation_owner'       => 'File 20',
-			'notification_owner'     => 'File 19',
-			'communication_owner'    => 'File 17',
-			'assurance_owner'        => 'File 24',
-			'visual_token_owner'     => 'File 25',
-			'search_projection_owner'=> 'File 26',
-			'status_model'           => array( 'specified', 'coded', 'packaged', 'automated_qa_green', 'staging_accepted', 'live_deployed', 'operational' ),
-			'laws'                   => self::laws(),
-			'generated_at'           => gmdate( 'c' ),
+			'contract'               => 'wca.central-governance',
+			'version'                => self::CONTRACT_VERSION,
+			'governing_addendum'      => self::GOVERNING_ADDENDUM,
+			'file_plan'               => 'SSH-F08-PLAN-2026-v1.0',
+			'canonical_owner'         => 'File 08 — Worldwide Clinic and Appointments',
+			'brand_primary'           => self::SABRI_GREEN,
+			'platform_commission_bps' => 0,
+			'paid_or_donor_boost'     => false,
+			'navigation_owner'        => 'File 20',
+			'notification_owner'      => 'File 19',
+			'communication_owner'     => 'File 17',
+			'assurance_owner'         => 'File 24',
+			'visual_token_owner'      => 'File 25',
+			'search_projection_owner' => 'File 26',
+			'status_model'            => array( 'specified', 'coded', 'packaged', 'automated_qa_green', 'staging_accepted', 'live_deployed', 'operational' ),
+			'laws'                    => self::laws(),
+			'generated_at'            => gmdate( 'c' ),
 		);
 	}
 
@@ -70,9 +70,9 @@ final class WCA_Central_Governance {
 	}
 
 	/**
-	 * Obtain an age/guardian claim without silently inventing adulthood.
-	 * File 00 remains the source of truth. Read-only legacy metadata is accepted
-	 * only as a compatibility projection when a versioned helper is unavailable.
+	 * Obtain current age/guardian eligibility without silently inventing
+	 * adulthood. File 00 remains the source of truth; legacy metadata is a
+	 * read-only compatibility projection only when no versioned helper exists.
 	 *
 	 * @return array<string,mixed>|WP_Error
 	 */
@@ -99,11 +99,8 @@ final class WCA_Central_Governance {
 				$source = 'file00:smc_get_membership_claims';
 			}
 		}
-
 		$raw = apply_filters( 'wca_age_guardian_claim', $raw, $patient_user_id );
-		if ( is_array( $raw ) && ! $source ) {
-			$source = 'versioned-filter';
-		}
+		if ( is_array( $raw ) && ! $source ) { $source = 'versioned-filter'; }
 
 		if ( ! is_array( $raw ) ) {
 			$birth = '';
@@ -125,7 +122,6 @@ final class WCA_Central_Governance {
 				$source = 'file00:legacy-read-projection';
 			}
 		}
-
 		if ( ! is_array( $raw ) ) {
 			return new WP_Error( 'wca_age_claim_unavailable', __( 'Current age and guardian eligibility could not be verified. Refresh your account verification before booking.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
@@ -135,23 +131,20 @@ final class WCA_Central_Governance {
 		$minor = array_key_exists( 'is_minor', $raw ) && null !== $raw['is_minor'] ? (bool) $raw['is_minor'] : null;
 		$threshold = 'female' === $gender ? 12 : 15;
 		$threshold = max( $threshold, absint( apply_filters( 'wca_guardian_age_threshold', $threshold, $gender, $patient_user_id ) ) );
-		if ( null === $minor && null !== $age ) {
-			$minor = $age < $threshold;
-		}
+		if ( null === $minor && null !== $age ) { $minor = $age < $threshold; }
 		if ( null === $minor ) {
 			return new WP_Error( 'wca_age_claim_incomplete', __( 'Age eligibility is incomplete and cannot be assumed.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
-
 		return array(
-			'contract'       => 'wca.age-guardian-claim',
-			'version'        => self::AGE_CLAIM_VERSION,
-			'patient_user_id'=> $patient_user_id,
-			'gender'         => $gender,
-			'age'            => $age,
-			'threshold'      => $threshold,
+			'contract'          => 'wca.age-guardian-claim',
+			'version'           => self::AGE_CLAIM_VERSION,
+			'patient_user_id'   => $patient_user_id,
+			'gender'            => $gender,
+			'age'               => $age,
+			'threshold'         => $threshold,
 			'guardian_required' => (bool) $minor,
-			'source'         => $source,
-			'checked_at_utc' => gmdate( 'c' ),
+			'source'            => $source,
+			'checked_at_utc'    => gmdate( 'c' ),
 		);
 	}
 
@@ -162,21 +155,14 @@ final class WCA_Central_Governance {
 		$actor_user_id    = absint( $actor_user_id );
 		$claim = self::age_guardian_claim( $patient_user_id );
 		if ( is_wp_error( $claim ) ) { return $claim; }
-
 		if ( ! empty( $claim['guardian_required'] ) ) {
 			if ( ! $guardian_user_id || $guardian_user_id !== $actor_user_id || ! WCA_Authorization::is_guardian( $guardian_user_id ) ) {
 				return new WP_Error( 'wca_guardian_required', __( 'A current verified guardian must act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 			}
 			$allowed = function_exists( 'smc_guardian_may_act_for' ) ? (bool) smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ) : (bool) apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
-			if ( ! $allowed ) {
-				return new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
-			}
-			return true;
+			return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
-
-		if ( $patient_user_id === $actor_user_id && ! $guardian_user_id ) {
-			return true;
-		}
+		if ( $patient_user_id === $actor_user_id && ! $guardian_user_id ) { return true; }
 		if ( $guardian_user_id && $guardian_user_id === $actor_user_id && WCA_Authorization::is_guardian( $guardian_user_id ) ) {
 			$allowed = function_exists( 'smc_guardian_may_act_for' ) ? (bool) smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ) : (bool) apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
 			return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
@@ -205,64 +191,73 @@ final class WCA_Central_Governance {
 	}
 
 	/**
-	 * Public-safe projection that File 26 may index. This does not create an
-	 * index or ranking database in File 08.
+	 * Public-safe projection for File 26. It is derived only from the already
+	 * allow-listed public File 08 projection so native numeric identifiers,
+	 * private contacts, schedule internals and patient/appointment data cannot
+	 * leak through this bridge.
 	 *
 	 * @return array<string,mixed>|WP_Error
 	 */
 	public static function file26_clinic_projection( $clinic_ref ) {
 		$clinic_ref = sanitize_text_field( $clinic_ref );
-		$clinic = WCA_Repository::get_clinic( $clinic_ref, true );
-		if ( ! $clinic ) {
-			return new WP_Error( 'wca_projection_missing', __( 'Clinic is not publicly eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
-		}
 		$projection = WCA_Service::public_clinic_projection( $clinic_ref );
-		if ( ! is_array( $projection ) || empty( $projection['verified_owner'] ) ) {
-			return new WP_Error( 'wca_projection_ineligible', __( 'Clinic verification is not current.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
+		if ( ! is_array( $projection ) || empty( $projection['verified_owner'] ) || empty( $projection['public_ref'] ) ) {
+			return new WP_Error( 'wca_projection_ineligible', __( 'Clinic is not currently eligible for public discovery.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 		}
-		$slug = sanitize_title( isset( $projection['slug'] ) ? $projection['slug'] : $clinic['slug'] );
+		$slug = sanitize_title( isset( $projection['slug'] ) ? $projection['slug'] : '' );
+		if ( ! $slug ) { return new WP_Error( 'wca_projection_route', __( 'Clinic canonical route is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$url = apply_filters( 'wca_canonical_clinic_url', home_url( '/clinic/' . rawurlencode( $slug ) . '/' ), $clinic_ref, $projection );
 		return array(
 			'contract'       => 'wca.file26-clinic-projection',
 			'version'        => self::FILE26_PROJECTION_VERSION,
 			'object_type'    => 'clinic',
-			'public_ref'     => (string) $clinic['public_ref'],
+			'public_ref'     => sanitize_text_field( $projection['public_ref'] ),
 			'canonical_url'  => esc_url_raw( $url ),
-			'title'          => sanitize_text_field( $clinic['name'] ),
-			'summary'        => sanitize_textarea_field( $clinic['summary'] ),
-			'languages'      => array_values( array_map( 'sanitize_text_field', (array) ( isset( $clinic['languages'] ) ? $clinic['languages'] : array() ) ) ),
-			'branches'       => WCA_Repository::list_branches( $clinic['id'], true ),
-			'services'       => WCA_Repository::list_services( $clinic['id'], true ),
+			'title'          => sanitize_text_field( isset( $projection['name'] ) ? $projection['name'] : '' ),
+			'summary'        => sanitize_textarea_field( isset( $projection['summary'] ) ? $projection['summary'] : '' ),
+			'languages'      => array_values( array_map( 'sanitize_text_field', (array) ( isset( $projection['languages'] ) ? $projection['languages'] : array() ) ) ),
+			'branches'       => self::projection_collection( isset( $projection['branches'] ) ? $projection['branches'] : array() ),
+			'services'       => self::projection_collection( isset( $projection['services'] ) ? $projection['services'] : array() ),
 			'verified_owner' => true,
 			'indexable'      => true,
 			'paid_boost'     => false,
 			'donor_boost'    => false,
 			'outcome_rank'   => false,
 			'freshness'      => array(
-				'version'    => absint( $clinic['version'] ),
-				'updated_at' => (string) $clinic['updated_at'],
-				'generated_at'=> gmdate( 'c' ),
+				'version'      => absint( isset( $projection['record_version'] ) ? $projection['record_version'] : 0 ),
+				'updated_at'   => sanitize_text_field( isset( $projection['updated_at'] ) ? $projection['updated_at'] : '' ),
+				'generated_at' => gmdate( 'c' ),
 			),
 		);
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private static function projection_collection( $rows ) {
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			if ( ! is_array( $row ) ) { continue; }
+			foreach ( WCA_Contracts::prohibited_public_fields() as $field ) { unset( $row[ $field ] ); }
+			foreach ( array( 'id', 'clinic_id', 'branch_id', 'doctor_user_id', 'owner_user_id', 'patient_user_id', 'guardian_user_id', 'native_id' ) as $field ) { unset( $row[ $field ] ); }
+			$out[] = $row;
+		}
+		return $out;
 	}
 
 	public static function observe_outbox_event( $envelope ) {
 		if ( ! is_array( $envelope ) ) { return; }
 		$topic = isset( $envelope['topic'] ) ? (string) $envelope['topic'] : '';
-		if ( ! in_array( $topic, array( 'ClinicActivated.v1', 'ClinicServiceChanged.v1', 'ClinicAvailabilityChanged.v1', 'DoctorSuspended.v1' ), true ) ) {
-			return;
-		}
+		if ( ! in_array( $topic, array( 'ClinicActivated.v1', 'ClinicServiceChanged.v1', 'ClinicAvailabilityChanged.v1' ), true ) ) { return; }
 		$payload = isset( $envelope['payload'] ) && is_array( $envelope['payload'] ) ? $envelope['payload'] : array();
 		$clinic_ref = sanitize_text_field( isset( $payload['clinic_ref'] ) ? $payload['clinic_ref'] : ( isset( $envelope['aggregate_ref'] ) ? $envelope['aggregate_ref'] : '' ) );
-		if ( ! $clinic_ref || ! preg_match( '/^[0-9a-f-]{36}$/i', $clinic_ref ) ) { return; }
+		if ( ! preg_match( '/^[0-9a-f-]{36}$/i', $clinic_ref ) ) { return; }
 		$trace = isset( $envelope['trace_id'] ) ? sanitize_text_field( $envelope['trace_id'] ) : WCA_Observability::trace_id();
 		WCA_Repository::enqueue( 'File26.SearchProjectionChanged.v1', $clinic_ref, array(
-			'contract'     => 'wca.file26-clinic-projection',
-			'version'      => self::FILE26_PROJECTION_VERSION,
-			'object_type'  => 'clinic',
-			'public_ref'   => $clinic_ref,
-			'change_source'=> sanitize_text_field( $topic ),
-			'owner'        => 'File08',
+			'contract'      => 'wca.file26-clinic-projection',
+			'version'       => self::FILE26_PROJECTION_VERSION,
+			'object_type'   => 'clinic',
+			'public_ref'    => $clinic_ref,
+			'change_source' => sanitize_text_field( $topic ),
+			'owner'         => 'File08',
 		), $trace );
 	}
 
@@ -294,9 +289,7 @@ final class WCA_Central_Governance {
 	}
 
 	public static function status_shortcode() {
-		if ( ! current_user_can( 'manage_worldwide_clinic' ) && ! current_user_can( 'manage_options' ) ) {
-			return '';
-		}
+		if ( ! current_user_can( 'manage_worldwide_clinic' ) && ! current_user_can( 'manage_options' ) ) { return ''; }
 		$manifest = self::manifest();
 		return '<section class="wca-card" aria-labelledby="wca-governance-title"><h2 id="wca-governance-title">' . esc_html__( 'File 08 governing status', 'worldwide-clinic-appointments' ) . '</h2><p>' . esc_html__( 'Canonical owner controls are active. Production acceptance remains a separate evidence gate.', 'worldwide-clinic-appointments' ) . '</p><dl><dt>' . esc_html__( 'Contract', 'worldwide-clinic-appointments' ) . '</dt><dd>' . esc_html( $manifest['version'] ) . '</dd><dt>' . esc_html__( 'Primary brand token', 'worldwide-clinic-appointments' ) . '</dt><dd>' . esc_html( self::SABRI_GREEN ) . '</dd><dt>' . esc_html__( 'Platform commission', 'worldwide-clinic-appointments' ) . '</dt><dd>0%</dd></dl></section>';
 	}
