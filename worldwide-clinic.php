@@ -38,6 +38,7 @@ $wca_files = array(
 	'includes/class-wca-repository.php',
 	'includes/class-wca-plan-guard.php',
 	'includes/class-wca-service.php',
+	'includes/class-wca-appointment-command.php',
 	'includes/class-wca-compatibility.php',
 	'includes/class-wca-outbox.php',
 	'includes/class-wca-continuity-secure.php',
@@ -85,6 +86,7 @@ function wca_start_plugin() {
 	WCA_Continuity_Guards::boot();
 	WCA_Verification_Reconciliation::boot();
 	WCA_Opaque_API::boot();
+	WCA_Appointment_Command::boot();
 	( new SWC_Plugin() )->run();
 }
 add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
