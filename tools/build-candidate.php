@@ -4,9 +4,9 @@ if ( ! class_exists( 'ZipArchive' ) ) { fwrite( STDERR, "ZipArchive is required.
 $options = getopt( '', array( 'root::', 'output-dir::', 'commit:', 'source-date-epoch:' ) );
 $root = realpath( $options['root'] ?? dirname( __DIR__ ) );
 $out  = $options['output-dir'] ?? $root . '/build';
-$commit = preg_replace( '/[^0-9a-f]/i', '', (string) ( $options['commit'] ?? '' ) );
+$commit = strtolower( trim( (string) ( $options['commit'] ?? '' ) ) );
 $epoch = (int) ( $options['source-date-epoch'] ?? 0 );
-if ( ! $root || strlen( $commit ) < 7 || $epoch < 1 ) { fwrite( STDERR, "Valid root, commit and source-date-epoch are required.\n" ); exit( 2 ); }
+if ( ! $root || ! preg_match( '/^[0-9a-f]{40}$/', $commit ) || $epoch < 1 ) { fwrite( STDERR, "Valid root, exact 40-hex commit and source-date-epoch are required.\n" ); exit( 2 ); }
 
 function wca_build_runtime_version( $root ) {
 	$plugin = $root . '/worldwide-clinic.php';
@@ -62,7 +62,7 @@ $manifest = array(
 	'plugin' => '08-worldwide-clinic-and-appointments',
 	'version' => $version,
 	'runtime_version_source' => 'worldwide-clinic.php',
-	'commit' => strtolower( $commit ),
+	'commit' => $commit,
 	'source_date_epoch' => $epoch,
 	'built_at_utc' => gmdate( 'c', $epoch ),
 	'staging_accepted' => false,
