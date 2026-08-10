@@ -32,6 +32,7 @@ jobs:
         run: |
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
+          node --check assets/js/future24.js
       - name: Repository hygiene
         shell: bash
         run: |
