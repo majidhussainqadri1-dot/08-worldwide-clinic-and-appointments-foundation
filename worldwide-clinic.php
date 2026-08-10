@@ -40,7 +40,7 @@ $wca_files = array(
 	'includes/class-wca-service.php',
 	'includes/class-wca-compatibility.php',
 	'includes/class-wca-outbox.php',
-	'includes/class-wca-continuity.php',
+	'includes/class-wca-continuity-secure.php',
 	'includes/class-wca-privacy.php',
 	'includes/class-wca-rest.php',
 	'includes/class-wca-routes.php',
