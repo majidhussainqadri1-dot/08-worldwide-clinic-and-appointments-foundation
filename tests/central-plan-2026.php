@@ -32,16 +32,16 @@ function f08_require_tokens( $label, $source, $tokens ) {
 	}
 }
 
-$bootstrap = f08_read( 'worldwide-clinic.php' );
+$bootstrap  = f08_read( 'worldwide-clinic.php' );
 $governance = f08_read( 'includes/class-wca-central-governance.php' );
-$continuity = f08_read( 'includes/class-wca-continuity.php' );
-$auth = f08_read( 'includes/class-wca-authorization.php' );
-$css = f08_read( 'assets/css/clinic.css' );
-$js = f08_read( 'assets/js/continuity.js' );
+$continuity = f08_read( 'includes/class-wca-continuity-secure.php' );
+$auth       = f08_read( 'includes/class-wca-authorization.php' );
+$css        = f08_read( 'assets/css/clinic.css' );
+$js         = f08_read( 'assets/js/continuity.js' );
 
 f08_require_tokens( 'bootstrap', $bootstrap, array(
 	'class-wca-central-governance.php',
-	'class-wca-continuity.php',
+	'class-wca-continuity-secure.php',
 	'WCA_Central_Governance::boot()',
 	'WCA_Continuity::boot()',
 	"register_activation_hook( WCA_FILE, array( 'WCA_Continuity', 'activate' ) )",
@@ -67,16 +67,26 @@ f08_require_tokens( 'continuity', $continuity, array(
 	'PreVisitIntakeSubmitted.v1', 'FollowUpPlanCreated.v1', 'FollowUpPlanCompleted.v1',
 	'wca.file17-clinic-context', 'messaging_allowed', 'call_allowed', 'recording_allowed',
 	'File19.NotificationRequested.v1', 'appointment_processing', 'followup',
-	'sodium-secretbox-v1', 'aes-256-gcm-v1', 'wca_crypto_unavailable',
+	'sodium-secretbox-v1', 'aes-256-gcm-v1', 'wca_crypto_unavailable', 'key_id',
+	'wca_continuity_decryption_keys', 'wca_continuity_encryption_key',
+	'wp_privacy_personal_data_exporters', 'wp_privacy_personal_data_erasers',
+	'wca_continuity_legal_hold', 'apply_retention',
 	'wca_emergency_diversion', 'no-store', 'noindex',
-	'/continuity/appointments/', '/file17-context', '/followups',
+	'/continuity/appointments/', '/file17-context', '/followups', '/continuity/health',
 ) );
 
-// Sensitive continuity records must never have a plaintext payload column.
-foreach ( array( 'payload longtext', 'reason text NOT NULL', 'instructions text NOT NULL', 'clinical_note text' ) as $unsafe_schema ) {
+// Sensitive continuity records must never have a plaintext narrative column.
+foreach ( array( 'payload longtext', 'reason text NOT NULL', 'instructions text NOT NULL', 'clinical_note text', 'resource_refs_json' ) as $unsafe_schema ) {
 	if ( false !== stripos( $continuity, $unsafe_schema ) ) {
 		$failures[] = 'Sensitive continuity schema contains a plaintext field: ' . $unsafe_schema;
 	}
+}
+
+if ( false !== strpos( $continuity, 'base64_decode(' ) ) {
+	$failures[] = 'Continuity implementation contains forbidden base64 decoding.';
+}
+if ( false === strpos( $continuity, 'bin2hex(' ) || false === strpos( $continuity, 'hex2bin(' ) ) {
+	$failures[] = 'Continuity ciphertext encoding is not explicit hexadecimal encoding.';
 }
 
 if ( false === strpos( $css, '--wca-green:#087A4E' ) ) {
