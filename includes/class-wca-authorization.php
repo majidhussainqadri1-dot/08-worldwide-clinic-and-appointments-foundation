@@ -15,21 +15,23 @@ final class WCA_Authorization {
 			return new WP_Error( 'wca_auth_required', __( 'Authentication is required.', 'worldwide-clinic-appointments' ), array( 'status' => 401 ) );
 		}
 
-		$status = function_exists( 'smc_user_status' ) ? (string) smc_user_status( $user_id ) : 'unknown';
-		$founder = function_exists( 'smc_is_founder' ) && smc_is_founder( $user_id );
-		$eligible = $founder || 'approved' === $status;
+		$status    = function_exists( 'smc_user_status' ) ? (string) smc_user_status( $user_id ) : 'unknown';
+		$founder   = function_exists( 'smc_is_founder' ) && smc_is_founder( $user_id );
+		$eligible  = $founder || 'approved' === $status;
 		$suspended = in_array( $status, array( 'suspended', 'revoked', 'rejected', 'expired', 'blocked' ), true );
-		$doctor = class_exists( 'SWC_Doctor_Authority' ) ? SWC_Doctor_Authority::is_eligible( $user_id ) : false;
-		$role = $founder ? 'founder' : ( $doctor ? 'doctor' : ( user_can( $user_id, 'manage_worldwide_clinic' ) ? 'administrator' : 'member' ) );
+		$doctor    = class_exists( 'SWC_Doctor_Authority' ) ? SWC_Doctor_Authority::is_eligible( $user_id ) : false;
+		$staff     = self::has_active_clinic_delegation( $user_id );
+		$role      = $founder ? 'founder' : ( $doctor ? 'doctor' : ( user_can( $user_id, 'manage_worldwide_clinic' ) ? 'administrator' : ( $staff ? 'clinic_staff' : 'member' ) ) );
 
 		$claims = array(
 			'contract'      => 'wca.identity-claims',
-			'version'       => '1.0.0',
+			'version'       => '1.1.0',
 			'user_id'       => $user_id,
 			'subject_uuid'  => self::subject_uuid( $user_id ),
 			'approved'      => $eligible && ! $suspended,
 			'founder'       => (bool) $founder,
 			'doctor'        => (bool) $doctor,
+			'clinic_staff'  => (bool) $staff,
 			'role'          => $role,
 			'suspended'     => (bool) $suspended,
 			'guardian'      => self::is_guardian( $user_id ),
@@ -60,9 +62,7 @@ final class WCA_Authorization {
 	private static function capabilities( $user_id ) {
 		$caps = array();
 		foreach ( array( 'manage_worldwide_clinic', 'manage_wca_clinics', 'manage_wca_complaints', 'manage_wca_operations', 'read', 'upload_files' ) as $cap ) {
-			if ( user_can( $user_id, $cap ) ) {
-				$caps[] = $cap;
-			}
+			if ( user_can( $user_id, $cap ) ) { $caps[] = $cap; }
 		}
 		return $caps;
 	}
@@ -77,21 +77,15 @@ final class WCA_Authorization {
 	/** @return true|WP_Error */
 	public static function require_step_up( $purpose, $user_id = 0 ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
-		if ( function_exists( 'smc_step_up_is_valid' ) && smc_step_up_is_valid( $user_id, sanitize_key( $purpose ) ) ) {
-			return true;
-		}
-		if ( (bool) apply_filters( 'wca_step_up_is_valid', false, $user_id, sanitize_key( $purpose ) ) ) {
-			return true;
-		}
+		if ( function_exists( 'smc_step_up_is_valid' ) && smc_step_up_is_valid( $user_id, sanitize_key( $purpose ) ) ) { return true; }
+		if ( (bool) apply_filters( 'wca_step_up_is_valid', false, $user_id, sanitize_key( $purpose ) ) ) { return true; }
 		return new WP_Error( 'wca_step_up_required', __( 'A recent security verification is required.', 'worldwide-clinic-appointments' ), array( 'status' => 403, 'purpose' => sanitize_key( $purpose ) ) );
 	}
 
 	/** @return true|WP_Error */
 	public static function can_create_clinic( $user_id = 0 ) {
 		$claims = self::claims( $user_id );
-		if ( is_wp_error( $claims ) ) {
-			return $claims;
-		}
+		if ( is_wp_error( $claims ) ) { return $claims; }
 		return ! empty( $claims['doctor'] ) || ! empty( $claims['founder'] ) ? true : new WP_Error( 'wca_doctor_required', __( 'Verified doctor authority is required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 	}
 
@@ -102,9 +96,8 @@ final class WCA_Authorization {
 		if ( is_wp_error( $claims ) ) { return $claims; }
 		if ( user_can( $user_id, 'manage_worldwide_clinic' ) || user_can( $user_id, 'manage_wca_clinics' ) ) { return true; }
 		if ( absint( $clinic['owner_user_id'] ?? 0 ) === $user_id && ( ! empty( $claims['doctor'] ) || ! empty( $claims['founder'] ) ) ) { return true; }
-		$delegated = (array) get_user_meta( $user_id, '_wca_clinic_delegations', true );
-		$clinic_id = absint( $clinic['id'] ?? 0 );
-		if ( isset( $delegated[ $clinic_id ] ) && is_array( $delegated[ $clinic_id ] ) && ! empty( $delegated[ $clinic_id ]['active'] ) ) { return true; }
+		$entry = self::clinic_delegation( $user_id, absint( $clinic['id'] ?? 0 ) );
+		if ( $entry && self::delegation_allows_scope( $entry, 'clinic_manage' ) ) { return true; }
 		return new WP_Error( 'wca_clinic_forbidden', __( 'You cannot manage this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 	}
 
@@ -119,6 +112,9 @@ final class WCA_Authorization {
 			$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
 			$guardian = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_id, $guardian_id, $user_id ) : true;
 			return is_wp_error( $guardian ) ? $guardian : true;
+		}
+		if ( self::can_staff_access_appointment( $appointment_id, $user_id, 'appointments' ) ) {
+			return true;
 		}
 		if ( user_can( $user_id, 'manage_worldwide_clinic' ) || user_can( $user_id, 'manage_wca_operations' ) ) {
 			$purpose = sanitize_key( $purpose );
@@ -150,8 +146,68 @@ final class WCA_Authorization {
 		$user_id = absint( $user_id ?: get_current_user_id() );
 		if ( user_can( $user_id, 'manage_worldwide_clinic' ) ) { return 'admin'; }
 		if ( SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) { return 'doctor'; }
+		if ( self::can_staff_access_appointment( $appointment_id, $user_id, 'appointments' ) ) { return 'clinic_staff'; }
 		if ( absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) ) === $user_id ) { return 'guardian'; }
 		return 'patient';
+	}
+
+	/**
+	 * Check explicit clinic delegation scope for an appointment. This does not
+	 * infer clinical authority from a role label or a generic active session.
+	 */
+	public static function can_staff_access_appointment( $appointment_id, $user_id = 0, $scope = 'appointments' ) {
+		$user_id   = absint( $user_id ?: get_current_user_id() );
+		$clinic_id = absint( SWC_Helpers::meta( $appointment_id, 'clinic_id', 0 ) );
+		if ( ! $user_id || ! $clinic_id ) { return false; }
+		$entry = self::clinic_delegation( $user_id, $clinic_id );
+		return $entry ? self::delegation_allows_scope( $entry, sanitize_key( $scope ) ) : false;
+	}
+
+	/** @return array<int,int> */
+	public static function delegated_clinic_ids( $user_id = 0, $scope = 'appointments' ) {
+		$user_id = absint( $user_id ?: get_current_user_id() );
+		$out = array();
+		foreach ( self::delegations( $user_id ) as $clinic_id => $entry ) {
+			$clinic_id = absint( $clinic_id );
+			if ( $clinic_id && is_array( $entry ) && self::delegation_allows_scope( $entry, sanitize_key( $scope ) ) ) { $out[] = $clinic_id; }
+		}
+		return array_values( array_unique( $out ) );
+	}
+
+	public static function has_active_clinic_delegation( $user_id = 0 ) {
+		$user_id = absint( $user_id ?: get_current_user_id() );
+		foreach ( self::delegations( $user_id ) as $entry ) {
+			if ( is_array( $entry ) && ! empty( $entry['active'] ) ) { return true; }
+		}
+		return false;
+	}
+
+	/** @return array<string,mixed> */
+	private static function delegations( $user_id ) {
+		$value = get_user_meta( absint( $user_id ), '_wca_clinic_delegations', true );
+		return is_array( $value ) ? $value : array();
+	}
+
+	/** @return array<string,mixed> */
+	private static function clinic_delegation( $user_id, $clinic_id ) {
+		$all = self::delegations( absint( $user_id ) );
+		$entry = isset( $all[ absint( $clinic_id ) ] ) && is_array( $all[ absint( $clinic_id ) ] ) ? $all[ absint( $clinic_id ) ] : array();
+		return ! empty( $entry['active'] ) ? $entry : array();
+	}
+
+	private static function delegation_allows_scope( $entry, $scope ) {
+		if ( ! is_array( $entry ) || empty( $entry['active'] ) ) { return false; }
+		$scope = sanitize_key( $scope );
+		$scopes = isset( $entry['scopes'] ) && is_array( $entry['scopes'] ) ? array_map( 'sanitize_key', $entry['scopes'] ) : array();
+		$direct = ! empty( $entry[ $scope ] ) || in_array( $scope, $scopes, true );
+		if ( 'appointments' === $scope ) {
+			$direct = $direct || ! empty( $entry['appointment_ops'] ) || ! empty( $entry['schedule'] ) || ! empty( $entry['clinical_followup'] ) || ! empty( $entry['clinical'] ) || in_array( 'appointment_ops', $scopes, true ) || in_array( 'schedule', $scopes, true ) || in_array( 'clinical_followup', $scopes, true );
+		} elseif ( 'clinical_followup' === $scope ) {
+			$direct = $direct || ! empty( $entry['clinical'] ) || in_array( 'clinical', $scopes, true );
+		} elseif ( 'clinic_manage' === $scope ) {
+			$direct = $direct || ! empty( $entry['manage'] ) || ! empty( $entry['schedule'] ) || ! empty( $entry['appointments'] ) || in_array( 'manage', $scopes, true );
+		}
+		return (bool) apply_filters( 'wca_clinic_delegation_allows_scope', $direct, $entry, $scope );
 	}
 
 	/** @return true|WP_Error */
@@ -162,14 +218,9 @@ final class WCA_Authorization {
 		if ( ! $patient_user_id || ! $actor_user_id ) {
 			return new WP_Error( 'wca_patient_actor', __( 'A valid patient and current actor are required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
-
-		// The new governing plan requires a fresh File 00 age/guardian recheck at
-		// every protected patient action. Unknown age is never assumed to be adult.
 		if ( class_exists( 'WCA_Central_Governance' ) ) {
 			return WCA_Central_Governance::validate_patient_guardian( $patient_user_id, $guardian_user_id, $actor_user_id );
 		}
-
-		// Compatibility fallback for pre-addendum execution only.
 		if ( ! $guardian_user_id ) {
 			return $patient_user_id === $actor_user_id ? true : new WP_Error( 'wca_patient_actor_mismatch', __( 'A user may only make a personal request or act through a verified guardian relationship.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
@@ -177,9 +228,7 @@ final class WCA_Authorization {
 			return new WP_Error( 'wca_guardian_unverified', __( 'The current actor must be the verified guardian.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		$allowed = (bool) apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
-		if ( function_exists( 'smc_guardian_may_act_for' ) ) {
-			$allowed = (bool) smc_guardian_may_act_for( $guardian_user_id, $patient_user_id );
-		}
+		if ( function_exists( 'smc_guardian_may_act_for' ) ) { $allowed = (bool) smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); }
 		return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 	}
 }
