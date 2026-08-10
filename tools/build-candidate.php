@@ -7,8 +7,35 @@ $out  = $options['output-dir'] ?? $root . '/build';
 $commit = preg_replace( '/[^0-9a-f]/i', '', (string) ( $options['commit'] ?? '' ) );
 $epoch = (int) ( $options['source-date-epoch'] ?? 0 );
 if ( ! $root || strlen( $commit ) < 7 || $epoch < 1 ) { fwrite( STDERR, "Valid root, commit and source-date-epoch are required.\n" ); exit( 2 ); }
+
+function wca_build_runtime_version( $root ) {
+	$plugin = $root . '/worldwide-clinic.php';
+	$source = is_file( $plugin ) ? file_get_contents( $plugin ) : false;
+	if ( ! is_string( $source ) ) {
+		fwrite( STDERR, "Runtime plugin source is unavailable.\n" );
+		exit( 2 );
+	}
+	$header = '';
+	$constant = '';
+	if ( preg_match( '/^\s*\*\s*Version:\s*([^\s]+)/m', $source, $match ) ) {
+		$header = trim( $match[1] );
+	}
+	if ( preg_match( "/define\(\s*'WCA_VERSION'\s*,\s*'([^']+)'\s*\)/", $source, $match ) ) {
+		$constant = trim( $match[1] );
+	}
+	if ( ! $header || ! $constant || ! hash_equals( $header, $constant ) ) {
+		fwrite( STDERR, "Plugin header/runtime version mismatch.\n" );
+		exit( 2 );
+	}
+	if ( ! preg_match( '/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $header ) ) {
+		fwrite( STDERR, "Runtime version is not a supported semantic version.\n" );
+		exit( 2 );
+	}
+	return $header;
+}
+
 @mkdir( $out, 0775, true );
-$version = '1.0.1';
+$version = wca_build_runtime_version( $root );
 $base = '08-worldwide-clinic-and-appointments-' . $version . '-candidate';
 $zipPath = rtrim( $out, '/' ) . '/' . $base . '.zip';
 $manifestPath = rtrim( $out, '/' ) . '/' . $base . '-manifest.json';
@@ -31,9 +58,16 @@ sort( $files, SORT_STRING );
 $entries = array();
 foreach ( $files as $file ) { $entries[] = array( 'path' => $file, 'bytes' => filesize( $root . '/' . $file ), 'sha256' => hash_file( 'sha256', $root . '/' . $file ) ); }
 $manifest = array(
-	'format' => 'wca-candidate-manifest-1', 'plugin' => '08-worldwide-clinic-and-appointments', 'version' => $version,
-	'commit' => strtolower( $commit ), 'source_date_epoch' => $epoch, 'built_at_utc' => gmdate( 'c', $epoch ),
-	'staging_accepted' => false, 'production_accepted' => false, 'commission_percent' => 0,
+	'format' => 'wca-candidate-manifest-1',
+	'plugin' => '08-worldwide-clinic-and-appointments',
+	'version' => $version,
+	'runtime_version_source' => 'worldwide-clinic.php',
+	'commit' => strtolower( $commit ),
+	'source_date_epoch' => $epoch,
+	'built_at_utc' => gmdate( 'c', $epoch ),
+	'staging_accepted' => false,
+	'production_accepted' => false,
+	'commission_percent' => 0,
 	'files' => $entries,
 );
 $json = json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n";
@@ -52,4 +86,4 @@ if ( method_exists( $zip, 'setMtimeName' ) ) { $zip->setMtimeName( $prefix . 'WC
 $zip->close();
 $checksum = hash_file( 'sha256', $zipPath ) . '  ' . basename( $zipPath ) . "\n";
 file_put_contents( $checksumPath, $checksum );
-echo json_encode( array( 'zip' => $zipPath, 'manifest' => $manifestPath, 'checksum' => $checksumPath, 'files' => count( $files ), 'bytes' => filesize( $zipPath ) ), JSON_PRETTY_PRINT ) . "\n";
+echo json_encode( array( 'version' => $version, 'zip' => $zipPath, 'manifest' => $manifestPath, 'checksum' => $checksumPath, 'files' => count( $files ), 'bytes' => filesize( $zipPath ) ), JSON_PRETTY_PRINT ) . "\n";
