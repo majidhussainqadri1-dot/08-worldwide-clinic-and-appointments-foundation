@@ -1,0 +1,41 @@
+name: Apply File 08 Future24 Overlay
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - '.codex/future24-overlay.part*'
+      - '.github/workflows/apply-future24-overlay.yml'
+permissions:
+  contents: write
+concurrency:
+  group: file08-future24-overlay
+  cancel-in-progress: false
+jobs:
+  apply:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Materialize exact Future24 source overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .codex/future24-overlay.part01 .codex/future24-overlay.part02 .codex/future24-overlay.part03 .codex/future24-overlay.part04 .codex/future24-overlay.part05 | base64 -d > /tmp/future24-overlay.tar.gz
+          tar -xzf /tmp/future24-overlay.tar.gz -C .
+          rm -f .codex/future24-overlay.part01 .codex/future24-overlay.part02 .codex/future24-overlay.part03 .codex/future24-overlay.part04 .codex/future24-overlay.part05
+          rm -f .github/workflows/apply-future24-overlay.yml
+          php -l worldwide-clinic.php
+          php -l includes/class-wca-contracts.php
+          php -l includes/class-wca-calendar-link.php
+          php -l includes/class-wca-future24.php
+          php -l tests/future24.php
+          node --check assets/js/future24.js
+          php tests/future24.php
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'feat(file08): implement Future Clinic Intelligence 24'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
