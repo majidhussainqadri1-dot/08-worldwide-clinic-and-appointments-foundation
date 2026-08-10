@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Worldwide Clinic and Appointments
  * Plugin URI: https://www.sabrihomeopathy.com/
- * Description: Canonical worldwide clinic identity, branches, services, fees, availability, slot holds, appointments, consent, lifecycle, notifications, calendar, complaints, review eligibility, privacy, observability, migration and secure clinical boundaries for the Sabri Social Homeopathy Platform.
+ * Description: Canonical worldwide clinic identity, branches, services, fees, availability, slot holds, appointments, consent, lifecycle, notifications, calendar, complaints, review eligibility, privacy, observability, migration, secure clinical boundaries, pre-visit intake and follow-up continuity for the Sabri Social Homeopathy Platform.
  * Version: 1.0.1
  * Requires at least: 6.6
  * Requires PHP: 7.4
@@ -34,11 +34,13 @@ $wca_files = array(
 	'includes/class-swc-helpers.php',
 	'includes/class-swc-doctor-authority.php',
 	'includes/class-wca-authorization.php',
+	'includes/class-wca-central-governance.php',
 	'includes/class-wca-repository.php',
 	'includes/class-wca-plan-guard.php',
 	'includes/class-wca-service.php',
 	'includes/class-wca-compatibility.php',
 	'includes/class-wca-outbox.php',
+	'includes/class-wca-continuity.php',
 	'includes/class-wca-privacy.php',
 	'includes/class-wca-rest.php',
 	'includes/class-wca-routes.php',
@@ -61,6 +63,7 @@ foreach ( $wca_files as $wca_relative_file ) {
 unset( $wca_files, $wca_relative_file );
 
 register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) );
+register_activation_hook( WCA_FILE, array( 'WCA_Continuity', 'activate' ) );
 register_deactivation_hook( WCA_FILE, array( 'SWC_Activator', 'deactivate' ) );
 
 function wca_start_plugin() {
@@ -74,6 +77,8 @@ function wca_start_plugin() {
 	}
 	SWC_Activator::maybe_upgrade();
 	WCA_Plugin::boot();
+	WCA_Central_Governance::boot();
+	WCA_Continuity::boot();
 	( new SWC_Plugin() )->run();
 }
 add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
@@ -82,3 +87,5 @@ add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
 function wca_contract_manifest() { return WCA_Contracts::contract_manifest(); }
 function wca_get_public_clinic_projection( $id_or_slug ) { return WCA_Service::public_clinic_projection( $id_or_slug ); }
 function wca_get_cf01_scheduling_context( $appointment_id, $actor_user_id = 0 ) { return swc_get_cf01_care_context( $appointment_id, $actor_user_id ); }
+function wca_get_central_governance_manifest() { return WCA_Central_Governance::manifest(); }
+function wca_get_file26_clinic_projection( $clinic_ref ) { return WCA_Central_Governance::file26_clinic_projection( $clinic_ref ); }
