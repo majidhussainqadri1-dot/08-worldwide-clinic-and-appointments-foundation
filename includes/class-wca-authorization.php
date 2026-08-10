@@ -115,7 +115,11 @@ final class WCA_Authorization {
 		if ( is_wp_error( $claims ) ) { return $claims; }
 		if ( SWC_Helpers::can_patient_manage( $appointment_id, $user_id ) || SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) { return true; }
 		$guardian_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );
-		if ( $guardian_id === $user_id && ! empty( $claims['guardian'] ) ) { return true; }
+		if ( $guardian_id === $user_id && ! empty( $claims['guardian'] ) ) {
+			$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
+			$guardian = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_id, $guardian_id, $user_id ) : true;
+			return is_wp_error( $guardian ) ? $guardian : true;
+		}
 		if ( user_can( $user_id, 'manage_worldwide_clinic' ) || user_can( $user_id, 'manage_wca_operations' ) ) {
 			$purpose = sanitize_key( $purpose );
 			$allowed = array( 'operations', 'complaint', 'privacy_request', 'incident', 'support_case' );
@@ -158,6 +162,14 @@ final class WCA_Authorization {
 		if ( ! $patient_user_id || ! $actor_user_id ) {
 			return new WP_Error( 'wca_patient_actor', __( 'A valid patient and current actor are required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
+
+		// The new governing plan requires a fresh File 00 age/guardian recheck at
+		// every protected patient action. Unknown age is never assumed to be adult.
+		if ( class_exists( 'WCA_Central_Governance' ) ) {
+			return WCA_Central_Governance::validate_patient_guardian( $patient_user_id, $guardian_user_id, $actor_user_id );
+		}
+
+		// Compatibility fallback for pre-addendum execution only.
 		if ( ! $guardian_user_id ) {
 			return $patient_user_id === $actor_user_id ? true : new WP_Error( 'wca_patient_actor_mismatch', __( 'A user may only make a personal request or act through a verified guardian relationship.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
