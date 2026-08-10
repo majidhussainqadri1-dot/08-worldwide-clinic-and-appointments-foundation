@@ -77,7 +77,7 @@ foreach ( array(
 	'data-consultation-type', 'wca_page', 'View details',
 ) as $token ) { f08h_has( 'frontend', $frontend, $token ); }
 f08h_lacks( 'frontend', $frontend, 'data-wca-appointment-id' );
-f08h_lacks( 'frontend', $frontend, 'wca/v1/appointments/\' . $id' );
+f08h_lacks( 'frontend', $frontend, "wca/v1/appointments/' . \$id" );
 
 foreach ( array(
 	'wcaAppointmentRef', 'appointment-refs/', 'telehealth_consent',
