@@ -44,6 +44,7 @@ $wca_files = array(
 	'includes/class-wca-continuity-guards.php',
 	'includes/class-wca-privacy.php',
 	'includes/class-wca-rest.php',
+	'includes/class-wca-opaque-api.php',
 	'includes/class-wca-routes.php',
 	'includes/class-wca-frontend.php',
 	'includes/class-wca-admin.php',
@@ -81,6 +82,7 @@ function wca_start_plugin() {
 	WCA_Central_Governance::boot();
 	WCA_Continuity::boot();
 	WCA_Continuity_Guards::boot();
+	WCA_Opaque_API::boot();
 	( new SWC_Plugin() )->run();
 }
 add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
