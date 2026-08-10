@@ -61,5 +61,38 @@ f24_has( 'future24', $future, 'subject_user_id( $subject )' );
 f24_has( 'future24', $future, 'wca_fhir_time' );
 f24_lacks( 'future24', $future, "gmdate( 'c', strtotime( SWC_Helpers::meta( $id, 'preferred_at_utc', '' )" );
 
+
+foreach ( array(
+	'wca_windows_clinic', "'expires_at' => gmdate", 'wca_resource_appointment_scope',
+	'cross_clinic_scope_checked', 'wca_group_window', 'apply_slot_policies_to_rest',
+	'enforcement', 'server_slot_projection', 'configured_capacity', 'free_estimate',
+	'guardian_recheck_runtime', 'remote_context_ready', 'count_only_evidence_is_not_sufficient',
+	'wca_arrival_state', 'wca_arrival_window', "'arrived'", 'wca_disruption_window',
+	'affected_count', 'rest_participant_revoke', 'participant_revoked', 'wca_virtual_room_state',
+	'wca_virtual_room_consent', 'teleconsult_consent_verified', 'wca_external_busy_window',
+	'wca_episode_scope', 'same_patient_doctor_clinic', 'clinic_appointments_between'
+) as $token ) { f24_has( 'fresh review hardening', $future, $token ); }
+
+f24_has( 'queue expiry', $future, "status='arrived' AND (expires_at IS NULL OR expires_at>%s)" );
+f24_has( 'maintenance expiry', $future, "'arrived','participant_active','room_requested','busy','disruption_active'" );
+f24_has( 'resource auth', $future, 'self::require_appointment( $appointment_ref, $actor )' );
+f24_has( 'virtual consent', $future, "consent['scopes']['teleconsult']" );
+f24_has( 'prerequisite matching', $future, 'array_diff( array_keys( $requirements ), array_keys( $evidence ) )' );
+f24_lacks( 'readiness', $future, "'guardian_recheck_runtime' => true" );
+f24_lacks( 'queue stale-count regression', $future, 'status=\'arrived\' AND created_at<%s", $clinic_id, $current[\'created_at\'] )' );
+
+
+foreach ( array(
+	'enforce_slot_hold_policy_pre_dispatch', 'wca_future24_slot_policy',
+	'observe_outbox_event', 'AppointmentCancelled.v1', 'offer_waitlist_for_cancelled_appointment',
+	'offer_pending', 'confirmation_required', 'waitlist_offer_available',
+	'questionnaire_for_appointment', 'wca.dynamic-previsit-questionnaire',
+	'performed_for_each_returned_appointment', 'File17.AppointmentParticipantChanged.v1'
+) as $token ) { f24_has( 'second review hardening', $future, $token ); }
+
+f24_has( 'smart hold policy', $future, 'self::guard_slot_hold_data( $data )' );
+f24_has( 'waitlist idempotency', $future, "status='offer_pending' AND starts_at=%s AND ends_at=%s" );
+f24_has( 'family current guardian', $future, 'WCA_Central_Governance::validate_patient_guardian( $patient_id, $actor, $actor )' );
+
 if ( $failures ) { fwrite( STDERR, "Future24 tests failed:\n- " . implode( "\n- ", $failures ) . "\n" ); exit(1); }
 echo "Future Clinic Intelligence 24 source assertions passed: {$checks}/{$checks}.\n";
