@@ -1,9 +1,10 @@
 <?php
 /** Independent candidate verifier. */
 if ( ! class_exists( 'ZipArchive' ) ) { fwrite( STDERR, "ZipArchive is required.\n" ); exit( 2 ); }
-$options = getopt( '', array( 'artifact:' ) );
+$options = getopt( '', array( 'artifact:', 'commit:' ) );
 $dir = realpath( $options['artifact'] ?? '' );
-if ( ! $dir ) { fwrite( STDERR, "Artifact directory is required.\n" ); exit( 2 ); }
+$expectedCommit = strtolower( trim( (string) ( $options['commit'] ?? '' ) ) );
+if ( ! $dir || ! preg_match( '/^[0-9a-f]{40}$/', $expectedCommit ) ) { fwrite( STDERR, "Artifact directory and exact 40-hex commit are required.\n" ); exit( 2 ); }
 $zips = glob( $dir . '/*-candidate.zip' );
 $manifests = glob( $dir . '/*-candidate-manifest.json' );
 $checksums = glob( $dir . '/*-candidate.sha256' );
@@ -20,8 +21,21 @@ if ( ! preg_match( '/^[0-9a-f]{64}$/i', $expected ) || basename( $zipPath ) !== 
 }
 $manifest = json_decode( (string) file_get_contents( $manifestPath ), true );
 $version = is_array( $manifest ) ? (string) ( $manifest['version'] ?? '' ) : '';
-if ( ! is_array( $manifest ) || ! preg_match( '/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $version ) || 0 !== ( $manifest['commission_percent'] ?? -1 ) || ! empty( $manifest['staging_accepted'] ) || ! empty( $manifest['production_accepted'] ) ) {
-	fwrite( STDERR, "Manifest policy mismatch.\n" ); exit( 5 );
+$manifestCommit = is_array( $manifest ) ? strtolower( (string) ( $manifest['commit'] ?? '' ) ) : '';
+if (
+	! is_array( $manifest ) ||
+	'wca-candidate-manifest-1' !== ( $manifest['format'] ?? '' ) ||
+	'08-worldwide-clinic-and-appointments' !== ( $manifest['plugin'] ?? '' ) ||
+	'worldwide-clinic.php' !== ( $manifest['runtime_version_source'] ?? '' ) ||
+	! preg_match( '/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $version ) ||
+	! preg_match( '/^[0-9a-f]{40}$/', $manifestCommit ) ||
+	! hash_equals( $expectedCommit, $manifestCommit ) ||
+	(int) ( $manifest['source_date_epoch'] ?? 0 ) < 1 ||
+	0 !== ( $manifest['commission_percent'] ?? -1 ) ||
+	! empty( $manifest['staging_accepted'] ) ||
+	! empty( $manifest['production_accepted'] )
+) {
+	fwrite( STDERR, "Manifest policy/commit mismatch.\n" ); exit( 5 );
 }
 $base = '08-worldwide-clinic-and-appointments-' . $version . '-candidate';
 if ( basename( $zipPath ) !== $base . '.zip' || basename( $manifestPath ) !== $base . '-manifest.json' || basename( $checksumPath ) !== $base . '.sha256' ) {
@@ -44,11 +58,13 @@ if ( ! is_string( $embedded ) || ! hash_equals( hash( 'sha256', (string) file_ge
 	fwrite( STDERR, "Manifest parity failed.\n" ); exit( 8 );
 }
 $expectedEntries = array( $prefix . 'WCA-CANDIDATE-MANIFEST.json' => true );
+$manifestPaths = array();
 foreach ( (array) ( $manifest['files'] ?? array() ) as $file ) {
 	$path = (string) ( $file['path'] ?? '' );
-	if ( ! $path || 0 === strpos( $path, '/' ) || false !== strpos( $path, '../' ) || false !== strpos( $path, "\0" ) ) {
-		fwrite( STDERR, "Unsafe manifest path.\n" ); exit( 9 );
+	if ( ! $path || 0 === strpos( $path, '/' ) || false !== strpos( $path, '../' ) || false !== strpos( $path, "\0" ) || isset( $manifestPaths[ $path ] ) ) {
+		fwrite( STDERR, "Unsafe or duplicate manifest path.\n" ); exit( 9 );
 	}
+	$manifestPaths[ $path ] = true;
 	$entry = $prefix . $path;
 	$expectedEntries[ $entry ] = true;
 	$data = $zip->getFromName( $entry );
@@ -71,4 +87,4 @@ if ( ! $header || ! $constant || ! hash_equals( $version, $header ) || ! hash_eq
 	fwrite( STDERR, "Manifest/plugin runtime version mismatch.\n" ); exit( 12 );
 }
 $zip->close();
-echo "Candidate verified: " . basename( $zipPath ) . " (runtime {$version})\n";
+echo "Candidate verified: " . basename( $zipPath ) . " (runtime {$version}, commit {$manifestCommit})\n";
