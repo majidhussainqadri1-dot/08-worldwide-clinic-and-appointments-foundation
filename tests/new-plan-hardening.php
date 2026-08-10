@@ -63,8 +63,12 @@ foreach ( array(
 	'wca_teleconsult_consent_required', 'privacy_consent_verified',
 	'emergency_ack_verified', 'remote_consultation_consent_verified',
 	"'teleconsult'", "'privacy_notice'", 'register_rest_route', "'/appointments'",
-	'WCA_Service::request_appointment', 'ensure_context_consent',
+	'WCA_Service::request_appointment', 'ensure_context_consent', 'affirmative',
+	"array( 'true', 'yes', 'on' )", "unset( \$result['appointment_id'] )",
 ) as $token ) { f08h_has( 'appointment command', $command, $token ); }
+f08h_lacks( 'appointment command', $command, "empty( \$data['privacy_consent'] )" );
+f08h_lacks( 'appointment command', $command, "empty( \$data['emergency_acknowledged'] )" );
+f08h_lacks( 'appointment command', $command, "empty( \$data['telehealth_consent'] )" );
 
 foreach ( array(
 	'ClinicEligibilityChanged.v1', 'File26.SearchProjectionChanged.v1',
