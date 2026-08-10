@@ -44,20 +44,74 @@
     return out;
   }
 
+  function setField(form, name, value) {
+    var field = form.querySelector('[name="' + name + '"]');
+    if (field && typeof value !== 'undefined' && value !== null) {
+      field.value = String(value);
+    }
+  }
+
+  function loadIntake(root, readOnly) {
+    var ref = root.getAttribute('data-appointment-ref');
+    var form = root.querySelector('form');
+    var statusNode = root.querySelector('[data-wca-status]');
+    if (!ref) return Promise.resolve();
+    return request('appointments/' + encodeURIComponent(ref) + '/intake', { method: 'GET' })
+      .then(function (data) {
+        if (!data || !data.payload) return;
+        if (form && !readOnly) {
+          Object.keys(data.payload).forEach(function (name) {
+            setField(form, name, data.payload[name]);
+          });
+          if (data.record_version) {
+            form.dataset.recordVersion = String(data.record_version);
+          }
+          status(statusNode, data.status === 'submitted' ? 'Submitted pre-visit information loaded.' : 'Saved draft loaded.', false);
+          return;
+        }
+        var target = root.querySelector('[data-wca-intake-readonly]');
+        if (target) {
+          target.textContent = '';
+          Object.keys(data.payload).forEach(function (name) {
+            if (!data.payload[name]) return;
+            var row = document.createElement('div');
+            var strong = document.createElement('strong');
+            strong.textContent = name.replace(/_/g, ' ') + ': ';
+            row.appendChild(strong);
+            row.appendChild(document.createTextNode(String(data.payload[name])));
+            target.appendChild(row);
+          });
+        }
+      })
+      .catch(function (error) {
+        if (error.status === 404) {
+          if (readOnly) status(statusNode, 'No submitted pre-visit information is available.', false);
+          return;
+        }
+        status(statusNode, error.message, true);
+      });
+  }
+
   function wirePrevisit(root) {
     var form = root.querySelector('form');
     var statusNode = root.querySelector('[data-wca-status]');
     var ref = root.getAttribute('data-appointment-ref');
     if (!form || !ref) return;
 
+    loadIntake(root, false);
+
     root.querySelectorAll('[data-action]').forEach(function (button) {
       button.addEventListener('click', function () {
         var action = button.getAttribute('data-action');
         var isSubmit = action === 'submit';
         var payload = formPayload(form);
+        if (form.dataset.recordVersion) {
+          payload.expected_version = form.dataset.recordVersion;
+        }
         if (!payload.reason) {
           status(statusNode, 'Please enter a short reason for the visit.', true);
-          form.querySelector('[name="reason"]').focus();
+          var reason = form.querySelector('[name="reason"]');
+          if (reason) reason.focus();
           return;
         }
         root.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
@@ -72,6 +126,9 @@
           })
           .catch(function (error) {
             status(statusNode, error.message, true);
+            if (error.status === 409) {
+              loadIntake(root, false);
+            }
           })
           .finally(function () {
             root.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
@@ -105,9 +162,10 @@
         instructions.textContent = item.plan.instructions;
         article.appendChild(instructions);
       }
-      if (Array.isArray(item.resources) && item.resources.length) {
+      var resourcesData = item.plan && Array.isArray(item.plan.resources) ? item.plan.resources : [];
+      if (resourcesData.length) {
         var resources = document.createElement('ul');
-        item.resources.forEach(function (resource) {
+        resourcesData.forEach(function (resource) {
           var li = document.createElement('li');
           if (resource.url) {
             var a = document.createElement('a');
@@ -127,16 +185,229 @@
     status(statusNode, '', false);
   }
 
-  function wireFollowups(root) {
+  function refreshFollowups(root) {
     var ref = root.getAttribute('data-appointment-ref');
     var statusNode = root.querySelector('[data-wca-status]');
-    if (!ref) return;
+    if (!ref) return Promise.resolve();
     status(statusNode, 'Loading follow-up plan…', false);
-    request('appointments/' + encodeURIComponent(ref) + '/followups', { method: 'GET' })
+    return request('appointments/' + encodeURIComponent(ref) + '/followups', { method: 'GET' })
       .then(function (items) { renderFollowups(root, items); })
       .catch(function (error) { status(statusNode, error.message, true); });
   }
 
+  function wireFollowups(root) {
+    refreshFollowups(root);
+    var form = root.querySelector('[data-wca-followup-create]');
+    var ref = root.getAttribute('data-appointment-ref');
+    var statusNode = root.querySelector('[data-wca-status]');
+    if (!form || !ref) return;
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var payload = formPayload(form);
+      if (payload.due_at_utc) {
+        payload.due_at_utc = payload.due_at_utc.replace('T', ' ') + (payload.due_at_utc.length === 16 ? ':00' : '');
+      }
+      if (payload.resource_ref || payload.resource_url) {
+        payload.resources = [{ type: 'educational', ref: payload.resource_ref || '', url: payload.resource_url || '' }];
+      }
+      delete payload.resource_ref;
+      delete payload.resource_url;
+      status(statusNode, 'Creating follow-up plan…', false);
+      form.querySelectorAll('button,input,textarea').forEach(function (el) { el.disabled = true; });
+      request('appointments/' + encodeURIComponent(ref) + '/followups', { method: 'POST', body: JSON.stringify(payload) })
+        .then(function () {
+          form.reset();
+          status(statusNode, 'Follow-up plan created.', false);
+          return refreshFollowups(root);
+        })
+        .catch(function (error) { status(statusNode, error.message, true); })
+        .finally(function () {
+          form.querySelectorAll('button,input,textarea').forEach(function (el) { el.disabled = false; });
+        });
+    });
+  }
+
+  function scopeLabel(scope) {
+    var labels = {
+      teleconsult: 'Teleconsultation / call context',
+      recording: 'Recording consent',
+      messaging: 'Clinic-linked messaging',
+      privacy_notice: 'Current privacy notice',
+      followup: 'Follow-up plan and reminders'
+    };
+    return labels[scope] || scope.replace(/_/g, ' ');
+  }
+
+  function wireConsents(root) {
+    var ref = root.getAttribute('data-appointment-ref');
+    var statusNode = root.querySelector('[data-wca-status]');
+    var list = root.querySelector('[data-wca-consent-list]');
+    if (!ref || !list) return Promise.resolve(null);
+    status(statusNode, 'Loading consent status…', false);
+    return request('appointments/' + encodeURIComponent(ref) + '/consents', { method: 'GET' })
+      .then(function (data) {
+        list.textContent = '';
+        Object.keys(data.scopes || {}).forEach(function (scope) {
+          var state = data.scopes[scope] || {};
+          var row = document.createElement('div');
+          row.className = 'wca-consent-row';
+          var label = document.createElement('span');
+          label.textContent = scopeLabel(scope) + ': ' + (state.status === 'granted' ? 'Granted' : 'Not granted');
+          row.appendChild(label);
+          if (data.can_manage_consents) {
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'wca-button wca-button-secondary';
+            button.textContent = state.status === 'granted' ? 'Revoke' : 'Grant';
+            button.addEventListener('click', function () {
+              button.disabled = true;
+              var method = state.status === 'granted' ? 'DELETE' : 'POST';
+              request('appointments/' + encodeURIComponent(ref) + '/consents', { method: method, body: JSON.stringify({ scope: scope }) })
+                .then(function () { return wireConsents(root); })
+                .catch(function (error) { status(statusNode, error.message, true); })
+                .finally(function () { button.disabled = false; });
+            });
+            row.appendChild(button);
+          }
+          list.appendChild(row);
+        });
+        status(statusNode, '', false);
+        return data;
+      })
+      .catch(function (error) {
+        status(statusNode, error.message, true);
+        return null;
+      });
+  }
+
+  function buildAutoExperience(ref) {
+    if (!ref || document.querySelector('[data-wca-auto-continuity]')) return;
+    var shell = document.querySelector('.wca-shell');
+    if (!shell) return;
+
+    var wrapper = document.createElement('section');
+    wrapper.className = 'wca-continuity-stack';
+    wrapper.setAttribute('data-wca-auto-continuity', '');
+
+    var consent = document.createElement('section');
+    consent.className = 'wca-card wca-continuity';
+    consent.setAttribute('data-wca-consents', '');
+    consent.setAttribute('data-appointment-ref', ref);
+    var consentTitle = document.createElement('h2');
+    consentTitle.textContent = 'Consultation consent and context';
+    consent.appendChild(consentTitle);
+    var consentIntro = document.createElement('p');
+    consentIntro.textContent = 'Consent is purpose-specific and may be withdrawn. Recording is never assumed from teleconsultation consent.';
+    consent.appendChild(consentIntro);
+    var consentList = document.createElement('div');
+    consentList.setAttribute('data-wca-consent-list', '');
+    consent.appendChild(consentList);
+    var consentStatus = document.createElement('p');
+    consentStatus.setAttribute('data-wca-status', '');
+    consentStatus.setAttribute('role', 'status');
+    consentStatus.setAttribute('aria-live', 'polite');
+    consent.appendChild(consentStatus);
+    wrapper.appendChild(consent);
+
+    shell.appendChild(wrapper);
+
+    wireConsents(consent).then(function (state) {
+      if (!state) return;
+
+      var intake = document.createElement('section');
+      intake.className = 'wca-card wca-continuity';
+      intake.setAttribute('data-appointment-ref', ref);
+      var intakeTitle = document.createElement('h2');
+      intakeTitle.textContent = 'Pre-visit information';
+      intake.appendChild(intakeTitle);
+      var emergency = document.createElement('div');
+      emergency.className = 'wca-alert';
+      emergency.setAttribute('role', 'note');
+      emergency.textContent = 'Do not wait here for an emergency. For severe or life-threatening symptoms, seek qualified local emergency care now.';
+      intake.appendChild(emergency);
+
+      if (state.can_edit_intake) {
+        intake.setAttribute('data-wca-previsit', '');
+        var form = document.createElement('form');
+        form.className = 'wca-form';
+        [
+          ['reason', 'Reason for visit', 1500, true],
+          ['category', 'Category', 80, false],
+          ['symptoms_summary', 'Short symptom summary', 3000, false],
+          ['medications_summary', 'Current medicines summary', 2000, false],
+          ['allergies_summary', 'Allergies or sensitivities', 1500, false],
+          ['accessibility_needs', 'Accessibility or communication needs', 1000, false],
+          ['notes', 'Other necessary pre-visit notes', 2000, false]
+        ].forEach(function (spec) {
+          var label = document.createElement('label');
+          label.appendChild(document.createTextNode(spec[1]));
+          var field = spec[0] === 'category' ? document.createElement('input') : document.createElement('textarea');
+          field.name = spec[0];
+          field.maxLength = spec[2];
+          if (spec[3]) field.required = true;
+          label.appendChild(field);
+          form.appendChild(label);
+        });
+        var actions = document.createElement('div');
+        actions.className = 'wca-actions';
+        var save = document.createElement('button');
+        save.type = 'button'; save.className = 'wca-button wca-button-secondary'; save.setAttribute('data-action', 'save'); save.textContent = 'Save draft';
+        var submit = document.createElement('button');
+        submit.type = 'button'; submit.className = 'wca-button'; submit.setAttribute('data-action', 'submit'); submit.textContent = 'Submit securely';
+        actions.appendChild(save); actions.appendChild(submit); form.appendChild(actions);
+        var intakeStatus = document.createElement('p');
+        intakeStatus.setAttribute('data-wca-status', ''); intakeStatus.setAttribute('role', 'status'); intakeStatus.setAttribute('aria-live', 'polite'); form.appendChild(intakeStatus);
+        intake.appendChild(form);
+        wrapper.appendChild(intake);
+        wirePrevisit(intake);
+      } else {
+        var readonly = document.createElement('div');
+        readonly.setAttribute('data-wca-intake-readonly', '');
+        intake.appendChild(readonly);
+        var intakeStatusRead = document.createElement('p');
+        intakeStatusRead.setAttribute('data-wca-status', ''); intakeStatusRead.setAttribute('role', 'status'); intakeStatusRead.setAttribute('aria-live', 'polite'); intake.appendChild(intakeStatusRead);
+        wrapper.appendChild(intake);
+        loadIntake(intake, true);
+      }
+
+      var follow = document.createElement('section');
+      follow.className = 'wca-card wca-continuity';
+      follow.setAttribute('data-wca-followups', '');
+      follow.setAttribute('data-appointment-ref', ref);
+      var followTitle = document.createElement('h2');
+      followTitle.textContent = 'Follow-up plan';
+      follow.appendChild(followTitle);
+      var followIntro = document.createElement('p');
+      followIntro.textContent = 'Follow-up is doctor-defined and may include approved educational resources. This surface does not generate treatment with AI.';
+      follow.appendChild(followIntro);
+      if (state.can_create_followup) {
+        var create = document.createElement('form');
+        create.className = 'wca-form';
+        create.setAttribute('data-wca-followup-create', '');
+        var dueLabel = document.createElement('label'); dueLabel.textContent = 'Due date and time (UTC)';
+        var due = document.createElement('input'); due.type = 'datetime-local'; due.name = 'due_at_utc'; due.required = true; dueLabel.appendChild(due); create.appendChild(dueLabel);
+        var purposeLabel = document.createElement('label'); purposeLabel.textContent = 'Purpose';
+        var purpose = document.createElement('input'); purpose.name = 'purpose'; purpose.maxLength = 191; purpose.required = true; purposeLabel.appendChild(purpose); create.appendChild(purposeLabel);
+        var instructionLabel = document.createElement('label'); instructionLabel.textContent = 'Instructions';
+        var instructions = document.createElement('textarea'); instructions.name = 'instructions'; instructions.maxLength = 5000; instructionLabel.appendChild(instructions); create.appendChild(instructionLabel);
+        var refLabel = document.createElement('label'); refLabel.textContent = 'Approved educational resource reference (optional)';
+        var resourceRef = document.createElement('input'); resourceRef.name = 'resource_ref'; resourceRef.maxLength = 191; refLabel.appendChild(resourceRef); create.appendChild(refLabel);
+        var urlLabel = document.createElement('label'); urlLabel.textContent = 'Approved same-site resource URL (optional)';
+        var resourceUrl = document.createElement('input'); resourceUrl.name = 'resource_url'; resourceUrl.type = 'url'; urlLabel.appendChild(resourceUrl); create.appendChild(urlLabel);
+        var createButton = document.createElement('button'); createButton.type = 'submit'; createButton.className = 'wca-button'; createButton.textContent = 'Create follow-up'; create.appendChild(createButton);
+        follow.appendChild(create);
+      }
+      var followList = document.createElement('div'); followList.setAttribute('data-wca-followup-list', ''); followList.setAttribute('aria-live', 'polite'); follow.appendChild(followList);
+      var followStatus = document.createElement('p'); followStatus.setAttribute('data-wca-status', ''); followStatus.setAttribute('role', 'status'); followStatus.setAttribute('aria-live', 'polite'); follow.appendChild(followStatus);
+      wrapper.appendChild(follow);
+      wireFollowups(follow);
+    });
+  }
+
   document.querySelectorAll('[data-wca-previsit]').forEach(wirePrevisit);
   document.querySelectorAll('[data-wca-followups]').forEach(wireFollowups);
+  document.querySelectorAll('[data-wca-consents]').forEach(wireConsents);
+  if (config.appointmentRef) {
+    buildAutoExperience(config.appointmentRef);
+  }
 }());
