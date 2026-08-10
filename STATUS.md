@@ -1,99 +1,90 @@
-# File 08 Status
+# File 08 — Worldwide Clinic and Appointments — Candidate Status
 
-## Current state
+## Current repository candidate
 
-**Runtime `1.0.1` — four-round reviewed and corrected 2026 master-plan source candidate, automatically verified and reproducibly packaged; external Hostinger staging and production acceptance remain pending.**
-
-## Canonical identity
-
-- Module: **File 08 — Worldwide Clinic and Appointments**
-- Runtime: `1.0.1`
-- Schema: `3.1.0`
-- Text domain: `worldwide-clinic-appointments`
-- Canonical implementation prefix: `WCA_`
-- Audited compatibility prefix: `SWC_`
+- Branch: `codex/file08-new-governing-plans-completion-2026`
+- Runtime candidate: **1.2.0**
+- Core File 08 schema: **3.1.0**
+- Restricted continuity schema: **1.1.0**
+- Future24 additive operational schema: **1.0.0**
+- File plan contract: **SSH-F08-PLAN-2026-v1.0**
+- Future24 amendment: **SSH-F08-FUT24-2026-v1.0**
+- Public Clinic Contract: **1.1.0**
+- CF-01 scheduling context contract: **1.1.0**
 - Platform commission: **0%**
-- Public Clinic Projection Contract: `1.1.0`
-- CF-01 Scheduling-Only Care Context Contract: `1.1.0`
 
-## Completed source scope
+The runtime-source commit reviewed after Future24 hardening is `b87313cb27521ca39b94abba43a5bee2a1d6d8e1`. Documentation-only commits may move the branch HEAD without changing that reviewed runtime source. The final branch HEAD, exact GitHub Actions run, deterministic artifact manifest and package SHA-256 remain the immutable repository release evidence.
 
-- Original `0.1.0` baseline and independent 32-finding audit evidence preserved.
-- All 32 prior critical/high/medium/low findings remain corrected and regression-covered.
-- Four fresh plan-governed review rounds completed against the Definitive Master Plan 2026 v3.0, Comprehensive Master Plan 2026 v2.0 and File 08 Complete Master Plan 2026 v1.0.
-- Complete clinic, branch, public/private location, service, fee and currency model.
-- Institutional clinic draft, submission, review and activation gate; Doctor self-activation is prohibited.
-- Authoritative Doctor and Founder eligibility boundaries through Files 00/03/07/09.
-- Clinic-scoped branch, service and availability ownership with cross-tenant reassignment rejection.
-- Versioned availability rules and exceptions, DST-safe slot projection and server-authoritative atomic expiring holds.
-- Idempotent appointment requests and actor-specific lifecycle covering request, review, acceptance, decline, reschedule, reassignment, cancellation, check-in, completion and no-show.
-- Optimistic versions, resource/advisory locks, collision prevention, replay resistance and immutable audit events.
-- Guardian/current-actor binding, object-level access control and purpose-limited, step-up administrative access.
-- Opaque public practitioner and appointment references; native numeric identifiers are excluded from public scheduling surfaces.
-- Appointment-bound, compensation-safe rescheduling and stale/expired hold rejection.
-- Appointment-processing consent separated from clinical treatment, publication, research and AI consent.
-- Emergency diversion, expiring review eligibility, private calendar export, conditional payment-intent reference, complaint/case reference and notification outbox boundaries.
-- CF-01 scheduling-only context explicitly denies treating relationship, chart read/write, prescription and break-glass authority.
-- Strict public projection allow lists exclude phone, WhatsApp, email, native identifiers, appointments, patients, clinical-like narratives and private notes.
-- REST object authorization, rate limiting, fail-closed dependencies, privacy export/erasure/retention/legal hold, no-store/noindex controls and safe uninstall.
-- Metrics, health diagnostics, circuit breakers, traces, schema migration, rollback metadata, WP-CLI and operational runbooks.
-- Responsive, green-first, RTL-aware and accessibility-oriented public/admin surfaces.
-- Requirements traceability covers all `18/18` functional and `10/10` non-functional master-plan groups.
+## Source implementation state
 
-## Four review rounds
+The candidate retains the complete File 08 implementation for `F08-FR-001` through `F08-FR-018` and `F08-NFR-001` through `F08-NFR-010`, plus the approved Future Clinic Intelligence & Interoperability layer `F08-FUT-01` through `F08-FUT-24`.
 
-1. **Architecture, ownership and lifecycle:** institutional activation, tenant ownership and authority boundaries corrected.
-2. **Security, privacy and authorization:** actor/guardian IDOR, blanket administration and native-ID exposure corrected.
-3. **Scheduling integrity and resilience:** authoritative slot validation, atomic holds, reschedule compensation and eligibility expiry corrected.
-4. **UI, accessibility, release and regression governance:** opaque UI references, version/schema parity, regression coverage and reproducible release controls completed.
+Future24 includes:
 
-Detailed evidence is recorded in `FOUR-ROUND-REVIEW-AND-CORRECTION-1.0.1.md`.
+- smart cancellation waitlist with short-lived offer-only recovery and no automatic booking;
+- flexible request windows and bounded recurring/series intents;
+- capacity-guarded multi-resource and group scheduling primitives;
+- compensation-safe one-tap reschedule over the canonical appointment state machine;
+- server-enforced buffer/travel/continuous-consultation policies for slot/hold paths;
+- privacy-safe capacity heatmap, advisory optimization and aggregate no-show forecasting with minimum-sample suppression;
+- service-specific dynamic pre-visit questionnaire metadata whose answers remain in encrypted `WCA_Continuity` intake;
+- appointment readiness with current guardian/consent/prerequisite/runtime checks;
+- prerequisite/document-evidence rules that require matching evidence rather than count-only bypass;
+- family/guardian hub with fresh File 00 guardian revalidation per returned appointment;
+- bounded digital arrival and privacy-preserving live queue position;
+- clinic disruption/recovery with File 19 notification requests and no silent auto-cancellation;
+- appointment-bound support/interpreter participant add/revoke contracts, with File 17 remaining transport owner;
+- virtual-room request contract requiring current teleconsult consent and never assuming recording consent;
+- privacy-safe FHIR-style appointment/clinic projections;
+- SMART Find → Hold → Book compatibility over current File 08 authoritative slot/hold/booking paths;
+- expiring external-calendar busy projections without provider-token storage;
+- same-patient/doctor/clinic episode/follow-up chains without public or clinical narrative storage;
+- Future24 governance manifest prohibiting automated diagnosis/prescribing, emergency replacement, paid/donor visibility advantage, hidden patient scoring and direct companion-table writes.
 
-## Automated verification
+## Fresh post-code review evidence
 
-The canonical GitHub Actions workflow performs:
+Two fresh post-final-runtime-code reviews are recorded in:
+
+`docs/FUTURE24-TWO-FRESH-REVIEWS-2026-08-10.md`
+
+- Review 1 — security/privacy/authorization/ownership/concurrency: **PASS** after correction.
+- Review 2 — migration/rollback/compatibility/accessibility/performance/degraded mode: **PASS** after correction.
+- Known unresolved repository-level blocker/critical defect after those two reviews: **0**.
+
+Any later runtime/source code change, security finding, dependency change, failing exact-head workflow, staging defect or live defect reopens the review cycle.
+
+## Automated repository verification
+
+The canonical GitHub Actions quality workflow is configured to run:
 
 - PHP 7.4 and PHP 8.3 syntax verification;
-- JavaScript syntax verification;
-- contract and state-law tests;
-- three-plan static traceability and four-round regression checks;
-- security and repository-hygiene checks;
+- complete File 08 source-contract/state/security/Future24 tests;
+- JavaScript syntax verification for `clinic.js`, `continuity.js` and `future24.js`;
+- repository hygiene checks;
 - deterministic double build and byte comparison;
 - embedded/detached manifest and checksum verification;
-- independent candidate re-opening and payload verification;
-- governed exact-head artifact upload.
+- independent candidate reopening/verification;
+- exact-head artifact upload.
 
-A passing workflow proves repository source and package reproducibility only; it does not substitute for real staging acceptance.
+A green exact-head workflow proves repository source/package reproducibility only. It does not substitute for real staging/live acceptance.
 
-## External acceptance gates not claimed by source
+## Evidence-state classification
 
-- Fresh installation on canonical Hostinger staging.
-- Upgrade/migration rehearsal from the exact accepted legacy baseline and current staging data.
-- Database backup restoration and rollback exercise.
-- Real immutable Files 00/03/07/09/19/20/25 and CF-01 package integration.
-- LiteSpeed/Hostinger private-cache and no-store validation.
-- Real notification delivery and SMTP fallback validation.
-- Real patient, Founder, eligible/ineligible/suspended/revoked Doctor and administrator workflows.
-- Concurrent overlapping-acceptance and failure-injection runtime testing.
-- Urdu RTL, cross-browser, mobile, keyboard, screen-reader, zoom, forced-colors, reduced-motion and manual WCAG acceptance.
-- Privacy, security and professional review; Founder acceptance; controlled merge; live deployment and post-deployment monitoring.
+| State | Current repository evidence |
+|---|---|
+| Specified | **Complete** — File 08 plan + approved Future24 amendment mapped. |
+| Coded | **Complete candidate** — `F08-FUT-01…24` implemented in repository source. |
+| Fresh post-code reviews | **Complete — PASS/PASS** for reviewed runtime-source commit. |
+| Packaged | **Requires final exact-head CI artifact confirmation.** |
+| Automated-QA Green | **Requires final exact-head workflow confirmation.** |
+| Staging-Accepted | **Pending / not claimed.** |
+| Live-Deployed | **Not claimed / not authorized from repository evidence alone.** |
+| Operational | **Pending.** |
 
-## Release classification
+## Mandatory staging / production gates
 
-- Baseline provenance: **PASS**
-- Independent source audit: **COMPLETE**
-- Prior corrective implementation: **COMPLETE — 32/32**
-- Four fresh plan-governed review rounds: **COMPLETE**
-- Defects found in those four source rounds: **CORRECTED AND REGRESSION-COVERED**
-- Complete 2026 master-plan source implementation: **COMPLETE**
-- Functional traceability: **COMPLETE — 18/18**
-- Non-functional traceability: **COMPLETE — 10/10**
-- Automated source verification: **PASS when the exact-head workflow is green**
-- Reproducible candidate engineering: **IMPLEMENTED**
-- Hostinger staging acceptance: **PENDING EXTERNAL EVIDENCE**
-- Production release: **NOT AUTHORIZED**
-- Live installation: **NOT AUTHORIZED**
+Before production, the exact final candidate artifact must be installed on canonical Hostinger staging and verified against the actually deployed database/configuration. Required external acceptance includes fresh install and real upgrade/migration; backup restore, encryption-key decrypt and rollback; exact Files 00/03/07/09/17/19/20/24/25/26 package integration; patient/guardian/doctor/delegated-staff/admin journeys; last-slot concurrency, stale/duplicate/retry/provider-outage/dead-letter scenarios; File 17/File 19/File 26 integration; private cache/no-store/noindex behavior; mobile/tablet/desktop, Urdu/Arabic RTL, English LTR, keyboard, screen-reader, 200–400% zoom/reflow, forced-colors and reduced-motion acceptance; Founder acceptance; controlled production deployment; live re-test and repository/deployed parity confirmation.
 
-## Governing next step
+## Live truth
 
-Install only the exact CI-generated `1.0.1` candidate and immutable reviewed dependency packages on canonical Hostinger staging, then execute `docs/STAGING-ACCEPTANCE-1.0.0.md`. Every discovered runtime defect must be corrected, followed by fresh exact-head regression, package, migration, restore, rollback and integration verification before production authorization.
+This repository status does not prove the current staging or live installation. Exact deployed plugin files/version, database/schema version, migration state, active configuration/dependencies and post-deploy behavior must be frozen and independently verified before any live/operational assertion.
