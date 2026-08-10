@@ -25,8 +25,11 @@ jobs:
           set -euo pipefail
           cat .codex/future24-overlay.part01 .codex/future24-overlay.part02 .codex/future24-overlay.part03 .codex/future24-overlay.part04 .codex/future24-overlay.part05 | base64 -d > /tmp/future24-overlay.tar.gz
           tar -xzf /tmp/future24-overlay.tar.gz -C .
+          # GitHub Actions' GITHUB_TOKEN may not mutate workflow files. Keep
+          # workflow paths byte-identical in the bot-authored source commit;
+          # the linked GitHub connector updates/removes them separately.
+          git restore --source=HEAD -- .github/workflows/file08-complete-quality.yml .github/workflows/apply-future24-overlay.yml
           rm -f .codex/future24-overlay.part01 .codex/future24-overlay.part02 .codex/future24-overlay.part03 .codex/future24-overlay.part04 .codex/future24-overlay.part05
-          rm -f .github/workflows/apply-future24-overlay.yml
           php -l worldwide-clinic.php
           php -l includes/class-wca-contracts.php
           php -l includes/class-wca-calendar-link.php
