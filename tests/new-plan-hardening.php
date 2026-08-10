@@ -63,7 +63,7 @@ foreach ( array(
 	'wca_teleconsult_consent_required', 'privacy_consent_verified',
 	'emergency_ack_verified', 'remote_consultation_consent_verified',
 	"'teleconsult'", "'privacy_notice'", 'register_rest_route', "'/appointments'",
-	'true\n\t\t);',
+	'WCA_Service::request_appointment', 'ensure_context_consent',
 ) as $token ) { f08h_has( 'appointment command', $command, $token ); }
 
 foreach ( array(
@@ -77,7 +77,7 @@ foreach ( array(
 	'data-consultation-type', 'wca_page', 'View details',
 ) as $token ) { f08h_has( 'frontend', $frontend, $token ); }
 f08h_lacks( 'frontend', $frontend, 'data-wca-appointment-id' );
-f08h_lacks( 'frontend', $frontend, "rest_url( 'wca/v1/appointments/' . $id" );
+f08h_lacks( 'frontend', $frontend, 'wca/v1/appointments/\' . $id' );
 
 foreach ( array(
 	'wcaAppointmentRef', 'appointment-refs/', 'telehealth_consent',
