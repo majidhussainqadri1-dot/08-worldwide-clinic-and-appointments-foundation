@@ -563,19 +563,26 @@ final class WCA_Service {
 			$public_ref = (string) SWC_Helpers::meta( $appointment_id, 'public_ref', 'appointment-' . $appointment_id );
 			$event_type = self::event_for_transition( $next );
 			$payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'appointment_ref' => $public_ref, 'old_status' => $current, 'new_status' => $next, 'scheduled_at_utc' => SWC_Helpers::meta( $appointment_id, 'preferred_at_utc' ), 'completed_at_utc' => SWC_Helpers::meta( $appointment_id, 'completed_at_utc' ), 'trace_id' => $trace );
-			WCA_Repository::append_event( $event_type, 'appointment', $public_ref, $payload, $actor_user_id, $trace );
-			WCA_Repository::enqueue( $event_type, $public_ref, $payload, $trace );
-			WCA_Repository::enqueue( 'File19.NotificationRequested.v1', $public_ref, array( 'event' => strtolower( str_replace( '.', '_', $event_type ) ), 'appointment_ref' => $public_ref, 'recipients' => array( absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ), absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) ) ), $trace );
-			WCA_Repository::enqueue( 'File17.AppointmentContextChanged.v1', $public_ref, self::file17_context_payload( $appointment_id ), $trace );
+			$event_record = WCA_Repository::append_event( $event_type, 'appointment', $public_ref, $payload, $actor_user_id, $trace );
+			if ( is_wp_error( $event_record ) ) { return $event_record; }
+			$outbox_event = WCA_Repository::enqueue( $event_type, $public_ref, $payload, $trace );
+			if ( is_wp_error( $outbox_event ) ) { return $outbox_event; }
+			$notification = WCA_Repository::enqueue( 'File19.NotificationRequested.v1', $public_ref, array( 'event' => strtolower( str_replace( '.', '_', $event_type ) ), 'appointment_ref' => $public_ref, 'recipients' => array( absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ), absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) ) ), $trace );
+			if ( is_wp_error( $notification ) ) { return $notification; }
+			$communication = WCA_Repository::enqueue( 'File17.AppointmentContextChanged.v1', $public_ref, self::file17_context_payload( $appointment_id ), $trace );
+			if ( is_wp_error( $communication ) ) { return $communication; }
 			if ( 'completed' === $next ) {
 				$eligibility = WCA_Repository::grant_review_eligibility( $appointment_id, absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ), absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ), absint( SWC_Helpers::meta( $appointment_id, 'clinic_id' ) ) );
-				if ( ! is_wp_error( $eligibility ) ) {
-					$review_payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'eligibility_ref' => $eligibility['public_ref'], 'appointment_ref' => $public_ref, 'reviewer_subject_uuid' => WCA_Authorization::subject_uuid( $eligibility['reviewer_user_id'] ), 'doctor_subject_uuid' => WCA_Authorization::subject_uuid( $eligibility['doctor_user_id'] ), 'trace_id' => $trace );
-					WCA_Repository::append_event( 'ReviewEligibilityGranted.v1', 'review_eligibility', $eligibility['public_ref'], $review_payload, $actor_user_id, $trace );
-					WCA_Repository::enqueue( 'ReviewEligibilityGranted.v1', $eligibility['public_ref'], $review_payload, $trace );
-				}
+				if ( is_wp_error( $eligibility ) ) { return $eligibility; }
+				$review_payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'eligibility_ref' => $eligibility['public_ref'], 'appointment_ref' => $public_ref, 'reviewer_subject_uuid' => WCA_Authorization::subject_uuid( $eligibility['reviewer_user_id'] ), 'doctor_subject_uuid' => WCA_Authorization::subject_uuid( $eligibility['doctor_user_id'] ), 'trace_id' => $trace );
+				$review_event = WCA_Repository::append_event( 'ReviewEligibilityGranted.v1', 'review_eligibility', $eligibility['public_ref'], $review_payload, $actor_user_id, $trace );
+				if ( is_wp_error( $review_event ) ) { return $review_event; }
+				$review_outbox = WCA_Repository::enqueue( 'ReviewEligibilityGranted.v1', $eligibility['public_ref'], $review_payload, $trace );
+				if ( is_wp_error( $review_outbox ) ) { return $review_outbox; }
 			}
-			SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) );
+			if ( ! SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) ) ) {
+				return new WP_Error( 'wca_transition_audit', __( 'The appointment transition could not be audited safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
 			WCA_Observability::metric( 'appointment_transition_total', 1, array( 'from' => $current, 'to' => $next, 'actor' => $actor ) );
 			return array( 'appointment_id' => $appointment_id, 'public_ref' => $public_ref, 'status' => $next, 'version' => SWC_Helpers::record_version( $appointment_id ), 'trace_id' => $trace );
 		} );
