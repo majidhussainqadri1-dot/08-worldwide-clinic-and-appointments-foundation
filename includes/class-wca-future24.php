@@ -1268,7 +1268,7 @@ final class WCA_Future24 {
 		}
 		$raw_evidence = (array) SWC_Helpers::meta( $appointment_id, 'prerequisite_evidence_refs', array() );
 		$evidence = array();
-		foreach ( array_slice( $raw_evidence, 0, 100, true ) as $key => $item ) {
+		foreach ( $raw_evidence as $key => $item ) {
 			if ( is_string($key) && !is_numeric($key) && $item ) { $evidence[sanitize_text_field($key)] = true; }
 			if ( is_string($item) ) { $evidence[sanitize_text_field($item)] = true; }
 			if ( is_array($item) ) {
