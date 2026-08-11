@@ -153,6 +153,8 @@ final class WCA_Future24 {
 			'/future24/resources/(?P<ref>[0-9a-fA-F-]{36})/reserve' => array( 'POST', 'rest_resource_reserve' ),
 			'/future24/group-sessions' => array( 'POST', 'rest_group_session' ),
 			'/future24/group-sessions/(?P<ref>[0-9a-fA-F-]{36})/join' => array( 'POST', 'rest_group_join' ),
+			'/future24/group-sessions/(?P<ref>[0-9a-fA-F-]{36})/leave' => array( 'POST', 'rest_group_leave' ),
+			'/future24/group-sessions/(?P<ref>[0-9a-fA-F-]{36})/cancel' => array( 'POST', 'rest_group_cancel' ),
 			'/future24/appointments/(?P<ref>[0-9a-fA-F-]{36})/safe-reschedule' => array( 'POST', 'rest_safe_reschedule' ),
 			'/future24/buffers' => array( 'POST', 'rest_buffers' ),
 			'/future24/heatmap' => array( 'GET', 'rest_heatmap' ),
@@ -766,6 +768,58 @@ final class WCA_Future24 {
 				'expires_at' => $session['expires_at'],
 				'payload' => array( 'member_ref' => WCA_Authorization::subject_uuid( $context['patient_user_id'] ), 'guardian_user_id' => $context['guardian_user_id'], 'peer_identity_visible' => false ),
 			), $context['actor_user_id'] );
+		} finally {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+		}
+	}
+
+
+	public static function leave_group_session( $session_ref, $data = array(), $actor = 0 ) {
+		global $wpdb;
+		$actor = absint( $actor ?: get_current_user_id() );
+		$claims = WCA_Authorization::claims( $actor );
+		if ( is_wp_error( $claims ) ) { return $claims; }
+		$context = self::patient_context( is_array( $data ) ? $data : array(), $actor );
+		if ( is_wp_error( $context ) ) { return $context; }
+		$session = self::get_record( $session_ref, 'F08-FUT-05' );
+		if ( ! $session || ! in_array( (string) $session['status'], array( 'group_open', 'group_cancelled' ), true ) ) {
+			return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
+		}
+		$table = self::tables()['records'];
+		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
+		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		try {
+			$member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status IN ('group_member','group_left','group_cancelled') ORDER BY id DESC LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( ! $member ) { return array( 'session_ref' => strtolower( $session_ref ), 'left' => true, 'already_absent' => true ); }
+			if ( in_array( (string) $member['status'], array( 'group_left', 'group_cancelled' ), true ) ) { return self::public_record( $member ); }
+			$ok = $wpdb->update( $table, array( 'status' => 'group_left', 'version' => absint( $member['version'] ) + 1, 'updated_at' => WCA_Repository::now() ), array( 'id' => absint( $member['id'] ), 'status' => 'group_member', 'version' => absint( $member['version'] ) ) );
+			if ( 1 !== (int) $ok ) { return new WP_Error( 'wca_group_leave_conflict', __( 'Group membership changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			self::audit( 'F08-FUT-05', 'group_member_left', strtolower( (string) $member['public_ref'] ), array( 'session_ref' => strtolower( $session_ref ) ), $context['actor_user_id'], false );
+			return self::public_record( self::get_record( $member['public_ref'], 'F08-FUT-05' ) );
+		} finally {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+		}
+	}
+
+	public static function cancel_group_session( $session_ref, $data = array(), $actor = 0 ) {
+		global $wpdb;
+		$actor = absint( $actor ?: get_current_user_id() );
+		$session = self::get_record( $session_ref, 'F08-FUT-05' );
+		if ( ! $session ) { return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+		$clinic = self::require_clinic_manager( absint( $session['clinic_id'] ), $actor );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
+		if ( 'group_cancelled' === (string) $session['status'] ) { return self::public_record( $session ); }
+		if ( 'group_open' !== (string) $session['status'] ) { return new WP_Error( 'wca_group_state', __( 'This group appointment cannot be cancelled from its current state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$table = self::tables()['records'];
+		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
+		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		try {
+			$now = WCA_Repository::now();
+			$ok = $wpdb->update( $table, array( 'status' => 'group_cancelled', 'version' => absint( $session['version'] ) + 1, 'updated_at' => $now ), array( 'id' => absint( $session['id'] ), 'status' => 'group_open', 'version' => absint( $session['version'] ) ) );
+			if ( 1 !== (int) $ok ) { return new WP_Error( 'wca_group_cancel_conflict', __( 'Group session changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='group_cancelled',version=version+1,updated_at=%s WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND status='group_member'", $now, strtolower( $session_ref ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			self::audit( 'F08-FUT-05', 'group_session_cancelled', strtolower( $session_ref ), array( 'reason_code' => sanitize_key( isset( $data['reason_code'] ) ? $data['reason_code'] : 'operator_cancelled' ) ), $actor, false );
+			return self::public_record( self::get_record( $session_ref, 'F08-FUT-05' ) );
 		} finally {
 			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		}
@@ -1437,6 +1491,8 @@ final class WCA_Future24 {
 	public static function rest_resource_reserve( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'resource_reserve','reserve_resource',array($r['ref'],$d),201); }
 	public static function rest_group_session( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'group_session','create_group_session',array($d),201); }
 	public static function rest_group_join( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'group_join','join_group_session',array($r['ref'],$d),201); }
+	public static function rest_group_leave( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'group_leave','leave_group_session',array($r['ref'],$d),200); }
+	public static function rest_group_cancel( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'group_cancel','cancel_group_session',array($r['ref'],$d),200); }
 	public static function rest_safe_reschedule( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'safe_reschedule','safe_reschedule',array($r['ref'],$d),200); }
 	public static function rest_buffers( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'buffers','set_buffers',array($d),200); }
 	public static function rest_heatmap( WP_REST_Request $r ){ return self::respond(self::heatmap(absint($r->get_param('clinic_id')),absint($r->get_param('days')?:30))); }
