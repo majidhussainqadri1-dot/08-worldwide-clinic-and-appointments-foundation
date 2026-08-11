@@ -11,5 +11,14 @@ if old in s:
 elif 'T12-R20 | DEFECT CORRECTED' not in s:
     raise SystemExit('twelfth evidence close anchor missing')
 p.write_text(s)
+
 subprocess.check_call([sys.executable, 'tools/twelfth-twenty-review-patcher.py', 'release'])
+
+# Every executable regression gate that asserts the current runtime must advance
+# with the release. Historical Markdown evidence is deliberately left untouched.
+for test in Path('tests').glob('*.php'):
+    text = test.read_text()
+    if '1.2.11' in text:
+        test.write_text(text.replace('1.2.11', '1.2.12'))
+
 print('Twelfth release identity/evidence closure applied')
