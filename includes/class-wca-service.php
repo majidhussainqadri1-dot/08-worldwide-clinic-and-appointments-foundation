@@ -29,6 +29,14 @@ final class WCA_Service {
 		return 1 === preg_match( '/^(?:[01]\d|2[0-3]):[0-5]\d$/', (string) $value );
 	}
 
+	/** Strict integer validator used by canonical persistence roots; never silently clamps caller intent. */
+	public static function strict_int( $value, $min, $max ) {
+		if ( ! is_int( $value ) && ! is_string( $value ) ) { return null; }
+		$validated = filter_var( $value, FILTER_VALIDATE_INT );
+		if ( false === $validated || $validated < $min || $validated > $max ) { return null; }
+		return (int) $validated;
+	}
+
 	/** @return array<string,mixed> */
 	public static function sanitize_rrule( $rule ) {
 		$weekdays = array( 'monday','tuesday','wednesday','thursday','friday','saturday','sunday' );
@@ -211,8 +219,16 @@ final class WCA_Service {
 		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) { return new WP_Error( 'wca_service_consultation_type', __( 'A valid consultation type is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$currency = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) ( $data['currency'] ?? ( $current['currency'] ?? '' ) ) ) );
 		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) ) { return new WP_Error( 'wca_service_currency', __( 'A valid three-letter currency code is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$duration = self::strict_int( array_key_exists( 'duration_minutes', $data ) ? $data['duration_minutes'] : ( $current['duration_minutes'] ?? 30 ), 10, 480 );
+		$fee_minor = self::strict_int( array_key_exists( 'fee_minor', $data ) ? $data['fee_minor'] : ( $current['fee_minor'] ?? 0 ), 0, PHP_INT_MAX );
+		$fee_max_minor = self::strict_int( array_key_exists( 'fee_max_minor', $data ) ? $data['fee_max_minor'] : ( $current['fee_max_minor'] ?? 0 ), 0, PHP_INT_MAX );
+		if ( null === $duration ) { return new WP_Error( 'wca_service_duration_range', __( 'Service duration must be an integer from 10 through 480 minutes.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( null === $fee_minor || null === $fee_max_minor || ( $fee_max_minor && $fee_max_minor < $fee_minor ) ) { return new WP_Error( 'wca_service_fee_range', __( 'Service fees must be non-negative integers and the maximum fee cannot be below the minimum fee.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$data['consultation_type'] = $consultation_type;
 		$data['currency'] = $currency;
+		$data['duration_minutes'] = $duration;
+		$data['fee_minor'] = $fee_minor;
+		$data['fee_max_minor'] = $fee_max_minor;
 		if ( ! empty( $data['branch_id'] ) ) { $branch = WCA_Repository::get_branch( absint( $data['branch_id'] ) ); if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_branch_scope', __( 'The branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
 		if ( ! empty( $data['doctor_user_id'] ) ) {
 			$service_doctor_id = absint( $data['doctor_user_id'] );
@@ -246,6 +262,18 @@ final class WCA_Service {
 		if ( isset( $rrule['effective_from'] ) && ! self::valid_date( $rrule['effective_from'] ) ) { return new WP_Error( 'wca_availability_effective_from', __( 'Availability effective-from date is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		if ( isset( $rrule['effective_until'] ) && ! self::valid_date( $rrule['effective_until'] ) ) { return new WP_Error( 'wca_availability_effective_until', __( 'Availability effective-until date is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		if ( ! empty( $rrule['effective_from'] ) && ! empty( $rrule['effective_until'] ) && (string) $rrule['effective_until'] < (string) $rrule['effective_from'] ) { return new WP_Error( 'wca_availability_effective_range', __( 'Availability effective dates are reversed.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$interval = self::strict_int( $rrule['interval_minutes'] ?? 30, 10, 1440 );
+		$buffer_before = self::strict_int( $data['buffer_before'] ?? 0, 0, 240 );
+		$buffer_after = self::strict_int( $data['buffer_after'] ?? 0, 0, 240 );
+		$capacity = self::strict_int( $data['capacity'] ?? 1, 1, 50 );
+		if ( null === $interval ) { return new WP_Error( 'wca_availability_interval_range', __( 'Availability interval must be an integer from 10 through 1440 minutes.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( null === $buffer_before || null === $buffer_after ) { return new WP_Error( 'wca_availability_buffer_range', __( 'Availability buffers must be integers from 0 through 240 minutes.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( null === $capacity ) { return new WP_Error( 'wca_availability_capacity_range', __( 'Availability capacity must be an integer from 1 through 50.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$rrule['interval_minutes'] = $interval;
+		$data['rrule'] = $rrule;
+		$data['buffer_before'] = $buffer_before;
+		$data['buffer_after'] = $buffer_after;
+		$data['capacity'] = $capacity;
 		$data['timezone'] = $timezone;
 		if ( $rule_id ) { $current = WCA_Repository::get_availability_rule( $rule_id ); if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_scope', __( 'The availability rule does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); } }
 		if ( ! empty( $data['service_id'] ) ) { $service = WCA_Repository::get_service( absint( $data['service_id'] ), false ); if ( ! $service || absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_service', __( 'The availability service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }

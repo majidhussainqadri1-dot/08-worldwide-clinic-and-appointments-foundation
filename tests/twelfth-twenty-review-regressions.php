@@ -21,5 +21,7 @@ t12_has('R15 cursor persistence fail closed','includes/class-wca-rest.php','wca_
 t12_has('R16 recurrence range validation','includes/class-wca-future24.php','wca_series_count_range');
 t12_has('R17 buffer range validation','includes/class-wca-future24.php','wca_buffer_policy_range');
 t12_has('R18 capacity range validation','includes/class-wca-future24.php','wca_resource_capacity_range');
+t12_has('R19 service numeric ranges','includes/class-wca-service.php','wca_service_duration_range');
+t12_has('R19 repository availability numeric ranges','includes/class-wca-repository.php','wca_repository_availability_numeric_range');
 if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
 echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";

@@ -245,21 +245,29 @@ final class WCA_Repository {
 		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) {
 			return new WP_Error( 'wca_repository_service_type', __( 'Service persistence requires a valid consultation type.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
+		$duration = WCA_Service::strict_int( array_key_exists( 'duration_minutes', $data ) ? $data['duration_minutes'] : 30, 10, 480 );
+		$fee_minor = WCA_Service::strict_int( array_key_exists( 'fee_minor', $data ) ? $data['fee_minor'] : 0, 0, PHP_INT_MAX );
+		$fee_max_minor = WCA_Service::strict_int( array_key_exists( 'fee_max_minor', $data ) ? $data['fee_max_minor'] : 0, 0, PHP_INT_MAX );
+		$status = $data['status'] ?? 'active';
+		if ( null === $duration || null === $fee_minor || null === $fee_max_minor || ( $fee_max_minor && $fee_max_minor < $fee_minor ) ) {
+			return new WP_Error( 'wca_repository_service_numeric_range', __( 'Service persistence received an invalid duration or fee range.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		if ( ! in_array( $status, array( 'active', 'paused', 'archived' ), true ) ) { return new WP_Error( 'wca_repository_service_status', __( 'Service persistence requires a valid status.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$row = array(
 			'clinic_id'                 => absint( $data['clinic_id'] ?? 0 ),
 			'branch_id'                 => absint( $data['branch_id'] ?? 0 ),
 			'doctor_user_id'            => absint( $data['doctor_user_id'] ?? 0 ),
 			'name'                      => sanitize_text_field( $data['name'] ?? '' ),
 			'consultation_type'         => $consultation_type,
-			'duration_minutes'          => min( 480, max( 10, absint( $data['duration_minutes'] ?? 30 ) ) ),
+			'duration_minutes'          => $duration,
 			'currency'                  => $currency,
-			'fee_minor'                 => max( 0, absint( $data['fee_minor'] ?? 0 ) ),
-			'fee_max_minor'             => max( 0, absint( $data['fee_max_minor'] ?? 0 ) ),
+			'fee_minor'                 => $fee_minor,
+			'fee_max_minor'             => $fee_max_minor,
 			'tax_policy'                => sanitize_textarea_field( $data['tax_policy'] ?? '' ),
 			'refund_policy'             => sanitize_textarea_field( $data['refund_policy'] ?? '' ),
 			'cancellation_policy'       => sanitize_textarea_field( $data['cancellation_policy'] ?? '' ),
 			'platform_commission_bps'   => 0,
-			'status'                    => in_array( $data['status'] ?? 'active', array( 'active', 'paused', 'archived' ), true ) ? $data['status'] : 'active',
+			'status'                    => $status,
 			'updated_at'                => self::now(),
 		);
 		if ( ! $row['clinic_id'] || ! $row['name'] ) {
@@ -338,19 +346,30 @@ final class WCA_Repository {
 		if ( ! WCA_Service::valid_timezone( $timezone ) ) {
 			return new WP_Error( 'wca_repository_availability_timezone', __( 'Availability persistence requires a valid IANA time zone.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
+		$rrule = (array) ( $data['rrule'] ?? array() );
+		$interval = WCA_Service::strict_int( $rrule['interval_minutes'] ?? 30, 10, 1440 );
+		$buffer_before = WCA_Service::strict_int( $data['buffer_before'] ?? 0, 0, 240 );
+		$buffer_after = WCA_Service::strict_int( $data['buffer_after'] ?? 0, 0, 240 );
+		$capacity = WCA_Service::strict_int( $data['capacity'] ?? 1, 1, 50 );
+		$status = $data['status'] ?? 'active';
+		if ( null === $interval || null === $buffer_before || null === $buffer_after || null === $capacity ) {
+			return new WP_Error( 'wca_repository_availability_numeric_range', __( 'Availability persistence received an invalid interval, buffer, or capacity.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		if ( ! in_array( $status, array( 'active', 'paused', 'archived' ), true ) ) { return new WP_Error( 'wca_repository_availability_status', __( 'Availability persistence requires a valid status.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$rrule['interval_minutes'] = $interval;
 		$row = array(
 			'clinic_id'      => absint( $data['clinic_id'] ?? 0 ),
 			'branch_id'      => absint( $data['branch_id'] ?? 0 ),
 			'service_id'     => absint( $data['service_id'] ?? 0 ),
 			'doctor_user_id' => absint( $data['doctor_user_id'] ?? 0 ),
 			'timezone'       => $timezone,
-			'rrule_json'      => self::json( WCA_Service::sanitize_rrule( (array) ( $data['rrule'] ?? array() ) ) ),
+			'rrule_json'      => self::json( WCA_Service::sanitize_rrule( $rrule ) ),
 			'breaks_json'     => self::json( WCA_Service::sanitize_time_ranges( (array) ( $data['breaks'] ?? array() ) ) ),
 			'exceptions_json' => self::json( WCA_Service::sanitize_exceptions( (array) ( $data['exceptions'] ?? array() ) ) ),
-			'buffer_before'   => min( 240, absint( $data['buffer_before'] ?? 0 ) ),
-			'buffer_after'    => min( 240, absint( $data['buffer_after'] ?? 0 ) ),
-			'capacity'        => min( 50, max( 1, absint( $data['capacity'] ?? 1 ) ) ),
-			'status'          => in_array( $data['status'] ?? 'active', array( 'active', 'paused', 'archived' ), true ) ? $data['status'] : 'active',
+			'buffer_before'   => $buffer_before,
+			'buffer_after'    => $buffer_after,
+			'capacity'        => $capacity,
+			'status'          => $status,
 			'updated_at'      => self::now(),
 		);
 		if ( ! $row['clinic_id'] || ! $row['doctor_user_id'] ) {
