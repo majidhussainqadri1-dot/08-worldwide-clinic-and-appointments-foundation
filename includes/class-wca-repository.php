@@ -34,14 +34,21 @@ final class WCA_Repository {
 	/** Execute one owner mutation and its required evidence/outbox writes atomically. */
 	public static function transaction( $callback, $error_code = 'wca_transaction_failed' ) {
 		global $wpdb;
-		$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$started = $wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		if ( false === $started ) {
+			return new WP_Error( sanitize_key( $error_code . '_start' ), __( 'The mutation transaction could not be started safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
 		try {
 			$result = call_user_func( $callback );
 			if ( is_wp_error( $result ) ) {
 				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 				return $result;
 			}
-			$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$committed = $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			if ( false === $committed ) {
+				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				return new WP_Error( sanitize_key( $error_code . '_commit' ), __( 'The mutation transaction could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
 			return $result;
 		} catch ( Throwable $error ) {
 			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
