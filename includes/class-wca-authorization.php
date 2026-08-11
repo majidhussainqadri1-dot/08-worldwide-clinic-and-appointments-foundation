@@ -179,6 +179,23 @@ final class WCA_Authorization {
 		return array_values( array_unique( $out ) );
 	}
 
+	/** Return whether a doctor has a current File 08 serving relationship with a clinic. */
+	public static function doctor_can_serve_clinic( $clinic, $doctor_user_id, $actor_user_id = 0 ) {
+		$clinic = is_array( $clinic ) ? $clinic : WCA_Repository::get_clinic( absint( $clinic ), false );
+		$doctor_user_id = absint( $doctor_user_id );
+		$actor_user_id  = absint( $actor_user_id );
+		if ( ! $clinic || ! $doctor_user_id ) { return false; }
+		$clinic_id = absint( $clinic['id'] ?? 0 );
+		if ( ! $clinic_id ) { return false; }
+		if ( $doctor_user_id === absint( $clinic['owner_user_id'] ?? 0 ) ) { return true; }
+		$delegated = array_merge(
+			self::delegated_clinic_ids( $doctor_user_id, 'schedule' ),
+			self::delegated_clinic_ids( $doctor_user_id, 'clinic_manage' )
+		);
+		$allowed = in_array( $clinic_id, array_map( 'absint', $delegated ), true );
+		return (bool) apply_filters( 'wca_doctor_may_serve_clinic', $allowed, $doctor_user_id, $clinic_id, $actor_user_id );
+	}
+
 	public static function has_active_clinic_delegation( $user_id = 0 ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
 		foreach ( self::delegations( $user_id ) as $entry ) {

@@ -56,6 +56,9 @@ final class WCA_Plan_Guard {
 		if ( absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) ) {
 			return new WP_Error( 'wca_slot_scope', __( 'The selected service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
+		if ( ! WCA_Authorization::doctor_can_serve_clinic( $clinic, $doctor_id ) ) {
+			return new WP_Error( 'wca_slot_doctor_scope', __( 'The selected practitioner no longer has authority to serve this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
 		$assigned = absint( $service['doctor_user_id'] );
 		if ( $assigned && $assigned !== $doctor_id ) {
 			return new WP_Error( 'wca_slot_practitioner', __( 'The selected practitioner is not assigned to this service.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
@@ -154,6 +157,9 @@ final class WCA_Plan_Guard {
 		$service = WCA_Repository::get_service( absint( $hold['service_id'] ?? 0 ), true );
 		if ( ! $clinic || ! $service || absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) || ! SWC_Doctor_Authority::is_eligible( absint( $hold['doctor_user_id'] ?? 0 ) ) ) {
 			return new WP_Error( 'wca_hold_scope', __( 'The clinic, service, or practitioner is no longer eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+		if ( ! WCA_Authorization::doctor_can_serve_clinic( $clinic, absint( $hold['doctor_user_id'] ?? 0 ) ) ) {
+			return new WP_Error( 'wca_hold_doctor_scope', __( 'The slot practitioner no longer has authority to serve this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		$branch_id = absint( $hold['branch_id'] ?? 0 );
 		if ( $branch_id ) {

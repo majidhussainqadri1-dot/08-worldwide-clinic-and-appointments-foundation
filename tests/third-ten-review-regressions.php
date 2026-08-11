@@ -14,6 +14,7 @@ $future=t310src('includes/class-wca-future24.php');
 $repo=t310src('includes/class-wca-repository.php');
 $second=t310src('includes/class-wca-second-ten-review-hardening.php');
 $service=t310src('includes/class-wca-service.php');
+$auth=t310src('includes/class-wca-authorization.php');
 $rest=t310src('includes/class-wca-rest.php');
 $readme=t310src('readme.txt');
 $repo_readme=t310src('README.md');
@@ -65,8 +66,8 @@ t310has('worker ownership readback',$repo,"status='processing' AND locked_by=%s"
 t310has('root clinic service helper',$service,'private static function doctor_may_serve_clinic');
 t310has('service doctor scope error',$service,'wca_service_doctor_scope');
 t310has('availability doctor scope error',$service,'wca_availability_doctor_scope');
-t310has('doctor clinic integration filter',$service,'wca_doctor_may_serve_clinic');
-t310has('doctor scheduling delegation',$service,'delegated_clinic_ids( $doctor_id, \'schedule\' )');
+t310has('doctor clinic integration filter',$auth,'wca_doctor_may_serve_clinic');
+t310has('doctor scheduling delegation',$auth,'delegated_clinic_ids( $doctor_user_id, \'schedule\' )');
 
 // T3-R9: release identity advances without schema inflation.
 t310has('plugin header 1.2.4',$bootstrap,'Version: 1.2.4');
