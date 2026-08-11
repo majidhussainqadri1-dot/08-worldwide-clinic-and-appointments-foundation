@@ -773,7 +773,7 @@ final class WCA_Service {
 				$seen++;
 			}
 			$page++;
-		} while ( 200 === count( $appointments ) && $page <= 500 );
+		} while ( 200 === count( $appointments ) );
 		WCA_Observability::metric( 'doctor_suspension_appointments_scanned', $seen, array( 'doctor_scope' => 'suspended' ) );
 	}
 
