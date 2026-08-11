@@ -892,9 +892,26 @@ final class WCA_Service {
 			foreach ( $appointments as $id ) {
 				$status = SWC_Helpers::status( $id );
 				if ( ! WCA_Contracts::is_terminal( $status ) ) {
-					update_post_meta( $id, '_swc_doctor_authority_hold', '1' );
-					update_post_meta( $id, '_swc_doctor_authority_hold_reason', sanitize_text_field( $reason ) );
-					WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) SWC_Helpers::meta( $id, 'public_ref' ), array( 'event' => 'doctor_authority_hold', 'recipients' => array( absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) ) ) ), WCA_Observability::trace_id() );
+					$reconciled = WCA_Repository::transaction( function () use ( $id, $reason ) {
+						update_post_meta( $id, '_swc_doctor_authority_hold', '1' );
+						update_post_meta( $id, '_swc_doctor_authority_hold_reason', sanitize_text_field( $reason ) );
+						if ( '1' !== (string) get_post_meta( $id, '_swc_doctor_authority_hold', true ) ) {
+							return new WP_Error( 'wca_doctor_hold_persist', __( 'Doctor authority hold could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+						}
+						$queued = WCA_Repository::enqueue(
+							'File19.NotificationRequested.v1',
+							(string) SWC_Helpers::meta( $id, 'public_ref' ),
+							array(
+								'event' => 'doctor_authority_hold',
+								'recipients' => array( absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) ) ),
+							),
+							WCA_Observability::trace_id()
+						);
+						return is_wp_error( $queued ) ? $queued : true;
+					}, 'wca_doctor_suspension_reconcile_transaction' );
+					if ( is_wp_error( $reconciled ) ) {
+						WCA_Observability::log( 'error', 'doctor_suspension_reconcile_failed', array( 'appointment_ref' => (string) SWC_Helpers::meta( $id, 'public_ref' ), 'error' => $reconciled->get_error_code() ) );
+					}
 				}
 				$seen++;
 			}
