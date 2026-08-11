@@ -1547,9 +1547,11 @@ final class WCA_Future24 {
 
 	/* FUT-23 */
 	public static function create_episode( $data, $actor = 0 ) {
+		$raw_refs = (array) ( isset( $data['appointment_refs'] ) ? $data['appointment_refs'] : array() );
+		if ( count( $raw_refs ) > 50 ) { return new WP_Error( 'wca_episode_appointment_limit', __( 'No more than 50 appointments may be linked in one episode.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) ); }
 		$refs = array();
 		$scope = null;
-		foreach ( array_slice( (array) ( isset( $data['appointment_refs'] ) ? $data['appointment_refs'] : array() ), 0, 50 ) as $ref ) {
+		foreach ( $raw_refs as $ref ) {
 			$id = self::require_appointment( $ref, $actor );
 			if ( is_wp_error( $id ) ) { return $id; }
 			$current = array(
