@@ -97,8 +97,10 @@ final class WCA_Plan_Guard {
 		if ( ! $start || ! $end || strtotime( $end . ' UTC' ) <= strtotime( $start . ' UTC' ) ) {
 			return new WP_Error( 'wca_slot_time', __( 'The selected slot time is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		$query['date_from'] = gmdate( 'Y-m-d', strtotime( $start . ' UTC' ) );
-		$query['date_to']   = $query['date_from'];
+		// A UTC slot can belong to the previous/next calendar day in the rule timezone.
+		// Reproject a bounded three-day window so valid cross-zone/DST-boundary slots are not rejected.
+		$query['date_from'] = gmdate( 'Y-m-d', strtotime( $start . ' UTC' ) - DAY_IN_SECONDS );
+		$query['date_to']   = gmdate( 'Y-m-d', strtotime( $end . ' UTC' ) + DAY_IN_SECONDS );
 		$query['timezone']  = 'UTC';
 		$query['limit']     = 500;
 		$projection = WCA_Service::search_slots( $query );
