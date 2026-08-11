@@ -13,7 +13,7 @@
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Appointment_Command {
-	const CONTRACT_VERSION = '1.0.1';
+	const CONTRACT_VERSION = '1.0.2';
 
 	public static function boot() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_route' ), 60 );
@@ -63,6 +63,11 @@ final class WCA_Appointment_Command {
 		if ( $remote && ! self::affirmative( isset( $data['telehealth_consent'] ) ? $data['telehealth_consent'] : null ) ) {
 			return new WP_Error( 'wca_teleconsult_consent_required', __( 'Explicit remote-consultation consent is required for the selected online or hybrid service.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
+		/* Fail closed before the legacy service can reclaim an ambiguous stale
+		 * processing reservation. A prior worker may already have committed the
+		 * appointment even if it died before persisting the idempotent response. */
+		$stale = self::guard_stale_request_claim( $data, $actor_user_id );
+		if ( is_wp_error( $stale ) ) { return $stale; }
 		$data['privacy_consent']        = true;
 		$data['emergency_acknowledged'] = true;
 		$data['telehealth_consent']     = $remote ? true : false;
@@ -84,6 +89,28 @@ final class WCA_Appointment_Command {
 		// Public/cross-file command responses use the opaque appointment ref only.
 		unset( $result['appointment_id'] );
 		return $result;
+	}
+
+	/** @return true|WP_Error */
+	private static function guard_stale_request_claim( $data, $actor_user_id ) {
+		$key = sanitize_text_field( isset( $data['idempotency_key'] ) ? $data['idempotency_key'] : '' );
+		if ( ! $key ) { return true; }
+		global $wpdb;
+		$table = WCA_Schema::tables()['idempotency'];
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id,status,updated_at FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1",
+				'request_appointment',
+				hash( 'sha256', $key ),
+				absint( $actor_user_id )
+			),
+			ARRAY_A
+		);
+		if ( $row && 'processing' === (string) $row['status'] && strtotime( (string) $row['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {
+			WCA_Observability::metric( 'idempotency_stale_processing_blocked_total', 1, array( 'scope' => 'request_appointment' ) );
+			return new WP_Error( 'wca_idempotency_in_progress', __( 'This appointment request has an ambiguous in-flight reservation and cannot be replayed automatically.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'reconciliation_required' => true ) );
+		}
+		return true;
 	}
 
 	private static function affirmative( $value ) {
