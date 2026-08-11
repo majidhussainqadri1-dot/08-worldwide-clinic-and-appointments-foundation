@@ -131,13 +131,16 @@ final class WCA_Service {
 		if ( is_wp_error( $claims ) ) { return $claims; }
 		$reviewer = ! empty( $claims['founder'] ) || user_can( $actor_user_id, 'manage_wca_clinics' ) || user_can( $actor_user_id, 'manage_worldwide_clinic' );
 		if ( ! $reviewer ) { return new WP_Error( 'wca_clinic_reviewer_required', __( 'Institutional reviewer authority is required to activate a clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
+		$step = WCA_Authorization::require_step_up( 'activate_clinic', $actor_user_id );
+		if ( is_wp_error( $step ) ) { return $step; }
+		if ( ! SWC_Doctor_Authority::is_eligible( absint( $clinic['owner_user_id'] ?? 0 ) ) ) { return new WP_Error( 'wca_clinic_owner_ineligible', __( 'The clinic owner is not currently eligible for activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		if ( ! in_array( $clinic['status'], array( 'review','paused' ), true ) ) {
 			return new WP_Error( 'wca_clinic_transition', __( 'Clinic cannot be activated from its current state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
-		$services = WCA_Repository::list_services( $clinic['id'], false );
-		$branches = WCA_Repository::list_branches( $clinic['id'], false );
+		$services = WCA_Repository::list_services( $clinic['id'], true );
+		$branches = WCA_Repository::list_branches( $clinic['id'], true );
 		if ( ! $services || ! $branches ) {
-			return new WP_Error( 'wca_clinic_incomplete', __( 'At least one branch and one service are required before activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+			return new WP_Error( 'wca_clinic_incomplete', __( 'At least one active public branch and one active eligible service are required before activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		$updated = WCA_Repository::update_clinic( $clinic['id'], $expected_version, array( 'status' => 'active' ) );
 		if ( is_wp_error( $updated ) ) { return $updated; }
