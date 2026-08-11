@@ -1122,6 +1122,28 @@ final class WCA_Future24 {
 		return self::put_record( 'F08-FUT-11', array( 'clinic_id' => $clinic_id, 'status' => 'template_active', 'payload' => array( 'service_ref' => $service_ref, 'fields' => $fields, 'answers_owner' => 'WCA_Continuity encrypted intake', 'automated_diagnosis' => false ) ), $actor );
 	}
 
+
+	/** Read every active Future24 policy/template row for one clinic with stable keyset pagination. */
+	private static function feature_rows_for_clinic( $feature_id, $clinic_id, $status, $shape = 'payload' ) {
+		global $wpdb;
+		$table = self::tables()['records'];
+		$feature_id = strtoupper( sanitize_text_field( $feature_id ) );
+		$status = sanitize_key( $status );
+		if ( ! isset( self::capabilities()[ $feature_id ] ) || ! $clinic_id || ! $status ) { return array(); }
+		$columns = 'questionnaire' === $shape ? 'id,public_ref,payload_json,version,updated_at' : 'id,payload_json';
+		$out = array();
+		$cursor = 0;
+		$batch = 100;
+		do {
+			$rows = (array) $wpdb->get_results( $wpdb->prepare(
+				"SELECT {$columns} FROM {$table} WHERE feature_id=%s AND clinic_id=%d AND status=%s AND id>%d ORDER BY id ASC LIMIT %d",
+				$feature_id, absint( $clinic_id ), $status, $cursor, $batch
+			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			foreach ( $rows as $row ) { $cursor = max( $cursor, absint( $row['id'] ?? 0 ) ); $out[] = $row; }
+		} while ( count( $rows ) === $batch );
+		return $out;
+	}
+
 	public static function questionnaire_for_appointment( $appointment_ref, $actor = 0 ) {
 		global $wpdb;
 		$id = self::require_appointment( $appointment_ref, $actor );
@@ -1131,7 +1153,7 @@ final class WCA_Future24 {
 		$service = $service_id ? WCA_Repository::get_service( $service_id, false ) : null;
 		$service_ref = $service && ! empty( $service['public_ref'] ) ? strtolower( (string) $service['public_ref'] ) : '';
 		$table = self::tables()['records'];
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT public_ref,payload_json,version,updated_at FROM {$table} WHERE feature_id='F08-FUT-11' AND clinic_id=%d AND status='template_active' ORDER BY id DESC LIMIT 20", $clinic_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = array_reverse( self::feature_rows_for_clinic( 'F08-FUT-11', $clinic_id, 'template_active', 'questionnaire' ) );
 		foreach ( $rows as $row ) {
 			$payload = json_decode( (string) $row['payload_json'], true );
 			if ( ! is_array( $payload ) ) { continue; }
