@@ -185,6 +185,9 @@ final class WCA_Authorization {
 		$doctor_user_id = absint( $doctor_user_id );
 		$actor_user_id  = absint( $actor_user_id );
 		if ( ! $clinic || ! $doctor_user_id ) { return false; }
+		/* Serving authority is never valid for a practitioner whose current File 09/doctor authority is no longer eligible.
+		 * Keep this invariant at the canonical relationship root so direct/internal callers cannot bypass an edge-only check. */
+		if ( ! class_exists( 'SWC_Doctor_Authority' ) || ! SWC_Doctor_Authority::is_eligible( $doctor_user_id ) ) { return false; }
 		$clinic_id = absint( $clinic['id'] ?? 0 );
 		if ( ! $clinic_id ) { return false; }
 		if ( $doctor_user_id === absint( $clinic['owner_user_id'] ?? 0 ) ) { return true; }
