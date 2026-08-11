@@ -6,8 +6,8 @@ function f08pkg_file( $root, $path ) { global $failures; $file=$root.'/'.$path; 
 function f08pkg_has( $label, $source, $needle ) { global $failures,$checks; $checks++; if(false===strpos($source,$needle)){ $failures[]=$label.' missing: '.$needle; } }
 function f08pkg_lacks( $label, $source, $needle ) { global $failures,$checks; $checks++; if(false!==strpos($source,$needle)){ $failures[]=$label.' forbidden: '.$needle; } }
 $plugin=f08pkg_file($root,'worldwide-clinic.php'); $builder=f08pkg_file($root,'tools/build-candidate.php'); $verifier=f08pkg_file($root,'tools/verify-candidate.php'); $workflow=f08pkg_file($root,'.github/workflows/file08-complete-quality.yml');
-f08pkg_has('runtime source',$plugin,'Version: 1.2.8');
-f08pkg_has('runtime source',$plugin,"define( 'WCA_VERSION', '1.2.8' )");
+f08pkg_has('runtime source',$plugin,'Version: 1.2.9');
+f08pkg_has('runtime source',$plugin,"define( 'WCA_VERSION', '1.2.9' )");
 f08pkg_has('builder',$builder,'wca_build_runtime_version');
 f08pkg_has('builder',$builder,'Plugin header/runtime version mismatch.');
 f08pkg_has('builder',$builder,"preg_match( '/^[0-9a-f]{40}$/'");

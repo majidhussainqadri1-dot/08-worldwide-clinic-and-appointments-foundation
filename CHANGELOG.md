@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.9 — 2026-08-11
+
+- Completed the ninth fresh sequential 10-round corrective cycle against exact v1.2.8 repository state.
+- Replaced browser-visible practitioner numeric references with opaque references and removed global doctor enumeration from mutation authorization.
+- Made locked appointment mutations transactional and transition events/outbox/review eligibility/audit fail closed.
+- Made Future24 governance-audited record creation fail closed and corrected waitlist offer, support participant revocation, virtual-room and group-cancellation atomicity.
+- Runtime 1.2.9; core schema remains 3.2.0; continuity schema 1.1.0; Future24 schema 1.0.0.
+- Added a permanent ninth-ten-review regression gate; staging/live evidence remains separate.
+
 ## 1.2.8 — 2026-08-11
 
 - Completed the eighth fresh sequential 10-round corrective cycle.
