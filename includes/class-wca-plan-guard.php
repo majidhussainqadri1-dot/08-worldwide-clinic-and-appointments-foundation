@@ -106,37 +106,24 @@ final class WCA_Plan_Guard {
 		if ( ! $start || ! $end || strtotime( $end . ' UTC' ) <= strtotime( $start . ' UTC' ) ) {
 			return new WP_Error( 'wca_slot_time', __( 'The selected slot time is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		// A UTC slot can belong to the previous/next calendar day in the rule timezone.
-		// Reproject a bounded three-day window so valid cross-zone/DST-boundary slots are not rejected.
-		$query['date_from'] = gmdate( 'Y-m-d', strtotime( $start . ' UTC' ) - DAY_IN_SECONDS );
-		$query['date_to']   = gmdate( 'Y-m-d', strtotime( $end . ' UTC' ) + DAY_IN_SECONDS );
-		$query['timezone']  = 'UTC';
-		$query['limit']     = 500;
-		$projection = WCA_Service::search_slots( $query );
-		if ( is_wp_error( $projection ) ) {
-			return $projection;
-		}
-		$matched = null;
-		foreach ( (array) ( $projection['slots'] ?? array() ) as $slot ) {
-			if ( hash_equals( $slot_ref, (string) ( $slot['slot_ref'] ?? '' ) )
-				&& hash_equals( (string) $rule['public_ref'], (string) ( $slot['rule_ref'] ?? '' ) )
-				&& $start === (string) ( $slot['start_utc'] ?? '' )
-				&& $end === (string) ( $slot['end_utc'] ?? '' )
-				&& $freshness === absint( $slot['freshness_version'] ?? 0 ) ) {
-				$matched = $slot;
-				break;
-			}
-		}
-		if ( ! $matched ) {
-			return new WP_Error( 'wca_slot_not_available', __( 'The selected slot is not in the current server availability projection.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
-		}
 		$client_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
 		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $client_key ) ) {
 			return new WP_Error( 'wca_idempotency_required', __( 'A valid idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		/* The repository's key is globally unique, but client keys are not. Namespace
-		 * the replay identity by the authorized patient without exposing the raw key. */
-		$data['idempotency_key'] = 'p' . absint( $patient_user_id ) . ':' . hash( 'sha256', $client_key );
+		/* Namespace the replay identity before re-projection. The exact-slot validator may
+		 * ignore only the hold created by this same patient/key, allowing a true replay
+		 * to reach repository idempotency while every other overlapping hold still blocks. */
+		$repository_key = 'p' . absint( $patient_user_id ) . ':' . hash( 'sha256', $client_key );
+		$service = $query['service_id'] ? WCA_Repository::get_service( $query['service_id'], true ) : null;
+		$duration = $service ? absint( $service['duration_minutes'] ) : max( 10, (int) round( ( strtotime( $end . ' UTC' ) - strtotime( $start . ' UTC' ) ) / 60 ) );
+		$matched = WCA_Service::project_rule_slot( $rule, $start, $end, $duration, 'UTC', $repository_key );
+		if ( ! $matched
+			|| ! hash_equals( $slot_ref, (string) ( $matched['slot_ref'] ?? '' ) )
+			|| ! hash_equals( (string) $rule['public_ref'], (string) ( $matched['rule_ref'] ?? '' ) )
+			|| $freshness !== absint( $matched['freshness_version'] ?? 0 ) ) {
+			return new WP_Error( 'wca_slot_not_available', __( 'The selected slot is not in the current server availability projection.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+		$data['idempotency_key'] = $repository_key;
 		return array_merge(
 			$data,
 			array(

@@ -350,10 +350,28 @@ final class WCA_Service {
 		return false;
 	}
 
-	private static function has_active_hold( $doctor_id, $start_utc, $end_utc ) {
+	private static function has_active_hold( $doctor_id, $start_utc, $end_utc, $ignore_idempotency_key = '' ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['slot_holds'];
+		if ( $ignore_idempotency_key ) {
+			return (bool) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND idempotency_key<>%s AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1", absint( $doctor_id ), sanitize_text_field( $ignore_idempotency_key ), WCA_Repository::now(), $end_utc, $start_utc ) );
+		}
 		return (bool) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1", absint( $doctor_id ), WCA_Repository::now(), $end_utc, $start_utc ) );
+	}
+
+	/** Reproject one exact rule/day slot without enumerating an arbitrary first-N global projection. */
+	public static function project_rule_slot( $rule, $start_utc, $end_utc, $duration, $display_timezone = 'UTC', $ignore_idempotency_key = '' ) {
+		if ( ! is_array( $rule ) || ! self::valid_timezone( $rule['timezone'] ?? '' ) || ! self::valid_timezone( $display_timezone ) ) { return null; }
+		$duration = min( 480, max( 10, absint( $duration ) ) );
+		try {
+			$start = new DateTimeImmutable( (string) $start_utc, new DateTimeZone( 'UTC' ) );
+			$local_date = $start->setTimezone( new DateTimeZone( (string) $rule['timezone'] ) )->format( 'Y-m-d' );
+		} catch ( Exception $e ) { return null; }
+		$slots = self::generate_rule_slots( $rule, $local_date, $local_date, $duration, $display_timezone, 200, '', '', $ignore_idempotency_key );
+		foreach ( $slots as $slot ) {
+			if ( (string) ( $slot['start_utc'] ?? '' ) === (string) $start_utc && (string) ( $slot['end_utc'] ?? '' ) === (string) $end_utc ) { return $slot; }
+		}
+		return null;
 	}
 
 	/** @return array<string,mixed>|WP_Error */

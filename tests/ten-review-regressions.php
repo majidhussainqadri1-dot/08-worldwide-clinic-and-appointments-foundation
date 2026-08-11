@@ -62,9 +62,9 @@ r10has('slot date leading expansion',$hardening,"strtotime( \$from . ' -1 day UT
 r10has('slot date trailing expansion',$hardening,"strtotime( \$to . ' +1 day UTC' )");
 r10has('display-zone filtering',$hardening,"setTimezone( \$zone )");
 r10has('display window',$hardening,"'display_window'");
-r10has('hold leading reprojection',$plan,"strtotime( \$start . ' UTC' ) - DAY_IN_SECONDS");
-r10has('hold trailing reprojection',$plan,"strtotime( \$end . ' UTC' ) + DAY_IN_SECONDS");
-r10has('hold reprojection UTC',$plan,"\$query['timezone']  = 'UTC'");
+r10has('exact rule slot reprojection',$plan,"WCA_Service::project_rule_slot( \$rule, \$start, \$end, \$duration, 'UTC', \$repository_key )");
+r10has('hold replay namespaced before projection',$plan,"\$repository_key = 'p' . absint( \$patient_user_id )");
+r10has('canonical service duration used',$plan,"\$service['duration_minutes']");
 r10has('exact slot evidence match',$plan,'hash_equals( $slot_ref');
 
 // R7 branch audit/domain/search projection evidence.
