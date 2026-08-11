@@ -374,12 +374,17 @@ final class WCA_Continuity {
 		$actor = WCA_Authorization::appointment_actor( $appointment_id, $actor_user_id );
 		if ( ! in_array( $actor, array( 'patient', 'guardian', 'doctor' ), true ) && ! self::followup_actor_allowed( $appointment_id, $actor_user_id ) ) { return self::not_found(); }
 		$table = self::tables()['followups'];
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT public_ref FROM {$table} WHERE appointment_id=%d ORDER BY due_at ASC,id ASC LIMIT 100", $appointment_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$out = array();
-		foreach ( $rows as $row ) {
-			$item = self::get_followup( $row['public_ref'], $actor_user_id );
-			if ( ! is_wp_error( $item ) ) { $out[] = $item; }
-		}
+		$cursor = 0;
+		$batch = 100;
+		do {
+			$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref FROM {$table} WHERE appointment_id=%d AND id>%d ORDER BY id ASC LIMIT %d", $appointment_id, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			foreach ( $rows as $row ) {
+				$cursor = max( $cursor, absint( $row['id'] ?? 0 ) );
+				$item = self::get_followup( $row['public_ref'], $actor_user_id );
+				if ( ! is_wp_error( $item ) ) { $out[] = $item; }
+			}
+		} while ( count( $rows ) === $batch );
 		return $out;
 	}
 
