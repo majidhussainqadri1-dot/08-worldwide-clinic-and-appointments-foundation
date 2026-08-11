@@ -409,6 +409,25 @@ final class WCA_Future24 {
 		self::offer_waitlist_for_cancelled_appointment( sanitize_text_field( isset( $envelope['aggregate_ref'] ) ? $envelope['aggregate_ref'] : '' ) );
 	}
 
+
+	/** Iterate every active waitlist entry in stable bounded pages so an eligible patient beyond an arbitrary first page is not starved. */
+	private static function waitlist_candidates( $clinic_id ) {
+		global $wpdb;
+		$table = self::tables()['records'];
+		$cursor = 0;
+		$batch = 100;
+		do {
+			$rows = (array) $wpdb->get_results( $wpdb->prepare(
+				"SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) AND id>%d ORDER BY id ASC LIMIT %d",
+				absint( $clinic_id ), WCA_Repository::now(), $cursor, $batch
+			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			foreach ( $rows as $row ) {
+				$cursor = max( $cursor, absint( $row['id'] ?? 0 ) );
+				yield $row;
+			}
+		} while ( count( $rows ) === $batch );
+	}
+
 	private static function offer_waitlist_for_cancelled_appointment( $appointment_ref ) {
 		global $wpdb;
 		$appointment_id = self::appointment_id( $appointment_ref );
@@ -421,10 +440,9 @@ final class WCA_Future24 {
 		$service = $service_id ? WCA_Repository::get_service( $service_id, false ) : null;
 		$service_ref = $service && ! empty( $service['public_ref'] ) ? strtolower( (string) $service['public_ref'] ) : '';
 		$table = self::tables()['records'];
-		$waiting = (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) ORDER BY created_at ASC,id ASC LIMIT 50", $clinic_id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$offered = 0;
 		$slot_date = substr( $start, 0, 10 );
-		foreach ( $waiting as $wait ) {
+		foreach ( self::waitlist_candidates( $clinic_id ) as $wait ) {
 			$payload = json_decode( (string) $wait['payload_json'], true );
 			$payload = is_array( $payload ) ? $payload : array();
 			$wanted_service = strtolower( sanitize_text_field( isset( $payload['service_ref'] ) ? $payload['service_ref'] : '' ) );
