@@ -714,13 +714,21 @@ final class WCA_Service {
 			$data['clinic_id'] = absint( SWC_Helpers::meta( $appointment_id, 'clinic_id' ) );
 		}
 		$data['complainant_user_id'] = $actor_user_id;
-		$result = WCA_Repository::create_complaint( $data );
-		if ( is_wp_error( $result ) ) { return $result; }
-		$trace = WCA_Observability::trace_id();
-		WCA_Repository::append_event( 'AppointmentComplaintSubmitted.v1', 'complaint', $result['public_ref'], array( 'complaint_ref' => $result['public_ref'], 'appointment_ref' => $appointment_id ? SWC_Helpers::meta( $appointment_id, 'public_ref' ) : '', 'category' => $result['category'], 'trace_id' => $trace ), $actor_user_id, $trace );
-		WCA_Repository::enqueue( 'CF02.CaseRequested.v1', $result['public_ref'], array( 'case_type' => 'appointment_complaint', 'complaint_ref' => $result['public_ref'], 'purpose_limit' => $result['purpose_limit'] ), $trace );
-		WCA_Repository::enqueue( 'File19.NotificationRequested.v1', $result['public_ref'], array( 'event' => 'complaint_submitted', 'recipients' => array( $actor_user_id ) ), $trace );
-		return $result;
+		return WCA_Repository::transaction( function () use ( $data, $actor_user_id, $appointment_id ) {
+			$result = WCA_Repository::create_complaint( $data );
+			if ( is_wp_error( $result ) ) { return $result; }
+			$trace = WCA_Observability::trace_id();
+			$event = WCA_Repository::append_event( 'AppointmentComplaintSubmitted.v1', 'complaint', $result['public_ref'], array( 'complaint_ref' => $result['public_ref'], 'appointment_ref' => $appointment_id ? SWC_Helpers::meta( $appointment_id, 'public_ref' ) : '', 'category' => $result['category'], 'trace_id' => $trace ), $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			foreach ( array(
+				array( 'CF02.CaseRequested.v1', array( 'case_type' => 'appointment_complaint', 'complaint_ref' => $result['public_ref'], 'purpose_limit' => $result['purpose_limit'] ) ),
+				array( 'File19.NotificationRequested.v1', array( 'event' => 'complaint_submitted', 'recipients' => array( $actor_user_id ) ) ),
+			) as $outbox ) {
+				$queued = WCA_Repository::enqueue( $outbox[0], $result['public_ref'], $outbox[1], $trace );
+				if ( is_wp_error( $queued ) ) { return $queued; }
+			}
+			return $result;
+		}, 'wca_complaint_transaction' );
 	}
 
 	/** @return array<string,mixed>|WP_Error */
