@@ -398,19 +398,25 @@ final class WCA_Repository {
 		$doctor_id = absint( $data['doctor_user_id'] ?? 0 );
 		$patient_id = absint( $data['patient_user_id'] ?? 0 );
 		$clinic_id = absint( $data['clinic_id'] ?? 0 );
+		$branch_id = absint( $data['branch_id'] ?? 0 );
 		$service_id = absint( $data['service_id'] ?? 0 );
 		$idempotency_plain = sanitize_text_field( $data['idempotency_key'] ?? '' );
 		if ( ! $idempotency_plain ) {
 			return new WP_Error( 'wca_idempotency_required', __( 'An idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
 		$idempotency_key = hash( 'sha256', $idempotency_plain );
+		$branch = $branch_id ? self::get_branch( $branch_id ) : null;
+		if ( $branch_id && ( ! $branch || absint( $branch['clinic_id'] ) !== $clinic_id || 'active' !== (string) $branch['status'] ) ) {
+			return new WP_Error( 'wca_slot_branch_scope', __( 'The selected slot branch is not active for this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
 		if ( ! $start || ! $end || ! $doctor_id || ! $patient_id || strtotime( $end . ' UTC' ) <= strtotime( $start . ' UTC' ) ) {
 			return new WP_Error( 'wca_slot_time', __( 'Invalid canonical slot request.', 'worldwide-clinic-appointments' ) );
 		}
 
-		$replay = static function ( $row ) use ( $clinic_id, $service_id, $doctor_id, $patient_id, $start, $end ) {
+		$replay = static function ( $row ) use ( $clinic_id, $branch_id, $service_id, $doctor_id, $patient_id, $start, $end ) {
 			if ( ! $row ) { return null; }
 			$same = absint( $row['clinic_id'] ) === $clinic_id
+				&& absint( $row['branch_id'] ?? 0 ) === $branch_id
 				&& absint( $row['service_id'] ) === $service_id
 				&& absint( $row['doctor_user_id'] ) === $doctor_id
 				&& absint( $row['patient_user_id'] ) === $patient_id
@@ -446,6 +452,7 @@ final class WCA_Repository {
 				'hold_token'      => $hold_token,
 				'idempotency_key' => $idempotency_key,
 				'clinic_id'       => $clinic_id,
+				'branch_id'       => $branch_id,
 				'service_id'      => $service_id,
 				'doctor_user_id'  => $doctor_id,
 				'patient_user_id' => $patient_id,

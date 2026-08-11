@@ -141,6 +141,7 @@ final class WCA_Schema {
 				hold_token char(64) NOT NULL,
 				idempotency_key char(64) NOT NULL,
 				clinic_id bigint(20) unsigned NOT NULL,
+				branch_id bigint(20) unsigned NOT NULL DEFAULT 0,
 				service_id bigint(20) unsigned NOT NULL DEFAULT 0,
 				doctor_user_id bigint(20) unsigned NOT NULL,
 				patient_user_id bigint(20) unsigned NOT NULL,
@@ -155,6 +156,7 @@ final class WCA_Schema {
 				UNIQUE KEY hold_token (hold_token),
 				UNIQUE KEY idempotency_key (idempotency_key),
 				KEY resource_window (doctor_user_id,start_utc,end_utc,status),
+				KEY clinic_branch (clinic_id,branch_id),
 				KEY expires_at (expires_at)
 			) {$collate};",
 			"CREATE TABLE {$tables['consents']} (

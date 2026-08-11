@@ -155,6 +155,13 @@ final class WCA_Plan_Guard {
 		if ( ! $clinic || ! $service || absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) || ! SWC_Doctor_Authority::is_eligible( absint( $hold['doctor_user_id'] ?? 0 ) ) ) {
 			return new WP_Error( 'wca_hold_scope', __( 'The clinic, service, or practitioner is no longer eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
+		$branch_id = absint( $hold['branch_id'] ?? 0 );
+		if ( $branch_id ) {
+			$branch = WCA_Repository::get_branch( $branch_id );
+			if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) || 'active' !== (string) $branch['status'] ) {
+				return new WP_Error( 'wca_hold_branch_scope', __( 'The slot branch is no longer active for this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+			}
+		}
 		return true;
 	}
 

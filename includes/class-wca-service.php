@@ -424,7 +424,7 @@ final class WCA_Service {
 			'doctor_id'              => $doctor_id,
 			'clinic_id'              => absint( $hold['clinic_id'] ),
 			'service_id'             => absint( $hold['service_id'] ),
-			'branch_id'              => absint( $data['branch_id'] ?? 0 ),
+			'branch_id'              => absint( $hold['branch_id'] ?? 0 ),
 			'status'                 => 'requested',
 			'preferred_at_utc'       => $hold['start_utc'],
 			'appointment_end_utc'    => $hold['end_utc'],
@@ -507,6 +507,7 @@ final class WCA_Service {
 				if ( is_wp_error( $hold_check ) ) { return $hold_check; }
 				update_post_meta( $appointment_id, '_swc_proposed_at_utc', $hold['start_utc'] );
 				update_post_meta( $appointment_id, '_swc_proposed_end_utc', $hold['end_utc'] );
+				update_post_meta( $appointment_id, '_swc_proposed_branch_id', absint( $hold['branch_id'] ?? 0 ) );
 				update_post_meta( $appointment_id, '_swc_proposed_hold_token', $hold_token );
 				update_post_meta( $appointment_id, '_swc_proposed_by_user_id', $actor_user_id );
 				update_post_meta( $appointment_id, '_swc_proposed_expires_at', $hold['expires_at'] );
@@ -520,7 +521,8 @@ final class WCA_Service {
 				WCA_Repository::release_appointment_slot( $appointment_id, 'released', $token );
 				update_post_meta( $appointment_id, '_swc_preferred_at_utc', $hold['start_utc'] );
 				update_post_meta( $appointment_id, '_swc_appointment_end_utc', $hold['end_utc'] );
-				foreach ( array( 'proposed_at_utc','proposed_end_utc','proposed_hold_token','proposed_by_user_id','proposed_expires_at' ) as $key ) { delete_post_meta( $appointment_id, '_swc_' . $key ); }
+				update_post_meta( $appointment_id, '_swc_branch_id', absint( $hold['branch_id'] ?? 0 ) );
+				foreach ( array( 'proposed_at_utc','proposed_end_utc','proposed_branch_id','proposed_hold_token','proposed_by_user_id','proposed_expires_at' ) as $key ) { delete_post_meta( $appointment_id, '_swc_' . $key ); }
 			}
 			if ( 'checked_in' === $next ) { update_post_meta( $appointment_id, '_swc_checked_in_at_utc', WCA_Repository::now() ); update_post_meta( $appointment_id, '_swc_actual_mode', sanitize_key( $data['actual_mode'] ?? SWC_Helpers::meta( $appointment_id, 'consultation_type' ) ) ); }
 			if ( 'completed' === $next ) {
