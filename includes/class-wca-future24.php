@@ -970,39 +970,49 @@ final class WCA_Future24 {
 		if ( ! $doctor_id || ! $start || ! $end ) { return false; }
 		$day_start = substr( $start, 0, 10 ) . ' 00:00:00';
 		$day_end = substr( $start, 0, 10 ) . ' 23:59:59';
-		$q = new WP_Query( array(
-			'post_type' => SWC_Helpers::TYPE,
-			'post_status' => array( 'private', 'publish' ),
-			'fields' => 'ids',
-			'posts_per_page' => 100,
-			'no_found_rows' => true,
-			'meta_query' => array(
-				array( 'key' => '_swc_doctor_id', 'value' => $doctor_id, 'compare' => '=' ),
-				array( 'key' => '_swc_preferred_at_utc', 'value' => array( $day_start, $day_end ), 'compare' => 'BETWEEN', 'type' => 'DATETIME' ),
-			),
-		) );
 		$near = 0;
 		$slot_branch = strtolower( sanitize_text_field( isset( $slot['branch_ref'] ) ? $slot['branch_ref'] : '' ) );
-		foreach ( (array) $q->posts as $appointment_id ) {
-			$status = SWC_Helpers::status( $appointment_id );
-			if ( in_array( $status, array( 'declined','cancelled','no_show' ), true ) ) { continue; }
-			$a_start = self::utc( SWC_Helpers::meta( $appointment_id, 'preferred_at_utc', '' ) );
-			$a_end = self::utc( SWC_Helpers::meta( $appointment_id, 'appointment_end_utc', '' ) );
-			if ( ! $a_start || ! $a_end ) { continue; }
-			if ( $maximum && abs( strtotime( $a_start . ' UTC' ) - strtotime( $start . ' UTC' ) ) <= 6 * HOUR_IN_SECONDS ) { $near++; }
-			$gap_before = strtotime( $start . ' UTC' ) - strtotime( $a_end . ' UTC' );
-			$gap_after = strtotime( $a_start . ' UTC' ) - strtotime( $end . ' UTC' );
-			if ( $before && $gap_before >= 0 && $gap_before < $before * MINUTE_IN_SECONDS ) { return false; }
-			if ( $after && $gap_after >= 0 && $gap_after < $after * MINUTE_IN_SECONDS ) { return false; }
-			if ( $travel ) {
-				$branch_id = absint( SWC_Helpers::meta( $appointment_id, 'branch_id', 0 ) );
-				$branches_table = WCA_Schema::tables()['branches'];
-				$appointment_branch = $branch_id ? strtolower( (string) $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$branches_table} WHERE id=%d LIMIT 1", $branch_id ) ) ) : ''; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				if ( $appointment_branch && $slot_branch && ! hash_equals( $appointment_branch, $slot_branch ) ) {
-					if ( ( $gap_before >= 0 && $gap_before < $travel * MINUTE_IN_SECONDS ) || ( $gap_after >= 0 && $gap_after < $travel * MINUTE_IN_SECONDS ) ) { return false; }
+		$page = 1;
+		$batch = 200;
+		do {
+			$q = new WP_Query( array(
+				'post_type' => SWC_Helpers::TYPE,
+				'post_status' => array( 'private', 'publish' ),
+				'fields' => 'ids',
+				'posts_per_page' => $batch,
+				'paged' => $page,
+				'orderby' => 'ID',
+				'order' => 'ASC',
+				'no_found_rows' => true,
+				'meta_query' => array(
+					array( 'key' => '_swc_doctor_id', 'value' => $doctor_id, 'compare' => '=' ),
+					array( 'key' => '_swc_preferred_at_utc', 'value' => array( $day_start, $day_end ), 'compare' => 'BETWEEN', 'type' => 'DATETIME' ),
+				),
+			) );
+			$ids = array_map( 'absint', (array) $q->posts );
+			foreach ( $ids as $appointment_id ) {
+				$status = SWC_Helpers::status( $appointment_id );
+				if ( in_array( $status, array( 'declined','cancelled','no_show' ), true ) ) { continue; }
+				$a_start = self::utc( SWC_Helpers::meta( $appointment_id, 'preferred_at_utc', '' ) );
+				$a_end = self::utc( SWC_Helpers::meta( $appointment_id, 'appointment_end_utc', '' ) );
+				if ( ! $a_start || ! $a_end ) { continue; }
+				if ( $maximum && abs( strtotime( $a_start . ' UTC' ) - strtotime( $start . ' UTC' ) ) <= 6 * HOUR_IN_SECONDS ) { $near++; }
+				$gap_before = strtotime( $start . ' UTC' ) - strtotime( $a_end . ' UTC' );
+				$gap_after = strtotime( $a_start . ' UTC' ) - strtotime( $end . ' UTC' );
+				if ( $before && $gap_before >= 0 && $gap_before < $before * MINUTE_IN_SECONDS ) { return false; }
+				if ( $after && $gap_after >= 0 && $gap_after < $after * MINUTE_IN_SECONDS ) { return false; }
+				if ( $travel ) {
+					$branch_id = absint( SWC_Helpers::meta( $appointment_id, 'branch_id', 0 ) );
+					$branches_table = WCA_Schema::tables()['branches'];
+					$appointment_branch = $branch_id ? strtolower( (string) $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$branches_table} WHERE id=%d LIMIT 1", $branch_id ) ) ) : ''; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( $appointment_branch && $slot_branch && ! hash_equals( $appointment_branch, $slot_branch ) ) {
+						if ( ( $gap_before >= 0 && $gap_before < $travel * MINUTE_IN_SECONDS ) || ( $gap_after >= 0 && $gap_after < $travel * MINUTE_IN_SECONDS ) ) { return false; }
+					}
 				}
 			}
-		}
+			$page++;
+		} while ( count( $ids ) === $batch );
+
 		return ! $maximum || $near < $maximum;
 	}
 
