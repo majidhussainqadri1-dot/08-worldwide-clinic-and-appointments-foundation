@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.9**
+- Runtime candidate: **1.2.10**
 - Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -43,6 +43,8 @@ The **seventh fresh 10-round corrective audit** closes privacy-lifecycle starvat
 
 The **eighth fresh 10-round corrective audit** closes additional high-volume, concurrency and exact-slot correctness gaps: doctor-suspension and verification-reconciliation scans no longer have artificial total ceilings; due follow-up reminders traverse the complete due set transactionally; canonical Future24 operational writes reject oversized payloads instead of silently truncating them; first-time practitioner opaque references are serialized; slot discovery avoids multi-rule/timezone starvation; hold revalidation projects the exact rule/slot while preserving true idempotent replay; and waitlist, flexible-window and support-participant semantic duplicates are serialized, with support-participant File17 projection committed atomically.
 The **ninth fresh 10-round corrective audit** closes residual browser-reference, authorization-scale and mutation-atomicity gaps: legacy browser booking now uses opaque practitioner references; mutation authorization no longer enumerates all doctors; locked appointment mutations roll back on fail-closed errors; appointment transitions require event, outbox, notification, communication, review-eligibility and audit persistence; Future24 record creation requires governance audit persistence; waitlist offer creation is serialized and atomic with File19 projection; participant revocation and virtual-room requests are atomic with File17 projection; and group-session cancellation is atomic across session/member state and governance audit.
+The **tenth fresh 10-round corrective audit** closes residual owner-transaction, event/outbox, replay-finalization and public-query contract gaps: initial appointment requests now commit slot/consent/events/File17/File19/audit/replay evidence atomically; clinic lifecycle, branch, service, availability, complaint and payment mutations fail closed with required evidence/projections; branch/availability time-zone inputs fail closed; HTTP replay finalization exposes authoritative mutation-status reconciliation; and public clinic discovery uses opaque cursor pagination plus conditional ETag caching.
+
 
 
 

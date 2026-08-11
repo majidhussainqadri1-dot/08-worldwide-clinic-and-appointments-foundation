@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.10 — 2026-08-11
+
+- Completed the tenth fresh sequential 10-round corrective cycle against exact v1.2.9 repository state.
+- Made appointment creation, clinic lifecycle, branch, service, availability, complaint and payment mutations atomic with their required event/outbox/replay evidence.
+- Added fail-closed branch/availability timezone and availability-window validation.
+- Added fail-closed HTTP idempotency finalization plus authoritative mutation-status reconciliation.
+- Replaced public clinic offset paging with opaque keyset cursor state and conditional ETag caching.
+- Runtime 1.2.10; core schema remains 3.2.0; continuity schema 1.1.0; Future24 schema 1.0.0.
+- Staging/live evidence remains separate.
+
 ## 1.2.9 — 2026-08-11
 
 - Completed the ninth fresh sequential 10-round corrective cycle against exact v1.2.8 repository state.

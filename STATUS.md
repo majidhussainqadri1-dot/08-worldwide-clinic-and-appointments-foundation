@@ -3,7 +3,7 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.9**
+- Runtime candidate: **1.2.10**
 - Core File 08 schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -22,6 +22,10 @@ The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F
 ## Ninth fresh 10-round corrective audit
 
 A ninth fresh sequential review-and-correct cycle was run against the exact v1.2.8 corrected repository state. Each supported defect was corrected and the complete source QA suite passed before the next round began. The cycle closes opaque browser practitioner-reference leakage, O(N) doctor enumeration in mutation authorization, fail-open locked mutation audit behavior, transition event/outbox/review-eligibility partial commits, Future24 governance-audit fail-open record creation, waitlist-offer duplicate/projection races, support-participant revocation projection gaps, virtual-room projection gaps, and non-atomic group cancellation. Runtime is 1.2.9 while core schema remains 3.2.0, continuity schema 1.1.0 and Future24 schema 1.0.0. Repository evidence does not prove Hostinger staging or live state.
+
+## Tenth fresh 10-round corrective audit
+
+A tenth fresh sequential review-and-correct cycle was run against exact v1.2.9 repository state. R1-R9 corrected owner transaction/event/outbox atomicity across appointment creation, clinic lifecycle, branch, service, availability, complaint and payment flows; replay-finalization now fails closed with a caller-owned mutation-status query; public clinic discovery uses opaque cursor pagination and conditional ETag caching. R10 aligns runtime/tests/docs to v1.2.10 while schemas remain 3.2.0 / 1.1.0 / 1.0.0. Repository evidence remains distinct from staging/live evidence.
 
 ## Evidence-state classification
 
