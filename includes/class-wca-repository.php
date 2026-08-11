@@ -897,7 +897,8 @@ final class WCA_Repository {
 	public static function release_idempotency( $id ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['idempotency'];
-		return false !== $wpdb->delete( $table, array( 'id' => absint( $id ), 'status' => 'processing' ) );
+		$deleted = $wpdb->delete( $table, array( 'id' => absint( $id ), 'status' => 'processing' ) );
+		return 1 === (int) $deleted;
 	}
 
 	public static function complete_idempotency( $id, $response_code, $response ) {

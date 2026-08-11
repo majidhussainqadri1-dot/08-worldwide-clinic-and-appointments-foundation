@@ -19,5 +19,6 @@
 | T12-R11 | DEFECT CORRECTED | Virtual-room request used unchecked manual transaction start/commit calls. |
 | T12-R12 | DEFECT CORRECTED | Several protected mutation callbacks lacked the plan-required request rate limits. |
 | T12-R13 | DEFECT CORRECTED | Sensitive appointment/calendar reads lacked explicit abuse-rate limiting. |
+| T12-R14 | DEFECT CORRECTED | Idempotency release treated a zero-row delete as successful release. |
 
-Rounds T12-R14–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R15–T12-R20 remain unreviewed in this sequential cycle at this commit.
