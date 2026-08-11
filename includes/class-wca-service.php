@@ -278,8 +278,10 @@ final class WCA_Service {
 		if ( ! $doctor_id || ! self::valid_timezone( $timezone ) || ! SWC_Doctor_Authority::is_eligible( $doctor_id ) ) {
 			return new WP_Error( 'wca_slot_query', __( 'Valid doctor and time zone are required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		$from = self::valid_date( $args['date_from'] ?? '' ) ? (string) $args['date_from'] : gmdate( 'Y-m-d' );
-		$to   = self::valid_date( $args['date_to'] ?? '' ) ? (string) $args['date_to'] : gmdate( 'Y-m-d', time() + 30 * DAY_IN_SECONDS );
+		if ( isset( $args['date_from'] ) && '' !== (string) $args['date_from'] && ! self::valid_date( $args['date_from'] ) ) { return new WP_Error( 'wca_slot_date_from_invalid', __( 'The slot-search start date is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( isset( $args['date_to'] ) && '' !== (string) $args['date_to'] && ! self::valid_date( $args['date_to'] ) ) { return new WP_Error( 'wca_slot_date_to_invalid', __( 'The slot-search end date is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$from = ! empty( $args['date_from'] ) ? (string) $args['date_from'] : gmdate( 'Y-m-d' );
+		$to   = ! empty( $args['date_to'] ) ? (string) $args['date_to'] : gmdate( 'Y-m-d', time() + 30 * DAY_IN_SECONDS );
 		$from_date = new DateTimeImmutable( $from, new DateTimeZone( 'UTC' ) );
 		$to_date   = new DateTimeImmutable( $to, new DateTimeZone( 'UTC' ) );
 		if ( $to_date < $from_date || $to_date->diff( $from_date )->days > self::SLOT_HORIZON_DAYS ) {
