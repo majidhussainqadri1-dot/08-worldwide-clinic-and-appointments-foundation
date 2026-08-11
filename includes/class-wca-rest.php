@@ -164,7 +164,8 @@ final class WCA_REST {
 			$last = end( $rows );
 			if ( is_array( $last ) && ! empty( $last['id'] ) && ! empty( $last['updated_at'] ) ) {
 				$next_cursor = strtolower( wp_generate_uuid4() );
-				set_transient( 'wca_clinic_cursor_' . md5( $next_cursor ), array( 'id' => absint( $last['id'] ), 'updated_at' => (string) $last['updated_at'], 'filter_hash' => $filter_hash ), 15 * MINUTE_IN_SECONDS );
+				$stored = set_transient( 'wca_clinic_cursor_' . md5( $next_cursor ), array( 'id' => absint( $last['id'] ), 'updated_at' => (string) $last['updated_at'], 'filter_hash' => $filter_hash ), 15 * MINUTE_IN_SECONDS );
+				if ( ! $stored ) { return new WP_Error( 'wca_cursor_store_failed', __( 'Clinic pagination state could not be stored safely. Please retry the search.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'retry_after' => 1 ) ); }
 			}
 		}
 		$payload = array( 'items' => $items, 'per_page' => $args['per_page'], 'next_cursor' => $next_cursor, 'generated_at' => gmdate( 'c' ) );
