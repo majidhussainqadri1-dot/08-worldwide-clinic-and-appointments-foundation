@@ -456,6 +456,8 @@ final class WCA_Service {
 		$guardian_user_id= absint( $data['guardian_user_id'] ?? 0 );
 		$guardian = WCA_Authorization::guardian_context( $patient_user_id, $guardian_user_id, $actor_user_id );
 		if ( is_wp_error( $guardian ) ) { return $guardian; }
+		$patient_timezone = isset( $data['timezone'] ) && '' !== trim( (string) $data['timezone'] ) ? (string) $data['timezone'] : SWC_Helpers::user_timezone( $patient_user_id );
+		if ( ! self::valid_timezone( $patient_timezone ) ) { return new WP_Error( 'wca_patient_timezone_invalid', __( 'A valid IANA time zone is required when a patient time zone is supplied.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$red_flag = self::emergency_red_flag( (string) ( $data['reason'] ?? '' ), (string) ( $data['category'] ?? '' ) );
 		if ( $red_flag ) {
 			WCA_Observability::metric( 'emergency_diversion_total', 1, array( 'category' => $red_flag['category'] ) );
@@ -488,7 +490,7 @@ final class WCA_Service {
 
 
 		$created_appointment_id = 0;
-		$result = WCA_Repository::transaction( function () use ( $patient_user_id, $guardian_user_id, $actor_user_id, $claims, $hold, $service, $clinic, $remote, $data, $idempotency_key, $claim, &$created_appointment_id ) {
+		$result = WCA_Repository::transaction( function () use ( $patient_user_id, $guardian_user_id, $actor_user_id, $claims, $hold, $service, $clinic, $remote, $data, $idempotency_key, $claim, $patient_timezone, &$created_appointment_id ) {
 			$appointment_id = wp_insert_post(
 				array(
 					'post_type'   => SWC_Helpers::TYPE,
@@ -512,7 +514,7 @@ final class WCA_Service {
 				'status'                 => 'requested',
 				'preferred_at_utc'       => $hold['start_utc'],
 				'appointment_end_utc'    => $hold['end_utc'],
-				'patient_timezone'       => self::valid_timezone( $data['timezone'] ?? '' ) ? (string) $data['timezone'] : 'UTC',
+				'patient_timezone'       => $patient_timezone,
 				'consultation_type'      => $service['consultation_type'] ?? sanitize_key( $data['consultation_type'] ?? 'online' ),
 				'appointment_duration'   => $service['duration_minutes'] ?? absint( ( strtotime( $hold['end_utc'] ) - strtotime( $hold['start_utc'] ) ) / 60 ),
 				'reason_category'        => sanitize_key( $data['category'] ?? 'general' ),
