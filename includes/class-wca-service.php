@@ -232,6 +232,14 @@ final class WCA_Service {
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$auth = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
+		$timezone = (string) ( $data['timezone'] ?? '' );
+		if ( ! self::valid_timezone( $timezone ) ) { return new WP_Error( 'wca_availability_timezone', __( 'A valid IANA time zone is required for availability.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$rrule = (array) ( $data['rrule'] ?? array() );
+		if ( ! self::valid_hhmm( $rrule['start'] ?? '' ) || ! self::valid_hhmm( $rrule['end'] ?? '' ) || (string) $rrule['end'] <= (string) $rrule['start'] ) { return new WP_Error( 'wca_availability_window', __( 'Availability requires a valid daily start and end time.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( isset( $rrule['effective_from'] ) && ! self::valid_date( $rrule['effective_from'] ) ) { return new WP_Error( 'wca_availability_effective_from', __( 'Availability effective-from date is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( isset( $rrule['effective_until'] ) && ! self::valid_date( $rrule['effective_until'] ) ) { return new WP_Error( 'wca_availability_effective_until', __( 'Availability effective-until date is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( ! empty( $rrule['effective_from'] ) && ! empty( $rrule['effective_until'] ) && (string) $rrule['effective_until'] < (string) $rrule['effective_from'] ) { return new WP_Error( 'wca_availability_effective_range', __( 'Availability effective dates are reversed.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$data['timezone'] = $timezone;
 		if ( $rule_id ) { $current = WCA_Repository::get_availability_rule( $rule_id ); if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_scope', __( 'The availability rule does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); } }
 		if ( ! empty( $data['service_id'] ) ) { $service = WCA_Repository::get_service( absint( $data['service_id'] ), false ); if ( ! $service || absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_service', __( 'The availability service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
 		if ( ! empty( $data['branch_id'] ) ) { $branch = WCA_Repository::get_branch( absint( $data['branch_id'] ) ); if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_branch', __( 'The availability branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
@@ -243,13 +251,17 @@ final class WCA_Service {
 			return new WP_Error( 'wca_availability_doctor_scope', __( 'The selected doctor has no current authority to serve this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		$data['doctor_user_id'] = $doctor_id;
-		$result = WCA_Repository::save_availability_rule( $data, $rule_id, $expected_version );
-		if ( is_wp_error( $result ) ) { return $result; }
-		$trace = WCA_Observability::trace_id();
-		$subject = WCA_Authorization::subject_uuid( $doctor_id );
-		WCA_Repository::append_event( 'ClinicAvailabilityChanged.v1', 'availability_rule', $result['public_ref'], array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'clinic_ref' => $clinic['public_ref'], 'doctor_subject_uuid' => $subject, 'version' => absint( $result['version'] ), 'trace_id' => $trace ), $actor_user_id, $trace );
-		WCA_Repository::enqueue( 'ClinicAvailabilityChanged.v1', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'doctor_subject_uuid' => $subject, 'version' => absint( $result['version'] ) ), $trace );
-		return $result;
+		return WCA_Repository::transaction( function () use ( $data, $rule_id, $expected_version, $clinic, $doctor_id, $actor_user_id ) {
+			$result = WCA_Repository::save_availability_rule( $data, $rule_id, $expected_version );
+			if ( is_wp_error( $result ) ) { return $result; }
+			$trace = WCA_Observability::trace_id();
+			$subject = WCA_Authorization::subject_uuid( $doctor_id );
+			$payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'clinic_ref' => $clinic['public_ref'], 'doctor_subject_uuid' => $subject, 'version' => absint( $result['version'] ), 'trace_id' => $trace );
+			$event = WCA_Repository::append_event( 'ClinicAvailabilityChanged.v1', 'availability_rule', $result['public_ref'], $payload, $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			$queued = WCA_Repository::enqueue( 'ClinicAvailabilityChanged.v1', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'doctor_subject_uuid' => $subject, 'version' => absint( $result['version'] ) ), $trace );
+			return is_wp_error( $queued ) ? $queued : $result;
+		}, 'wca_availability_mutation_transaction' );
 	}
 
 	/**
