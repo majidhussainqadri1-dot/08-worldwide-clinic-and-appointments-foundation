@@ -1,12 +1,48 @@
-name: F08 Fixer Probe
+name: F08 Third Review R1 Fix
 
 on:
   push:
     branches: [codex/file08-new-governing-plans-completion-2026]
     paths: [.github/workflows/f08-fixer-probe.yml]
 
+permissions:
+  contents: write
+
 jobs:
-  probe:
+  fix:
     runs-on: ubuntu-24.04
     steps:
-      - run: echo probe-ok
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - name: Apply exact root correction
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('includes/class-wca-repository.php')
+          lines=p.read_text().splitlines(True)
+          marker=next(i for i,x in enumerate(lines) if 'A crashed worker must not block an idempotent command' in x)
+          end=next(i for i in range(marker,len(lines)) if lines[i].strip()=='return $existing;')
+          repl=[
+          "\t\t\t/* Fail closed on stale processing reservations: the domain side effect may already have committed. */\n",
+          "\t\t\tif ( 'processing' === (string) $existing['status'] && strtotime( (string) $existing['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {\n",
+          "\t\t\t\t$existing['stale_processing'] = true;\n",
+          "\t\t\t\tif ( class_exists( 'WCA_Observability' ) ) {\n",
+          "\t\t\t\t\tWCA_Observability::metric( 'idempotency_stale_processing_total', 1, array( 'scope' => $scope ) );\n",
+          "\t\t\t\t}\n",
+          "\t\t\t}\n",
+          ]
+          lines[marker:end]=repl
+          p.write_text(''.join(lines))
+          PY
+          php -l includes/class-wca-repository.php
+          grep -q "stale_processing.*true" includes/class-wca-repository.php
+          ! grep -q "Reclaim a stale processing lease atomically" includes/class-wca-repository.php
+          git config user.name "Sabri File 08 QA"
+          git config user.email "actions@users.noreply.github.com"
+          git add includes/class-wca-repository.php
+          git diff --cached --quiet && exit 1 || true
+          git commit -m "File 08 third review R1: fail closed stale idempotency claims"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
