@@ -214,12 +214,15 @@ final class WCA_Service {
 		}
 		$data['clinic_id'] = absint( $clinic['id'] );
 		$data['platform_commission_bps'] = 0;
-		$result = WCA_Repository::save_service( $data, $service_id, $expected_version );
-		if ( is_wp_error( $result ) ) { return $result; }
-		$trace = WCA_Observability::trace_id();
-		WCA_Repository::append_event( $service_id ? 'ClinicServiceUpdated.v1' : 'ClinicServiceCreated.v1', 'clinic_service', $result['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'service_ref' => $result['public_ref'], 'commission_bps' => 0 ), $actor_user_id, $trace );
-		WCA_Repository::enqueue( 'ClinicServiceChanged.v1', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'service_ref' => $result['public_ref'] ), $trace );
-		return $result;
+		return WCA_Repository::transaction( function () use ( $data, $service_id, $expected_version, $clinic, $actor_user_id ) {
+			$result = WCA_Repository::save_service( $data, $service_id, $expected_version );
+			if ( is_wp_error( $result ) ) { return $result; }
+			$trace = WCA_Observability::trace_id();
+			$event = WCA_Repository::append_event( $service_id ? 'ClinicServiceUpdated.v1' : 'ClinicServiceCreated.v1', 'clinic_service', $result['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'service_ref' => $result['public_ref'], 'commission_bps' => 0 ), $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			$queued = WCA_Repository::enqueue( 'ClinicServiceChanged.v1', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'service_ref' => $result['public_ref'] ), $trace );
+			return is_wp_error( $queued ) ? $queued : $result;
+		}, 'wca_service_mutation_transaction' );
 	}
 
 	/** @return array<string,mixed>|WP_Error */
