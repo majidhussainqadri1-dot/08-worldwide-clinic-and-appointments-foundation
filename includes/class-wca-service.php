@@ -340,7 +340,11 @@ final class WCA_Service {
 		$guardian_user_id = absint( $data['guardian_user_id'] ?? 0 );
 		$guardian = WCA_Authorization::guardian_context( $patient_user_id, $guardian_user_id, $actor_user_id );
 		if ( is_wp_error( $guardian ) ) { return $guardian; }
-		$data['idempotency_key'] = sanitize_text_field( $data['idempotency_key'] ?? WCA_Repository::uuid() );
+		$idempotency_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $idempotency_key ) ) {
+			return new WP_Error( 'wca_idempotency_required', __( 'A valid idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$data['idempotency_key'] = $idempotency_key;
 		$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $patient_user_id );
 		if ( is_wp_error( $canonical ) ) { return $canonical; }
 		return WCA_Repository::hold_slot( $canonical );
