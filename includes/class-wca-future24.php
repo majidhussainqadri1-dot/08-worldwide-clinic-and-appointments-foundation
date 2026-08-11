@@ -218,7 +218,7 @@ final class WCA_Future24 {
 	private static function service_for_clinic( $clinic_id, $service_ref ) {
 		$service_ref = strtolower( sanitize_text_field( $service_ref ) );
 		if ( '' === $service_ref ) { return null; }
-		$service = WCA_Repository::get_service( $service_ref, true );
+		$service = WCA_Repository::get_service_by_ref( $service_ref, true );
 		if ( ! $service || absint( $service['clinic_id'] ) !== absint( $clinic_id ) ) {
 			return new WP_Error( 'wca_future24_service_scope', __( 'The selected service does not belong to this active clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
