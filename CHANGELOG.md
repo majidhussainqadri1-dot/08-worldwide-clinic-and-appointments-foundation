@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.2 — 2026-08-11
+
+- Opened and completed a second fresh sequential 10-round corrective audit after the v1.2.1 post-closure cycle; each discovered defect was corrected before the next review proceeded.
+- Required purpose-limited `operations` access plus recent step-up before the canonical administrator actor may transition appointments.
+- Required explicit slot-hold idempotency keys and namespaced repository replay identity by authorized patient to prevent cross-account client-key collision.
+- Added fail-closed handling for ambiguous stale `processing` idempotency reservations on both the governed appointment command and the cross-cutting REST mutation boundary; stale claims are not automatically stolen.
+- Added strict Future24 date/timestamp validation and recursive removal of native numeric identifiers from Future24 REST responses.
+- Serialized outbox dispatch with a MySQL advisory lock so cron, shutdown, or overlapping workers cannot concurrently claim/finalize the same outbox work.
+- Retained supported entry-point transition state/version preconditions, patient/current-authorized-guardian payment-intent authority, doctor-to-clinic availability scope, delegated staff bounds, timezone/DST correctness, branch audit evidence and File26 projection invalidation.
+- Advanced runtime/document identity to `1.2.2`; core schema remains `3.1.0`, restricted continuity schema `1.1.0`, Future24 schema `1.0.0`.
+- Added a permanent second-ten-review regression gate. Repository/package/CI, staging, live and operational evidence remain separate states.
+
 ## 1.2.1 — 2026-08-11
 
 - Closed the requested 80-round corrective cycle and then completed a separate 10-round post-closure review-and-correct cycle against the current File 08/Future24 and platform governance boundaries.
