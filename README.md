@@ -1,31 +1,33 @@
 # File 08 — Worldwide Clinic and Appointments
 
-Canonical repository implementation of **File 08 — Worldwide Clinic and Appointments Complete Master Plan 2026 v1.0** for the Sabri Social Homeopathy Platform.
+Canonical repository implementation of **File 08 — Worldwide Clinic and Appointments Complete Master Plan 2026** plus its approved Future Clinic Intelligence & Interoperability 24 amendment for the Sabri Social Homeopathy Platform.
 
 ## Canonical identity
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime: `1.0.1`
-- Schema: `3.1.0`
+- Runtime candidate: **1.2.1**
+- Core schema: **3.1.0**
+- Restricted continuity schema: **1.1.0**
+- Future24 additive operational schema: **1.0.0**
 - Text domain: `worldwide-clinic-appointments`
-- Canonical PHP namespace prefix: `WCA_`
+- Canonical PHP prefix: `WCA_`
 - Legacy compatibility prefix: `SWC_`
 - Platform commission: **0%**
 
-## Governing review basis
+The authoritative repository release identity is the **exact candidate HEAD + exact-head CI run + deterministic manifest + candidate SHA-256**. Repository evidence never proves the current staging or live installation.
 
-Runtime `1.0.1` has completed four fresh source-level review-and-correction rounds against:
+## Governing ownership boundaries
 
-1. Definitive Master Plan 2026 v3.0;
-2. Comprehensive Master Plan 2026 v2.0;
-3. File 08 Complete Master Plan 2026 v1.0.
+File 08 owns clinic identity, branches, services/fees, availability, slot/appointment state, scheduling relationship eligibility, clinical-safety scheduling gates, and completed-appointment review eligibility. File 00 owns identity/age/guardian truth; File 09 doctor verification; File 17 messaging/calls/virtual-room transport; File 19 notification delivery; File 20 the global shell; File 24 assurance/security governance; File 25 visual tokens; and File 26 search/discovery/ranking.
 
-The detailed defect and correction record is `FOUR-ROUND-REVIEW-AND-CORRECTION-1.0.1.md`.
+The runtime does not introduce automated diagnosis/prescribing, emergency-service replacement, paid/donor visibility advantage, hidden individual patient scoring, or direct ownership of companion tables.
 
 ## Implemented scope
 
-The runtime implements institutional clinic identity and activation, branches and public/private locations, tenant-scoped services and fees, availability rules, DST-safe slot projection, server-authoritative atomic holds, idempotent appointment requests, canonical appointment state law, compensation-safe rescheduling, cancellation, check-in, completion and no-show, patient/doctor/clinic dashboards, actor and guardian authorization, purpose-limited administration, opaque public scheduling references, emergency diversion, versioned consent, expiring verified-completion review eligibility, private ICS calendar export, conditional payment-intent bridge, CF-01 scheduling-only clinical boundary, File 17 context events, File 19 notifications with privacy-minimal fallback, CF-02 complaint bridge, transactional outbox, privacy export/erasure/retention/legal holds, audit events, metrics, traces, circuit breakers, schema migration, rollback metadata, health checks, accessible responsive RTL UI, REST API, WP-CLI and deterministic release engineering.
+The current source implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24`: institutional clinic activation, branches, services/fees, availability, timezone/DST-safe slot projection, server-authoritative holds, explicit mutation idempotency/replay protection, canonical appointment lifecycle, compensation-safe rescheduling, patient/guardian/doctor/delegated-staff authorization, opaque protected references, emergency diversion, consent, secure continuity, expiring review eligibility, calendar, payment/complaint adapters, privacy lifecycle, audit/outbox/observability, migration/rollback metadata, accessibility/localization, waitlist/series/resource/group scheduling, readiness/prerequisite governance, queue/disruption/support/interpreter contracts, consent-gated File 17 virtual-room requests, privacy-safe interoperability adapters, external busy projections, and episode chains.
+
+The subsequent 10-round post-closure review also corrected canonical detail routing, legacy native-ID browser mutation surfaces, delegated clinic-staff appointment/dashboard visibility, transition state/version preconditions, core mutation rate/replay behavior, payment-payer authority, doctor-to-clinic availability scope, display-timezone boundary slot discovery, hold reprojection across timezone/DST day boundaries, and branch-change audit/File26 projection events.
 
 ## Canonical routes
 
@@ -35,20 +37,24 @@ The runtime implements institutional clinic identity and activation, branches an
 - `/clinic/dashboard`
 - `/appointment/{public_ref}`
 
-Protected routes and REST resources are private, `no-store`, `noindex`, object-authorized and fail closed. Public routes do not expose native numeric user, clinic or appointment identifiers.
+An old plural appointment-detail alias containing an opaque UUID is redirected to the canonical singular detail route. Legacy numeric browser mutation workflows are disabled by default and may only be re-enabled through an explicit migration filter.
 
 ## Verification
 
-Run:
+Run repository checks with:
 
 ```bash
-find . -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
 node --check assets/js/clinic.js
+node --check assets/js/continuity.js
+node --check assets/js/future24.js
 php tests/run-all.php
 ```
 
-GitHub Actions repeats these checks on PHP 7.4 and 8.3, runs the three-plan and four-round regression suites, builds the candidate twice, byte-compares it and independently verifies every payload hash, size, path, embedded manifest and detached checksum.
+The GitHub Actions quality workflow repeats PHP 7.4/8.3 syntax and source-contract/security tests, JavaScript syntax, repository hygiene, deterministic double build/byte comparison, exact-commit manifest verification, candidate reopening, checksum verification, and artifact upload.
 
-## Acceptance classification
+## Evidence-state classification
 
-`1.0.1` is a **source-complete, automatically verified candidate** after four fresh review-and-correction rounds. This classification is limited to repository source, static/runtime-independent contracts and reproducible packaging. It is not marked Hostinger-staging-accepted or production-accepted. Exact dependency packages, real accounts, database migration and restoration, rollback rehearsal, SMTP and cache behavior, browser/mobile/Urdu RTL/manual accessibility, privacy/security/professional review, Founder acceptance and live deployment require external evidence under `docs/STAGING-ACCEPTANCE-1.0.0.md`.
+The repository candidate may be called **Coded**, **Packaged**, or **Automated-QA Green** only after those respective exact-head gates actually pass. It is not `Staging-Accepted`, `Live-Deployed`, or `Operational` from repository evidence alone.
+
+Before production, complete `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, including actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback, Founder acceptance, controlled deployment, and post-deploy live parity re-test.
