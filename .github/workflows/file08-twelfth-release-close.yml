@@ -29,7 +29,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - name: Close runtime identity, evidence, transient tooling, and perform two post-change reviews
+      - name: Release identity and evidence closure
         shell: bash
         run: |
           set -euo pipefail
@@ -45,46 +45,24 @@ jobs:
             test ! -e .gitmodules
             ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
           }
-
-          echo '===== Complete permanent R19/R20 evidence ====='
-          python3 - <<'PY'
-from pathlib import Path
-p=Path('TWELFTH-TWENTY-REVIEW-EVIDENCE.md')
-s=p.read_text()
-old='Rounds T12-R19–T12-R20 remain unreviewed in this sequential cycle at this commit.\n'
-new="| T12-R19 | DEFECT CORRECTED | Canonical service/availability numeric values could still be silently clamped/normalized at service and repository persistence roots. |\n| T12-R20 | DEFECT CORRECTED | Clinic disruption state could persist while one or more required File19 notification projections failed. |\n\nAll 20 rounds contained a supported repository defect/gap and each correction passed full corrected-state QA before the next accepted product round.\n"
-if old not in s: raise SystemExit('twelfth evidence close anchor missing')
-p.write_text(s.replace(old,new,1))
-PY
-
-          echo '===== Release identity closure to v1.2.12 ====='
-          python3 tools/twelfth-twenty-review-patcher.py release
+          python3 tools/t12-release-final.py
           qa
           git add -A
           git commit -m 'File 08: close twelfth 20-round source at v1.2.12'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
           echo "T12_RELEASE_HEAD=$(git rev-parse HEAD)"
 
-          echo '===== Remove all transient T12 orchestration ====='
-          for f in \
-            tools/twelfth-twenty-review-patcher.py \
-            tools/t12-r19-r20-final.py \
-            .github/workflows/file08-twelfth-twenty-review.yml \
-            .github/workflows/file08-twelfth-twenty-review-resume.yml \
-            .github/workflows/file08-twelfth-r11-r20.yml \
-            .github/workflows/file08-twelfth-r19-r20-final.yml \
-            .github/workflows/file08-twelfth-release-close.yml; do
+          for f in tools/twelfth-twenty-review-patcher.py tools/t12-r19-r20-final.py tools/t12-release-final.py .github/workflows/file08-twelfth-twenty-review.yml .github/workflows/file08-twelfth-twenty-review-resume.yml .github/workflows/file08-twelfth-r11-r20.yml .github/workflows/file08-twelfth-r19-r20-final.yml .github/workflows/file08-twelfth-release-close.yml; do
             if [ -e "$f" ]; then git rm "$f"; fi
           done
           qa
           git add -A
           git commit -m 'File 08: remove transient twelfth-review tooling'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
-          FINAL=$(git rev-parse HEAD)
-          echo "FINAL_SOURCE_HEAD=$FINAL"
+          echo "FINAL_SOURCE_HEAD=$(git rev-parse HEAD)"
 
           echo '===== Fresh post-final-change review A ====='
-          git status --porcelain | grep -q '^$' || { git status --short; exit 1; }
+          test -z "$(git status --porcelain)"
           grep -q 'Version: 1.2.12' worldwide-clinic.php
           grep -q "RUNTIME_VERSION                 = '1.2.12'" includes/class-wca-contracts.php
           grep -q 'wca_disruption_transaction' includes/class-wca-future24.php
@@ -94,7 +72,6 @@ PY
 
           echo '===== Fresh post-final-change review B ====='
           grep -q 'T12-R20 | DEFECT CORRECTED' TWELFTH-TWENTY-REVIEW-EVIDENCE.md
-          grep -q 'twelfth fresh twenty-round regression assertions passed' tests/twelfth-twenty-review-regressions.php || true
           test "$(find .github/workflows -maxdepth 1 -type f -name 'file08-twelfth*' | wc -l)" -eq 0
           test ! -e tools/twelfth-twenty-review-patcher.py
           test ! -e tools/t12-r19-r20-final.py
