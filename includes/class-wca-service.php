@@ -467,8 +467,11 @@ final class WCA_Service {
 		$next = WCA_Contracts::normalize_appointment_status( $next );
 		$auth = WCA_Authorization::can_transition_appointment( $appointment_id, $next, $actor_user_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
-		$expected_status  = WCA_Contracts::normalize_appointment_status( $data['expected_status'] ?? SWC_Helpers::status( $appointment_id ) );
-		$expected_version = absint( $data['expected_version'] ?? SWC_Helpers::record_version( $appointment_id ) );
+		if ( empty( $data['expected_status'] ) || ! isset( $data['expected_version'] ) || absint( $data['expected_version'] ) < 1 ) {
+			return new WP_Error( 'wca_transition_precondition_required', __( 'Current appointment status and positive record version are required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+		$expected_status  = WCA_Contracts::normalize_appointment_status( $data['expected_status'] );
+		$expected_version = absint( $data['expected_version'] );
 		return SWC_Helpers::with_lock( $appointment_id, function () use ( $appointment_id, $next, $data, $actor_user_id, $expected_status, $expected_version ) {
 			$check = SWC_Helpers::assert_expected( $appointment_id, $expected_status, $expected_version );
 			if ( is_wp_error( $check ) ) { return $check; }
