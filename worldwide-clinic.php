@@ -49,6 +49,7 @@ $wca_files = array(
 	'includes/class-wca-opaque-api.php',
 	'includes/class-wca-calendar-link.php',
 	'includes/class-wca-future24.php',
+	'includes/class-wca-ten-review-hardening.php',
 	'includes/class-wca-routes.php',
 	'includes/class-wca-frontend.php',
 	'includes/class-wca-admin.php',
@@ -93,6 +94,7 @@ function wca_start_plugin() {
 	WCA_Appointment_Command::boot();
 	WCA_Future24::boot();
 	( new SWC_Plugin() )->run();
+	WCA_Ten_Review_Hardening::boot();
 }
 add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
 
