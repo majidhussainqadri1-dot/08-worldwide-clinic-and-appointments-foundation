@@ -1,0 +1,66 @@
+name: File 08 Third Review R1 Fix
+
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/file08-third-review-r1-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-root-fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - name: Fail closed stale idempotency claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('includes/class-wca-repository.php')
+          s = p.read_text()
+          old = """\t\t\t$existing['response'] = self::decode( $existing['response_json'] );
+\t\t\t$existing['claimed_new'] = false;
+\t\t\t/* A crashed worker must not block an idempotent command for a full day. Reclaim a stale processing lease atomically. */
+\t\t\tif ( 'processing' === (string) $existing['status'] && strtotime( (string) $existing['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {
+\t\t\t\t$now = self::now();
+\t\t\t\t$claimed = $wpdb->query( $wpdb->prepare( \"UPDATE {$table} SET updated_at=%s,expires_at=%s WHERE id=%d AND status='processing' AND updated_at=%s\", $now, gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ), absint( $existing['id'] ), (string) $existing['updated_at'] ) );
+\t\t\t\tif ( 1 === (int) $claimed ) {
+\t\t\t\t\t$existing['updated_at'] = $now;
+\t\t\t\t\t$existing['claimed_new'] = true;
+\t\t\t\t}
+\t\t\t}
+\t\t\treturn $existing;
+"""
+          new = """\t\t\t$existing['response'] = self::decode( $existing['response_json'] );
+\t\t\t$existing['claimed_new'] = false;
+\t\t\t/* Fail closed on stale processing reservations: the domain side effect may already have committed. */
+\t\t\tif ( 'processing' === (string) $existing['status'] && strtotime( (string) $existing['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {
+\t\t\t\t$existing['stale_processing'] = true;
+\t\t\t\tif ( class_exists( 'WCA_Observability' ) ) {
+\t\t\t\t\tWCA_Observability::metric( 'idempotency_stale_processing_total', 1, array( 'scope' => $scope ) );
+\t\t\t\t}
+\t\t\t}
+\t\t\treturn $existing;
+"""
+          if old not in s:
+              raise SystemExit('R1 target block not found; refusing non-exact patch')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          php -l includes/class-wca-repository.php
+          grep -q "stale_processing.*true" includes/class-wca-repository.php
+          ! grep -q "Reclaim a stale processing lease atomically" includes/class-wca-repository.php
+          rm .github/workflows/file08-third-review-r1-fix.yml
+          git config user.name "Sabri File 08 QA"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "File 08 third review R1: fail closed stale idempotency claims"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
