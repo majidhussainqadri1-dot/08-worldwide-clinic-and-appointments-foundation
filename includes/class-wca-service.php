@@ -91,17 +91,23 @@ final class WCA_Service {
 		$step = WCA_Authorization::require_step_up( 'create_clinic', $actor_user_id );
 		if ( is_wp_error( $step ) ) { return $step; }
 		$claims = WCA_Authorization::claims( $actor_user_id );
+		if ( is_wp_error( $claims ) ) { return $claims; }
 		$data['status']             = 'draft';
 		$data['owner_user_id']      = $actor_user_id;
-		$data['owner_subject_uuid'] = is_wp_error( $claims ) ? '' : $claims['subject_uuid'];
-		$clinic = WCA_Repository::create_clinic( $data );
-		if ( is_wp_error( $clinic ) ) { return $clinic; }
-		$trace = WCA_Observability::trace_id();
-		WCA_Repository::append_event( 'ClinicCreated.v1', 'clinic', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'status' => $clinic['status'] ), $actor_user_id, $trace );
-		WCA_Repository::enqueue( 'File24.AssuranceEvidenceRequested.v1', $clinic['public_ref'], array( 'entity' => 'clinic', 'entity_ref' => $clinic['public_ref'], 'change' => 'created' ), $trace );
-		WCA_Observability::metric( 'clinic_created_total', 1 );
-		return $clinic;
+		$data['owner_subject_uuid'] = $claims['subject_uuid'];
+		$result = WCA_Repository::transaction( function () use ( $data, $actor_user_id ) {
+			$clinic = WCA_Repository::create_clinic( $data );
+			if ( is_wp_error( $clinic ) ) { return $clinic; }
+			$trace = WCA_Observability::trace_id();
+			$event = WCA_Repository::append_event( 'ClinicCreated.v1', 'clinic', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'status' => $clinic['status'] ), $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			$queued = WCA_Repository::enqueue( 'File24.AssuranceEvidenceRequested.v1', $clinic['public_ref'], array( 'entity' => 'clinic', 'entity_ref' => $clinic['public_ref'], 'change' => 'created' ), $trace );
+			return is_wp_error( $queued ) ? $queued : $clinic;
+		}, 'wca_clinic_create_transaction' );
+		if ( ! is_wp_error( $result ) ) { WCA_Observability::metric( 'clinic_created_total', 1 ); }
+		return $result;
 	}
+
 
 
 	/** @return array<string,mixed>|WP_Error */
@@ -113,14 +119,19 @@ final class WCA_Service {
 		if ( is_wp_error( $auth ) ) { return $auth; }
 		if ( 'draft' !== (string) $clinic['status'] ) { return new WP_Error( 'wca_clinic_review_state', __( 'Only a draft clinic may be submitted for institutional review.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		if ( ! WCA_Repository::list_services( $clinic['id'], false ) || ! WCA_Repository::list_branches( $clinic['id'], false ) ) { return new WP_Error( 'wca_clinic_incomplete', __( 'At least one branch and one service are required before review.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		$updated = WCA_Repository::update_clinic( $clinic['id'], $expected_version, array( 'status' => 'review' ) );
-		if ( is_wp_error( $updated ) ) { return $updated; }
-		$clinic = WCA_Repository::get_clinic( $clinic['id'], false );
-		$trace = WCA_Observability::trace_id();
-		WCA_Repository::append_event( 'ClinicReviewRequested.v1', 'clinic', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'trace_id' => $trace ), $actor_user_id, $trace );
-		WCA_Repository::enqueue( 'ClinicReviewRequested.v1', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'] ), $trace );
-		return $clinic;
+		return WCA_Repository::transaction( function () use ( $clinic_id, $expected_version, $actor_user_id ) {
+			$updated = WCA_Repository::update_clinic( $clinic_id, $expected_version, array( 'status' => 'review' ) );
+			if ( is_wp_error( $updated ) ) { return $updated; }
+			$current = WCA_Repository::get_clinic( $clinic_id, false );
+			if ( ! $current ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found after update.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$trace = WCA_Observability::trace_id();
+			$event = WCA_Repository::append_event( 'ClinicReviewRequested.v1', 'clinic', $current['public_ref'], array( 'clinic_ref' => $current['public_ref'], 'trace_id' => $trace ), $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			$queued = WCA_Repository::enqueue( 'ClinicReviewRequested.v1', $current['public_ref'], array( 'clinic_ref' => $current['public_ref'] ), $trace );
+			return is_wp_error( $queued ) ? $queued : $current;
+		}, 'wca_clinic_review_transaction' );
 	}
+
 
 	/** @return array<string,mixed>|WP_Error */
 	public static function activate_clinic( $clinic_id, $expected_version, $actor_user_id = 0 ) {
@@ -134,22 +145,22 @@ final class WCA_Service {
 		$step = WCA_Authorization::require_step_up( 'activate_clinic', $actor_user_id );
 		if ( is_wp_error( $step ) ) { return $step; }
 		if ( ! SWC_Doctor_Authority::is_eligible( absint( $clinic['owner_user_id'] ?? 0 ) ) ) { return new WP_Error( 'wca_clinic_owner_ineligible', __( 'The clinic owner is not currently eligible for activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		if ( ! in_array( $clinic['status'], array( 'review','paused' ), true ) ) {
-			return new WP_Error( 'wca_clinic_transition', __( 'Clinic cannot be activated from its current state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
-		}
-		$services = WCA_Repository::list_services( $clinic['id'], true );
-		$branches = WCA_Repository::list_branches( $clinic['id'], true );
-		if ( ! $services || ! $branches ) {
-			return new WP_Error( 'wca_clinic_incomplete', __( 'At least one active public branch and one active eligible service are required before activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
-		}
-		$updated = WCA_Repository::update_clinic( $clinic['id'], $expected_version, array( 'status' => 'active' ) );
-		if ( is_wp_error( $updated ) ) { return $updated; }
-		$clinic = WCA_Repository::get_clinic( $clinic['id'], false );
-		$trace = WCA_Observability::trace_id();
-		WCA_Repository::append_event( 'ClinicActivated.v1', 'clinic', $clinic['public_ref'], array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'clinic_ref' => $clinic['public_ref'], 'owner_subject_uuid' => $clinic['owner_subject_uuid'], 'trace_id' => $trace ), $actor_user_id, $trace );
-		WCA_Repository::enqueue( 'ClinicActivated.v1', $clinic['public_ref'], array( 'clinic_ref' => $clinic['public_ref'], 'owner_subject_uuid' => $clinic['owner_subject_uuid'] ), $trace );
-		return $clinic;
+		if ( ! in_array( $clinic['status'], array( 'review','paused' ), true ) ) { return new WP_Error( 'wca_clinic_transition', __( 'Clinic cannot be activated from its current state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( ! WCA_Repository::list_services( $clinic['id'], true ) || ! WCA_Repository::list_branches( $clinic['id'], true ) ) { return new WP_Error( 'wca_clinic_incomplete', __( 'At least one active public branch and one active eligible service are required before activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		return WCA_Repository::transaction( function () use ( $clinic_id, $expected_version, $actor_user_id ) {
+			$updated = WCA_Repository::update_clinic( $clinic_id, $expected_version, array( 'status' => 'active' ) );
+			if ( is_wp_error( $updated ) ) { return $updated; }
+			$current = WCA_Repository::get_clinic( $clinic_id, false );
+			if ( ! $current ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found after activation.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$trace = WCA_Observability::trace_id();
+			$payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'clinic_ref' => $current['public_ref'], 'owner_subject_uuid' => $current['owner_subject_uuid'], 'trace_id' => $trace );
+			$event = WCA_Repository::append_event( 'ClinicActivated.v1', 'clinic', $current['public_ref'], $payload, $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			$queued = WCA_Repository::enqueue( 'ClinicActivated.v1', $current['public_ref'], array( 'clinic_ref' => $current['public_ref'], 'owner_subject_uuid' => $current['owner_subject_uuid'] ), $trace );
+			return is_wp_error( $queued ) ? $queued : $current;
+		}, 'wca_clinic_activate_transaction' );
 	}
+
 
 	/** A globally eligible doctor still requires a current clinic-serving relationship. */
 	private static function doctor_may_serve_clinic( $clinic, $doctor_id, $actor_user_id ) {
