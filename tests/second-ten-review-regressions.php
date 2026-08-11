@@ -33,11 +33,11 @@ s210has('canonical admin actor',$auth,"return 'admin'");
 // S2-R2: slot holds require an explicit client replay key.
 s210has('slot key regex',$service,'A-Za-z0-9._:-');
 s210has('slot key required',$service,'wca_idempotency_required');
-s210lacks('no synthetic slot key',$service,'idempotency_key'] ?? WCA_Repository::uuid');
+s210lacks('no synthetic slot key',$service,"idempotency_key'] ?? WCA_Repository::uuid");
 
 // S2-R3: replay identity is isolated by authorized patient.
 s210has('patient namespace marker',$plan,"'p' . absint");
-s210has('patient replay hash',$plan,"hash( 'sha256', $client_key )");
+s210has('patient replay hash',$plan,'hash( \'sha256\', $client_key )');
 s210has('patient binding',$plan,'patient_user_id');
 
 // S2-R4: ambiguous stale mutation reservations fail closed.
