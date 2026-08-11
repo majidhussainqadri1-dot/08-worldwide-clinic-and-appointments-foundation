@@ -464,7 +464,7 @@ final class WCA_Service {
 		if ( ! self::affirmative( $data['privacy_consent'] ?? null ) ) { return new WP_Error( 'wca_privacy_consent_required', __( 'Current appointment-processing and privacy consent is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		if ( ! self::affirmative( $data['emergency_acknowledged'] ?? null ) ) { return new WP_Error( 'wca_emergency_ack_required', __( 'You must acknowledge that this booking service is not emergency care.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$idempotency_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
-		if ( ! $idempotency_key ) { return new WP_Error( 'wca_idempotency_required', __( 'An idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $idempotency_key ) ) { return new WP_Error( 'wca_idempotency_required', __( 'A valid 8-128 character idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$hold = WCA_Repository::get_slot_hold( (string) ( $data['hold_token'] ?? '' ) );
 		$hold_check = WCA_Plan_Guard::validate_bookable_hold( $hold, $patient_user_id );
 		if ( is_wp_error( $hold_check ) ) { return $hold_check; }
