@@ -72,7 +72,7 @@ final class SWC_Frontend {
 		$valid     = SWC_Helpers::availability_is_valid( $a );
 		$available = $valid && $a['accepting'] && ! $a['unavailable'];
 		$pages     = SWC_Helpers::pages();
-		$request   = $available && ! empty( $pages['request'] ) ? add_query_arg( 'doctor', $id, get_permalink( $pages['request'] ) ) : '';
+		$request   = $available && ! empty( $pages['request'] ) ? add_query_arg( 'doctor_ref', SWC_Helpers::practitioner_ref( $id ), get_permalink( $pages['request'] ) ) : '';
 		$photo     = absint( SWC_Helpers::profile_value( $id, 'profile_photo_id', 0 ) );
 		$days      = array_map( 'ucfirst', $a['days'] );
 		$location  = trim( SWC_Helpers::profile_value( $id, 'city' ) . ', ' . SWC_Helpers::profile_value( $id, 'country' ), ', ' );
@@ -106,8 +106,9 @@ final class SWC_Frontend {
 		if ( ! is_user_logged_in() ) {
 			return '<div class="swc-notice"><h2>' . esc_html__( 'Log in to request an appointment', 'worldwide-clinic-appointments' ) . '</h2><p>' . esc_html__( 'You may browse the clinic publicly, but an account is required to submit private contact information.', 'worldwide-clinic-appointments' ) . '</p><a class="swc-button" href="' . esc_url( wp_login_url( get_permalink() ) ) . '">' . esc_html__( 'Log In', 'worldwide-clinic-appointments' ) . '</a></div>';
 		}
-		$ids      = SWC_Helpers::requestable_doctor_ids();
-		$selected = isset( $_GET['doctor'] ) ? absint( $_GET['doctor'] ) : 0;
+		$ids          = SWC_Helpers::requestable_doctor_ids();
+		$selected_ref = isset( $_GET['doctor_ref'] ) ? strtolower( sanitize_text_field( wp_unslash( $_GET['doctor_ref'] ) ) ) : '';
+		$selected     = $selected_ref ? SWC_Helpers::practitioner_id( $selected_ref ) : 0;
 		if ( ! in_array( $selected, $ids, true ) ) {
 			$selected = 0;
 		}
@@ -121,7 +122,7 @@ final class SWC_Frontend {
 			<?php if ( ! $ids ) : ?><div class="swc-empty"><?php esc_html_e( 'No eligible verified doctor is currently accepting appointment requests.', 'worldwide-clinic-appointments' ); ?></div><?php else : ?>
 			<form class="swc-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 				<input type="hidden" name="action" value="swc_submit_appointment"><?php wp_nonce_field( 'swc_submit_appointment', 'swc_nonce' ); ?>
-				<label><?php esc_html_e( 'Verified doctor', 'worldwide-clinic-appointments' ); ?><select id="swc-doctor-select" name="doctor_id" required><option value=""><?php esc_html_e( 'Choose a doctor', 'worldwide-clinic-appointments' ); ?></option><?php foreach ( $ids as $id ) : $a = SWC_Helpers::availability( $id ); ?><option value="<?php echo absint( $id ); ?>" data-online="<?php echo $a['online'] ? '1' : '0'; ?>" data-in-person="<?php echo $a['in_person'] ? '1' : '0'; ?>" <?php selected( $selected, $id ); ?>><?php echo esc_html( get_the_author_meta( 'display_name', $id ) ); ?></option><?php endforeach; ?></select></label>
+				<label><?php esc_html_e( 'Verified doctor', 'worldwide-clinic-appointments' ); ?><select id="swc-doctor-select" name="doctor_ref" required><option value=""><?php esc_html_e( 'Choose a doctor', 'worldwide-clinic-appointments' ); ?></option><?php foreach ( $ids as $id ) : $a = SWC_Helpers::availability( $id ); ?><option value="<?php echo esc_attr( SWC_Helpers::practitioner_ref( $id ) ); ?>" data-online="<?php echo $a['online'] ? '1' : '0'; ?>" data-in-person="<?php echo $a['in_person'] ? '1' : '0'; ?>" <?php selected( $selected, $id ); ?>><?php echo esc_html( get_the_author_meta( 'display_name', $id ) ); ?></option><?php endforeach; ?></select></label>
 				<label><?php esc_html_e( 'Consultation type', 'worldwide-clinic-appointments' ); ?><select id="swc-consultation-type" name="consultation_type" required><option value=""><?php esc_html_e( 'Choose a consultation type', 'worldwide-clinic-appointments' ); ?></option><option value="online"><?php esc_html_e( 'Online consultation', 'worldwide-clinic-appointments' ); ?></option><option value="in-person"><?php esc_html_e( 'In-person consultation', 'worldwide-clinic-appointments' ); ?></option></select></label>
 				<label><?php esc_html_e( 'Preferred date', 'worldwide-clinic-appointments' ); ?><input type="date" name="preferred_date" min="<?php echo esc_attr( gmdate( 'Y-m-d', time() + DAY_IN_SECONDS ) ); ?>" required></label>
 				<label><?php esc_html_e( 'Preferred time', 'worldwide-clinic-appointments' ); ?><input type="time" name="preferred_time" required></label>

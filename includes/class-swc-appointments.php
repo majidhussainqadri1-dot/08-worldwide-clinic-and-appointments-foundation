@@ -28,8 +28,9 @@ final class SWC_Appointments {
 			wp_die( esc_html__( 'Please wait before submitting another request.', 'worldwide-clinic-appointments' ), '', array( 'response' => 429 ) );
 		}
 
-		$doctor = isset( $_POST['doctor_id'] ) ? absint( $_POST['doctor_id'] ) : 0;
-		if ( ! in_array( $doctor, SWC_Helpers::requestable_doctor_ids(), true ) ) {
+		$doctor_ref = isset( $_POST['doctor_ref'] ) ? strtolower( sanitize_text_field( wp_unslash( $_POST['doctor_ref'] ) ) ) : '';
+		$doctor     = SWC_Helpers::practitioner_id( $doctor_ref );
+		if ( ! $doctor || ! in_array( $doctor, SWC_Helpers::requestable_doctor_ids(), true ) ) {
 			wp_die( esc_html__( 'Choose an eligible verified doctor.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
 		}
 

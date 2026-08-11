@@ -117,6 +117,15 @@ final class SWC_Helpers {
 		return array_values( array_filter( self::doctor_ids(), array( __CLASS__, 'doctor_is_requestable' ) ) );
 	}
 
+	/** Public/browser doctor references must remain opaque. */
+	public static function practitioner_ref( $doctor_id ) {
+		return class_exists( 'WCA_Plan_Guard' ) ? WCA_Plan_Guard::practitioner_ref( absint( $doctor_id ) ) : '';
+	}
+
+	public static function practitioner_id( $ref ) {
+		return class_exists( 'WCA_Plan_Guard' ) ? WCA_Plan_Guard::practitioner_id( sanitize_text_field( $ref ) ) : 0;
+	}
+
 	public static function can_doctor_manage( $appointment_id, $user_id = 0 ) {
 		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
 		return $user_id
