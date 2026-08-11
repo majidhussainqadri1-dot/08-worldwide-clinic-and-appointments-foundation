@@ -148,6 +148,21 @@ final class WCA_Service {
 		return $clinic;
 	}
 
+	/** A globally eligible doctor still requires current authority to serve this clinic. */
+	private static function doctor_may_serve_clinic( $clinic, $doctor_id, $actor_user_id ) {
+		$clinic_id = absint( $clinic['id'] ?? 0 );
+		$doctor_id = absint( $doctor_id );
+		$actor_user_id = absint( $actor_user_id );
+		if ( ! $clinic_id || ! $doctor_id || ! $actor_user_id ) { return false; }
+		if ( user_can( $actor_user_id, 'manage_worldwide_clinic' ) || $doctor_id === $actor_user_id || $doctor_id === absint( $clinic['owner_user_id'] ?? 0 ) ) { return true; }
+		$delegated = array_merge(
+			WCA_Authorization::delegated_clinic_ids( $doctor_id, 'schedule' ),
+			WCA_Authorization::delegated_clinic_ids( $doctor_id, 'clinic_manage' )
+		);
+		$allowed = in_array( $clinic_id, array_map( 'absint', $delegated ), true );
+		return (bool) apply_filters( 'wca_doctor_may_serve_clinic', $allowed, $doctor_id, $clinic_id, $actor_user_id );
+	}
+
 	/** @return array<string,mixed>|WP_Error */
 	public static function save_service( $data, $service_id = 0, $expected_version = 0, $actor_user_id = 0 ) {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
@@ -160,7 +175,11 @@ final class WCA_Service {
 			if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_service_scope', __( 'The service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		}
 		if ( ! empty( $data['branch_id'] ) ) { $branch = WCA_Repository::get_branch( absint( $data['branch_id'] ) ); if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_branch_scope', __( 'The branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
-		if ( ! empty( $data['doctor_user_id'] ) && ! SWC_Doctor_Authority::is_eligible( absint( $data['doctor_user_id'] ) ) ) { return new WP_Error( 'wca_service_doctor', __( 'The assigned practitioner is not currently eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( ! empty( $data['doctor_user_id'] ) ) {
+			$service_doctor_id = absint( $data['doctor_user_id'] );
+			if ( ! SWC_Doctor_Authority::is_eligible( $service_doctor_id ) ) { return new WP_Error( 'wca_service_doctor', __( 'The assigned practitioner is not currently eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			if ( ! self::doctor_may_serve_clinic( $clinic, $service_doctor_id, $actor_user_id ) ) { return new WP_Error( 'wca_service_doctor_scope', __( 'The selected doctor has no current authority to serve this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
+		}
 		$data['clinic_id'] = absint( $clinic['id'] );
 		$data['platform_commission_bps'] = 0;
 		$result = WCA_Repository::save_service( $data, $service_id, $expected_version );
@@ -184,6 +203,9 @@ final class WCA_Service {
 		$doctor_id = absint( $data['doctor_user_id'] ?? $actor_user_id );
 		if ( ! SWC_Doctor_Authority::is_eligible( $doctor_id ) ) {
 			return new WP_Error( 'wca_doctor_ineligible', __( 'The doctor is not currently eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+		}
+		if ( ! self::doctor_may_serve_clinic( $clinic, $doctor_id, $actor_user_id ) ) {
+			return new WP_Error( 'wca_availability_doctor_scope', __( 'The selected doctor has no current authority to serve this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		$data['doctor_user_id'] = $doctor_id;
 		$result = WCA_Repository::save_availability_rule( $data, $rule_id, $expected_version );
