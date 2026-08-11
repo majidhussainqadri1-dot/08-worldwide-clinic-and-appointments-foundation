@@ -444,10 +444,14 @@ final class WCA_Continuity {
 		if ( ! in_array( $actor, array( 'patient', 'guardian', 'doctor' ), true ) && ! self::followup_actor_allowed( absint( $row['appointment_id'] ), $actor_user_id ) ) { return self::not_found(); }
 		if ( 'scheduled' !== (string) $row['status'] ) { return new WP_Error( 'wca_followup_state', __( 'Follow-up plan is not active.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$now = WCA_Repository::now();
-		$changed = $wpdb->update( $table, array( 'status' => 'completed', 'completed_at' => $now, 'updated_at' => $now, 'version' => absint( $row['version'] ) + 1 ), array( 'id' => absint( $row['id'] ), 'version' => absint( $row['version'] ) ) );
-		if ( false === $changed || 0 === $changed ) { return new WP_Error( 'wca_followup_stale', __( 'Follow-up plan changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		WCA_Repository::append_event( 'FollowUpPlanCompleted.v1', 'followup', (string) $row['public_ref'], array( 'followup_ref' => (string) $row['public_ref'], 'appointment_ref' => self::appointment_ref( absint( $row['appointment_id'] ) ) ), $actor_user_id, WCA_Observability::trace_id() );
-		return true;
+		$result = WCA_Repository::transaction( function () use ( $table, $row, $now, $actor_user_id ) {
+			global $wpdb;
+			$changed = $wpdb->update( $table, array( 'status' => 'completed', 'completed_at' => $now, 'updated_at' => $now, 'version' => absint( $row['version'] ) + 1 ), array( 'id' => absint( $row['id'] ), 'status' => 'scheduled', 'version' => absint( $row['version'] ) ) );
+			if ( 1 !== (int) $changed ) { return new WP_Error( 'wca_followup_stale', __( 'Follow-up plan changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			$event = WCA_Repository::append_event( 'FollowUpPlanCompleted.v1', 'followup', (string) $row['public_ref'], array( 'followup_ref' => (string) $row['public_ref'], 'appointment_ref' => self::appointment_ref( absint( $row['appointment_id'] ) ) ), $actor_user_id, WCA_Observability::trace_id() );
+			return is_wp_error( $event ) ? $event : true;
+		}, 'wca_followup_complete_transaction' );
+		return $result;
 	}
 
 	public static function maintenance() {
