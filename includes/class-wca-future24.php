@@ -1370,12 +1370,18 @@ final class WCA_Future24 {
 		$type=sanitize_key(SWC_Helpers::meta($id,'consultation_type','')); if(!in_array($type,array('online','hybrid'),true)){return new WP_Error('wca_virtual_room_mode',__('A virtual room is only available for online or hybrid appointments.','worldwide-clinic-appointments'),array('status'=>409));}
 		$consent=class_exists('WCA_Continuity_Guards')?WCA_Continuity_Guards::consent_state($appointment_ref,$actor_id):new WP_Error('wca_virtual_room_consent_state',__('Current teleconsult consent could not be verified.','worldwide-clinic-appointments'));
 		if(is_wp_error($consent)||empty($consent['scopes']['teleconsult'])||'granted'!==$consent['scopes']['teleconsult']['status']){return new WP_Error('wca_virtual_room_consent',__('Current teleconsult consent is required before requesting a virtual room.','worldwide-clinic-appointments'),array('status'=>409));}
-		$table=self::tables()['records'];
-		$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-19' AND appointment_id=%d AND status='room_requested' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if($existing){return self::public_record($existing);}
-		$record=self::put_record('F08-FUT-19',array('appointment_id'=>$id,'clinic_id'=>absint(SWC_Helpers::meta($id,'clinic_id',0)),'subject_user_id'=>$actor_id,'status'=>'room_requested','expires_at'=>gmdate('Y-m-d H:i:s',time()+HOUR_IN_SECONDS),'payload'=>array('appointment_ref'=>strtolower($appointment_ref),'transport_owner'=>'File17','recording_assumed'=>false,'teleconsult_consent_verified'=>true,'idempotent_request'=>true)),$actor_id);
-		if(!is_wp_error($record)){WCA_Repository::enqueue('File17.VirtualRoomRequested.v1',strtolower($appointment_ref),array('appointment_ref'=>strtolower($appointment_ref),'request_ref'=>$record['public_ref'],'recording_allowed'=>false,'teleconsult_consent_verified'=>true),WCA_Observability::trace_id());}
-		return $record;
+		$lock=self::semantic_lock('virtual-room',$id);
+		if(is_wp_error($lock)){return $lock;}
+		try {
+			$table=self::tables()['records'];
+			$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-19' AND appointment_id=%d AND status='room_requested' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if($existing){return self::public_record($existing);}
+			$record=self::put_record('F08-FUT-19',array('appointment_id'=>$id,'clinic_id'=>absint(SWC_Helpers::meta($id,'clinic_id',0)),'subject_user_id'=>$actor_id,'status'=>'room_requested','expires_at'=>gmdate('Y-m-d H:i:s',time()+HOUR_IN_SECONDS),'payload'=>array('appointment_ref'=>strtolower($appointment_ref),'transport_owner'=>'File17','recording_assumed'=>false,'teleconsult_consent_verified'=>true,'idempotent_request'=>true)),$actor_id);
+			if(!is_wp_error($record)){WCA_Repository::enqueue('File17.VirtualRoomRequested.v1',strtolower($appointment_ref),array('appointment_ref'=>strtolower($appointment_ref),'request_ref'=>$record['public_ref'],'recording_allowed'=>false,'teleconsult_consent_verified'=>true),WCA_Observability::trace_id());}
+			return $record;
+		} finally {
+			self::release_semantic_lock($lock);
+		}
 	}
 
 	private static function subject_user_id( $subject ) {
