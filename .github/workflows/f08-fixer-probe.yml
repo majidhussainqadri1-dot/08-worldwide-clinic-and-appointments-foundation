@@ -1,0 +1,12 @@
+name: F08 Fixer Probe
+
+on:
+  push:
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/f08-fixer-probe.yml]
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo probe-ok
