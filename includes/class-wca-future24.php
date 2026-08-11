@@ -540,10 +540,25 @@ final class WCA_Future24 {
 	}
 
 	private static function utc( $value ) {
-		$value = sanitize_text_field( (string) $value );
-		if ( ! $value ) { return null; }
-		$ts = strtotime( $value . ( false === stripos( $value, 'UTC' ) && false === strpos( $value, 'Z' ) ? ' UTC' : '' ) );
-		return $ts ? gmdate( 'Y-m-d H:i:s', $ts ) : null;
+		$value = trim( sanitize_text_field( (string) $value ) );
+		if ( '' === $value ) { return null; }
+		$utc = new DateTimeZone( 'UTC' );
+		$formats = array(
+			array( '!Y-m-d H:i:s', 'Y-m-d H:i:s', $utc ),
+			array( '!Y-m-d H:i', 'Y-m-d H:i', $utc ),
+			array( '!Y-m-d\TH:i:s\Z', 'Y-m-d\TH:i:s\Z', $utc ),
+			array( '!Y-m-d\TH:i\Z', 'Y-m-d\TH:i\Z', $utc ),
+			array( '!Y-m-d\TH:i:sP', 'Y-m-d\TH:i:sP', null ),
+			array( '!Y-m-d\TH:iP', 'Y-m-d\TH:iP', null ),
+		);
+		foreach ( $formats as $entry ) {
+			$dt = null === $entry[2] ? DateTimeImmutable::createFromFormat( $entry[0], $value ) : DateTimeImmutable::createFromFormat( $entry[0], $value, $entry[2] );
+			$errors = DateTimeImmutable::getLastErrors();
+			if ( $dt && ( false === $errors || ( 0 === $errors['warning_count'] && 0 === $errors['error_count'] ) ) && $dt->format( $entry[1] ) === $value ) {
+				return $dt->setTimezone( $utc )->format( 'Y-m-d H:i:s' );
+			}
+		}
+		return null;
 	}
 
 	private static function audit( $feature_id, $action, $object_ref, $context = array(), $actor_user_id = 0, $automated = false ) {
@@ -575,7 +590,7 @@ final class WCA_Future24 {
 		$date_to   = sanitize_text_field( isset( $data['date_to'] ) ? $data['date_to'] : '' );
 		$today = gmdate( 'Y-m-d' );
 		$max_date = gmdate( 'Y-m-d', time() + 180 * DAY_IN_SECONDS );
-		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_from ) || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) || $date_from < $today || $date_to < $date_from || $date_to > $max_date ) {
+		if ( ! WCA_Service::valid_date( $date_from ) || ! WCA_Service::valid_date( $date_to ) || $date_from < $today || $date_to < $date_from || $date_to > $max_date ) {
 			return new WP_Error( 'wca_waitlist_dates', __( 'A valid future waitlist date range of no more than 180 days is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
 		$timezone = sanitize_text_field( isset( $data['timezone'] ) ? $data['timezone'] : 'UTC' );

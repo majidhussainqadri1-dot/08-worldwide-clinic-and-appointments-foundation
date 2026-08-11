@@ -86,7 +86,8 @@ final class WCA_Second_Ten_Review_Hardening {
 
 	/** @return true|WP_Error */
 	private static function validate_calendar_payload( $value, $depth = 0 ) {
-		if ( $depth > 7 || ! is_array( $value ) ) { return true; }
+		if ( ! is_array( $value ) ) { return true; }
+		if ( $depth > 7 ) { return new WP_Error( 'wca_future24_payload_depth', __( 'Future24 calendar payload nesting is too deep.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		foreach ( $value as $key => $item ) {
 			$key_string = is_string( $key ) ? sanitize_key( $key ) : '';
 			if ( is_array( $item ) ) {
@@ -96,7 +97,7 @@ final class WCA_Second_Ten_Review_Hardening {
 			}
 			if ( ! is_scalar( $item ) || '' === trim( (string) $item ) ) { continue; }
 			$text = trim( (string) $item );
-			if ( self::is_date_key( $key_string ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $text ) && ! WCA_Service::valid_date( $text ) ) {
+			if ( self::is_date_key( $key_string ) && ! WCA_Service::valid_date( $text ) ) {
 				return new WP_Error( 'wca_future24_date_invalid', __( 'A Future24 calendar date is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400, 'field' => $key_string ) );
 			}
 			if ( self::is_time_key( $key_string ) && ! self::strict_utc( $text ) ) {
@@ -140,7 +141,8 @@ final class WCA_Second_Ten_Review_Hardening {
 	}
 
 	private static function public_payload( $value, $depth = 0 ) {
-		if ( $depth > 8 || ! is_array( $value ) ) { return $value; }
+		if ( ! is_array( $value ) ) { return $value; }
+		if ( $depth > 8 ) { return array(); }
 		$blocked = array( 'id', 'appointment_id', 'clinic_id', 'service_id', 'branch_id', 'patient_id', 'patient_user_id', 'doctor_id', 'doctor_user_id', 'guardian_user_id', 'subject_user_id', 'actor_user_id', 'owner_user_id', 'native_user_id' );
 		$out = array();
 		foreach ( $value as $key => $item ) {
