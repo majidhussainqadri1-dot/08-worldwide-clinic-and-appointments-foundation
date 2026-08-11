@@ -369,8 +369,13 @@ final class WCA_Continuity {
 			'created_at'         => WCA_Repository::now(),
 			'updated_at'         => WCA_Repository::now(),
 		);
-		if ( false === $wpdb->insert( self::tables()['followups'], $row ) ) { return new WP_Error( 'wca_followup_insert', __( 'Follow-up plan could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-		WCA_Repository::append_event( 'FollowUpPlanCreated.v1', 'followup', $row['public_ref'], array( 'followup_ref' => $row['public_ref'], 'appointment_ref' => self::appointment_ref( $appointment_id ), 'due_at_utc' => $due ), $actor_user_id, WCA_Observability::trace_id() );
+		$stored = WCA_Repository::transaction( function () use ( $row, $appointment_id, $due, $actor_user_id ) {
+			global $wpdb;
+			if ( false === $wpdb->insert( self::tables()['followups'], $row ) ) { return new WP_Error( 'wca_followup_insert', __( 'Follow-up plan could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$event = WCA_Repository::append_event( 'FollowUpPlanCreated.v1', 'followup', $row['public_ref'], array( 'followup_ref' => $row['public_ref'], 'appointment_ref' => self::appointment_ref( $appointment_id ), 'due_at_utc' => $due ), $actor_user_id, WCA_Observability::trace_id() );
+			return is_wp_error( $event ) ? $event : true;
+		}, 'wca_followup_create_transaction' );
+		if ( is_wp_error( $stored ) ) { return $stored; }
 		return self::get_followup( $row['public_ref'], $actor_user_id );
 	}
 
