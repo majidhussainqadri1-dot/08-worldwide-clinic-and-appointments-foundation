@@ -111,12 +111,15 @@ final class WCA_Repository {
 		$search   = sanitize_text_field( $args['search'] ?? '' );
 		$country  = strtoupper( substr( sanitize_text_field( $args['country_code'] ?? '' ), 0, 2 ) );
 		$city     = sanitize_text_field( $args['city'] ?? '' );
+		$cursor_updated_at = sanitize_text_field( $args['cursor_updated_at'] ?? '' );
+		$cursor_id = absint( $args['cursor_id'] ?? 0 );
 		$where    = array( '1=1' );
 		$params   = array();
 		$join     = '';
 		if ( $status ) { $where[] = 'c.status=%s'; $params[] = $status; }
 		if ( $owner_id ) { $where[] = 'c.owner_user_id=%d'; $params[] = $owner_id; }
 		if ( $search ) { $like = '%' . $wpdb->esc_like( $search ) . '%'; $where[] = '(c.name LIKE %s OR c.summary LIKE %s)'; $params[] = $like; $params[] = $like; }
+		if ( $cursor_updated_at && $cursor_id ) { $where[] = '(c.updated_at<%s OR (c.updated_at=%s AND c.id<%d))'; $params[] = $cursor_updated_at; $params[] = $cursor_updated_at; $params[] = $cursor_id; $offset = 0; }
 		if ( $country || $city ) {
 			$join = " INNER JOIN " . WCA_Schema::tables()['branches'] . " b ON b.clinic_id=c.id AND b.status='active'";
 			if ( $country ) { $where[] = 'b.country_code=%s'; $params[] = $country; }

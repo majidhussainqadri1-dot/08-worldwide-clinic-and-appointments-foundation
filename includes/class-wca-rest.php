@@ -142,16 +142,42 @@ final class WCA_REST {
 			'country_code' => sanitize_text_field( $request->get_param( 'country' ) ),
 			'city'         => sanitize_text_field( $request->get_param( 'city' ) ),
 			'search'       => sanitize_text_field( $request->get_param( 'search' ) ),
-			'page'         => max( 1, absint( $request->get_param( 'page' ) ) ),
 			'per_page'     => min( 50, max( 1, absint( $request->get_param( 'per_page' ) ?: 20 ) ) ),
 		);
+		$filter_hash = hash( 'sha256', wp_json_encode( array( $args['country_code'], $args['city'], $args['search'], $args['per_page'] ) ) );
+		$cursor = strtolower( sanitize_text_field( $request->get_param( 'cursor' ) ) );
+		if ( $cursor ) {
+			if ( ! preg_match( '/^[0-9a-f-]{36}$/', $cursor ) ) { return new WP_Error( 'wca_cursor_invalid', __( 'The clinic cursor is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+			$state = get_transient( 'wca_clinic_cursor_' . md5( $cursor ) );
+			if ( ! is_array( $state ) || ! hash_equals( (string) ( $state['filter_hash'] ?? '' ), $filter_hash ) ) { return new WP_Error( 'wca_cursor_expired', __( 'The clinic cursor expired or does not match these filters.', 'worldwide-clinic-appointments' ), array( 'status' => 410 ) ); }
+			$args['cursor_updated_at'] = sanitize_text_field( $state['updated_at'] ?? '' );
+			$args['cursor_id'] = absint( $state['id'] ?? 0 );
+		}
 		$rows = WCA_Repository::list_clinics( $args );
 		$items = array();
 		foreach ( $rows as $row ) {
 			$projection = WCA_Service::public_clinic_projection( $row['public_ref'] );
 			if ( $projection ) { $items[] = $projection; }
 		}
-		return self::respond( array( 'items' => $items, 'page' => $args['page'], 'per_page' => $args['per_page'], 'generated_at' => gmdate( 'c' ) ) );
+		$next_cursor = '';
+		if ( count( $rows ) === $args['per_page'] ) {
+			$last = end( $rows );
+			if ( is_array( $last ) && ! empty( $last['id'] ) && ! empty( $last['updated_at'] ) ) {
+				$next_cursor = strtolower( wp_generate_uuid4() );
+				set_transient( 'wca_clinic_cursor_' . md5( $next_cursor ), array( 'id' => absint( $last['id'] ), 'updated_at' => (string) $last['updated_at'], 'filter_hash' => $filter_hash ), 15 * MINUTE_IN_SECONDS );
+			}
+		}
+		$payload = array( 'items' => $items, 'per_page' => $args['per_page'], 'next_cursor' => $next_cursor, 'generated_at' => gmdate( 'c' ) );
+		$etag = '"' . hash( 'sha256', wp_json_encode( array( $filter_hash, array_map( static function ( $item ) { return array( $item['public_ref'] ?? '', $item['updated_at'] ?? '', $item['record_version'] ?? 0 ); }, $items ), $next_cursor ) ) ) . '"';
+		if ( hash_equals( $etag, (string) $request->get_header( 'If-None-Match' ) ) ) {
+			$response = new WP_REST_Response( null, 304 );
+		} else {
+			$response = rest_ensure_response( $payload );
+		}
+		$response->header( 'ETag', $etag );
+		$response->header( 'Cache-Control', 'public, max-age=60, stale-while-revalidate=120' );
+		$response->header( 'X-Request-ID', WCA_Observability::trace_id() );
+		return $response;
 	}
 
 	public static function clinic( WP_REST_Request $request ) {
