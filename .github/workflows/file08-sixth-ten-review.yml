@@ -37,6 +37,26 @@ jobs:
           for round in 1 2 3 4 5 6 7 8 9; do
             echo "===== F08 SIXTH REVIEW ROUND ${round} ====="
             python tools/sixth-ten-review-patcher.py "${round}"
+            if [ "${round}" = "9" ]; then
+              python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/sixth-ten-review-regressions.php')
+          s=p.read_text(encoding='utf-8')
+          replacements={
+          '''t610has('doctor eligibility at serving root',$auth,"SWC_Doctor_Authority::is_eligible( $doctor_user_id )");''': '''t610has('doctor eligibility at serving root',$auth,'SWC_Doctor_Authority::is_eligible( $doctor_user_id )');''',
+          '''t610has('outbox dispatch stable message id argument',$outbox,"self::dispatch( (string) $item['message_id']");''': '''t610has('outbox dispatch stable message id argument',$outbox,'self::dispatch( (string) $item[\\'message_id\\']');''',
+          '''t610has('outbox envelope stable message id',$outbox,"'message_id'    => sanitize_text_field( $message_id )");''': '''t610has('outbox envelope stable message id',$outbox,'\\'message_id\\'    => sanitize_text_field( $message_id )');''',
+          '''t610has('questionnaire complete traversal',$future,"feature_rows_for_clinic( 'F08-FUT-11', $clinic_id, 'template_active', 'questionnaire' )");''': '''t610has('questionnaire complete traversal',$future,'feature_rows_for_clinic( \\'F08-FUT-11\\', $clinic_id, \\'template_active\\', \\'questionnaire\\' )');''',
+          '''t610has('prerequisite complete traversal',$future,"feature_rows_for_clinic( 'F08-FUT-13', $clinic_id, 'rule_active', 'payload' )");''': '''t610has('prerequisite complete traversal',$future,'feature_rows_for_clinic( \\'F08-FUT-13\\', $clinic_id, \\'rule_active\\', \\'payload\\' )');''',
+          '''t610lacks('no raw monthly modify drift',$future,"$cursor = $cursor->modify( '+' . $interval . ' months' )");''': '''t610lacks('no raw monthly modify drift',$future,'$cursor = $cursor->modify( \\'+'\\' . $interval . \\' months\\' )');''',
+          }
+          for old,new in replacements.items():
+              if old not in s:
+                  raise SystemExit('sixth-ten literal marker missing: '+old)
+              s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+            fi
             find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/f08-sixth-lint.txt
             php tests/run-all.php
             node --check assets/js/clinic.js
