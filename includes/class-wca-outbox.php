@@ -64,6 +64,8 @@ final class WCA_Outbox {
 			return 0;
 		}
 		try {
+			$recovered = WCA_Repository::recover_stale_outbox( 300 );
+			if ( $recovered > 0 ) { WCA_Observability::metric( 'outbox_stale_recovered_total', $recovered ); }
 			$worker = 'wp-' . substr( hash( 'sha256', wp_generate_uuid4() ), 0, 16 );
 			$items  = WCA_Repository::claim_outbox( min( 100, max( 1, absint( $limit ) ) ), $worker );
 			foreach ( $items as $item ) {

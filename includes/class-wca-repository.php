@@ -714,6 +714,34 @@ final class WCA_Repository {
 		return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
 	}
 
+
+	/** Recover abandoned processing rows after the dispatcher connection/lease disappeared.
+	 * Stable message_id fencing (included in every envelope) lets idempotent consumers
+	 * safely de-duplicate a retry if the prior worker died after external delivery.
+	 */
+	public static function recover_stale_outbox( $stale_seconds = 300 ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['outbox'];
+		$stale_seconds = min( HOUR_IN_SECONDS, max( 60, absint( $stale_seconds ) ) );
+		$now = self::now();
+		$stale_before = gmdate( 'Y-m-d H:i:s', time() - $stale_seconds );
+		return (int) $wpdb->query( $wpdb->prepare(
+			"UPDATE {$table}
+			 SET status=CASE WHEN attempts>=7 THEN 'dead_letter' ELSE 'retry' END,
+			     attempts=attempts+1,
+			     last_error=%s,
+			     next_attempt_at=%s,
+			     locked_at=NULL,
+			     locked_by='',
+			     updated_at=%s
+			 WHERE status='processing' AND locked_at IS NOT NULL AND locked_at<%s",
+			__( 'Previous outbox worker lease expired; delivery will be retried using the stable message id.', 'worldwide-clinic-appointments' ),
+			$now,
+			$now,
+			$stale_before
+		) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
 	/** @return array<int,array<string,mixed>> */
 	public static function claim_outbox( $limit = 20, $worker = '' ) {
 		global $wpdb;
