@@ -42,14 +42,14 @@ Supported public/cross-file mutation paths continue to enforce transition expect
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
 | Coded | **Corrected candidate** — fourth-cycle source corrections are present. |
-| Fresh post-final-code reviews | **Complete at source-review level; exact-final-HEAD CI/package reopening remains the release gate.** |
-| Packaged | **Pending exact-final-HEAD CI artifact confirmation.** |
-| Automated-QA Green | **Pending exact-final-HEAD workflow confirmation.** |
+| Fresh post-final-code reviews | **Complete at repository/source-review level.** |
+| Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
+| Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
 | Staging-Accepted | **Pending / not claimed.** |
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
 
-Do not promote this candidate to Packaged or Automated-QA Green using any older v1.2.1/v1.2.2/v1.2.3 artifact. Rebuild and reverify from the exact final HEAD.
+No older v1.2.1/v1.2.2/v1.2.3 artifact or older CI run may be used as evidence for the v1.2.4 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
 
 ## Mandatory staging / production gates
 
