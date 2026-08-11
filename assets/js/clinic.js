@@ -171,6 +171,7 @@
 				try {
 					var result = await api('appointment-refs/' + encodeURIComponent(ref) + '/transitions', {method: 'POST', body: JSON.stringify({
 						next_status: next,
+						idempotency_key: uuid(),
 						expected_status: card.dataset.wcaStatus,
 						expected_version: Number(card.dataset.wcaVersion || 0),
 						reason_code: 'user_action'
