@@ -58,14 +58,7 @@ jobs:
             printf -v rr '%02d' "$n"
             echo "===== T12-R${rr} review -> correction -> full corrected-state QA ====="
             if [ "$n" -eq 9 ]; then
-              python3 - <<'PY'
-from pathlib import Path
-p=Path('tests/eighth-ten-review-regressions.php')
-s=p.read_text()
-s=s.replace("t810has('support participant transaction',$future,'START TRANSACTION');", "t810has('support participant canonical transaction',$future,'wca_support_add_transaction');")
-s=s.replace("t810has('support participant commit',$future,'COMMIT');", "t810has('support participant fail-closed transaction API',$future,'WCA_Repository::transaction');")
-p.write_text(s)
-PY
+              python3 -c "from pathlib import Path; p=Path('tests/eighth-ten-review-regressions.php'); s=p.read_text(); s=s.replace(\"t810has('support participant transaction',\$future,'START TRANSACTION');\",\"t810has('support participant canonical transaction',\$future,'wca_support_add_transaction');\"); s=s.replace(\"t810has('support participant commit',\$future,'COMMIT');\",\"t810has('support participant fail-closed transaction API',\$future,'WCA_Repository::transaction');\"); p.write_text(s)"
             fi
             python3 tools/twelfth-twenty-review-patcher.py "$n"
             qa
