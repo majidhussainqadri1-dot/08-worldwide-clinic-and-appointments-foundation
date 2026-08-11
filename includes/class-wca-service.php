@@ -242,12 +242,16 @@ final class WCA_Service {
 		$duration = $service ? absint( $service['duration_minutes'] ) : absint( $args['duration_minutes'] ?? 30 );
 		$duration = min( 480, max( 10, $duration ) );
 		$limit = min( 500, max( 1, absint( $args['limit'] ?? 100 ) ) );
+		$display_from = self::valid_date( $args['display_date_from'] ?? '' ) ? (string) $args['display_date_from'] : '';
+		$display_to   = self::valid_date( $args['display_date_to'] ?? '' ) ? (string) $args['display_date_to'] : '';
+		if ( ( $display_from && ! $display_to ) || ( $display_to && ! $display_from ) || ( $display_from && $display_to < $display_from ) ) {
+			return new WP_Error( 'wca_slot_display_range', __( 'The display-local slot range is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		$slots = array();
 		$versions = array();
 		foreach ( $rules as $rule ) {
 			$versions[] = $rule['public_ref'] . ':' . $rule['version'];
-			$slots = array_merge( $slots, self::generate_rule_slots( $rule, $from, $to, $duration, $timezone, $limit - count( $slots ) ) );
-			if ( count( $slots ) >= $limit ) { break; }
+			$slots = array_merge( $slots, self::generate_rule_slots( $rule, $from, $to, $duration, $timezone, $limit, $display_from, $display_to ) );
 		}
 		usort( $slots, static function ( $a, $b ) { return strcmp( $a['start_utc'], $b['start_utc'] ); } );
 		WCA_Observability::metric( 'slot_search_total', 1, array( 'result_bucket' => count( $slots ) ? 'non_empty' : 'empty' ) );
@@ -260,7 +264,7 @@ final class WCA_Service {
 	}
 
 	/** @return array<int,array<string,mixed>> */
-	private static function generate_rule_slots( $rule, $from, $to, $duration, $display_timezone, $limit ) {
+	private static function generate_rule_slots( $rule, $from, $to, $duration, $display_timezone, $limit, $display_from = '', $display_to = '', $ignore_hold_key = '' ) {
 		$slots = array();
 		if ( $limit <= 0 || empty( $rule['rrule']['days'] ) ) { return $slots; }
 		$rule_zone = new DateTimeZone( $rule['timezone'] );
@@ -292,7 +296,9 @@ final class WCA_Service {
 						$slot_end = $slot->modify( '+' . $duration . ' minutes' );
 						$start_utc = $slot->setTimezone( new DateTimeZone( 'UTC' ) );
 						$end_utc = $slot_end->setTimezone( new DateTimeZone( 'UTC' ) );
-						if ( $start_utc->getTimestamp() > time() + max( 0, absint( $rule['buffer_before'] ) ) * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! SWC_Helpers::has_conflict( absint( $rule['doctor_user_id'] ), $start_utc->format( 'Y-m-d H:i:s' ), $duration, 0 ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $start_utc->format( 'Y-m-d H:i:s' ), $end_utc->format( 'Y-m-d H:i:s' ) ) ) {
+						$display_date = $start_utc->setTimezone( $display_zone )->format( 'Y-m-d' );
+						$inside_display = ( ! $display_from || ( $display_date >= $display_from && $display_date <= $display_to ) );
+						if ( $inside_display && $start_utc->getTimestamp() > time() + max( 0, absint( $rule['buffer_before'] ) ) * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! SWC_Helpers::has_conflict( absint( $rule['doctor_user_id'] ), $start_utc->format( 'Y-m-d H:i:s' ), $duration, 0 ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $start_utc->format( 'Y-m-d H:i:s' ), $end_utc->format( 'Y-m-d H:i:s' ), $ignore_hold_key ) ) {
 							$slots[] = array(
 								'slot_ref'       => hash( 'sha256', $rule['public_ref'] . '|' . $start_utc->format( 'c' ) . '|' . $duration ),
 								'rule_ref'       => $rule['public_ref'],

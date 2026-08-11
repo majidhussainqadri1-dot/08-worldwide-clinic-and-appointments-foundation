@@ -163,7 +163,9 @@ final class WCA_Ten_Review_Hardening {
 		$expanded = $query;
 		$expanded['date_from'] = gmdate( 'Y-m-d', strtotime( $from . ' -1 day UTC' ) );
 		$expanded['date_to']   = gmdate( 'Y-m-d', strtotime( $to . ' +1 day UTC' ) );
-		$expanded['limit'] = 500;
+		$expanded['limit'] = $limit;
+		$expanded['display_date_from'] = $from;
+		$expanded['display_date_to'] = $to;
 		$result = WCA_Service::search_slots( $expanded );
 		if ( is_wp_error( $result ) ) { return $result; }
 		$zone = new DateTimeZone( (string) $query['timezone'] );
