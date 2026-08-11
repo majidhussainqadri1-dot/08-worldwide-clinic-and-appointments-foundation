@@ -624,20 +624,40 @@ final class WCA_Service {
 		$start = (string) SWC_Helpers::meta( $appointment_id, 'preferred_at_utc' );
 		$end = (string) SWC_Helpers::meta( $appointment_id, 'appointment_end_utc' );
 		if ( ! $start ) { return new WP_Error( 'wca_calendar_time', __( 'Appointment time is unavailable.', 'worldwide-clinic-appointments' ) ); }
-		if ( ! $end ) { $end = gmdate( 'Y-m-d H:i:s', strtotime( $start . ' UTC' ) + max( 10, absint( SWC_Helpers::meta( $appointment_id, 'appointment_duration', 30 ) ) ) * 60 ); }
+		$start_ts = self::strict_utc_timestamp( $start );
+		if ( false === $start_ts ) { return new WP_Error( 'wca_calendar_time_invalid', __( 'Stored appointment start time is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( $end ) {
+			$end_ts = self::strict_utc_timestamp( $end );
+			if ( false === $end_ts ) { return new WP_Error( 'wca_calendar_time_invalid', __( 'Stored appointment end time is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		} else {
+			$end_ts = $start_ts + max( 10, absint( SWC_Helpers::meta( $appointment_id, 'appointment_duration', 30 ) ) ) * 60;
+		}
+		if ( $end_ts <= $start_ts ) { return new WP_Error( 'wca_calendar_time_invalid', __( 'Stored appointment end time must be after the start time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$uid = (string) SWC_Helpers::meta( $appointment_id, 'public_ref', 'appointment-' . $appointment_id ) . '@sabrihomeopathy.com';
 		$summary = 'Clinic Appointment';
 		$lines = array(
 			'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Sabri Social Homeopathy Platform//File 08//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',
 			'UID:' . self::ics_escape( $uid ),
 			'DTSTAMP:' . gmdate( 'Ymd\THis\Z' ),
-			'DTSTART:' . gmdate( 'Ymd\THis\Z', strtotime( $start . ' UTC' ) ),
-			'DTEND:' . gmdate( 'Ymd\THis\Z', strtotime( $end . ' UTC' ) ),
+			'DTSTART:' . gmdate( 'Ymd\THis\Z', $start_ts ),
+			'DTEND:' . gmdate( 'Ymd\THis\Z', $end_ts ),
 			'SUMMARY:' . self::ics_escape( $summary ),
 			'DESCRIPTION:' . self::ics_escape( 'Private appointment details are available only in the authenticated platform.' ),
 			'CLASS:PRIVATE','TRANSP:OPAQUE','END:VEVENT','END:VCALENDAR',
 		);
 		return implode( "\r\n", $lines ) . "\r\n";
+	}
+
+	private static function strict_utc_timestamp( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value ) { return false; }
+		$utc = new DateTimeZone( 'UTC' );
+		foreach ( array( array( '!Y-m-d H:i:s', 'Y-m-d H:i:s' ), array( '!Y-m-d H:i', 'Y-m-d H:i' ), array( '!Y-m-d\TH:i:s\Z', 'Y-m-d\TH:i:s\Z' ), array( '!Y-m-d\TH:i\Z', 'Y-m-d\TH:i\Z' ) ) as $entry ) {
+			$dt = DateTimeImmutable::createFromFormat( $entry[0], $value, $utc );
+			$errors = DateTimeImmutable::getLastErrors();
+			if ( $dt && ( false === $errors || ( 0 === $errors['warning_count'] && 0 === $errors['error_count'] ) ) && $dt->format( $entry[1] ) === $value ) { return $dt->getTimestamp(); }
+		}
+		return false;
 	}
 
 	private static function ics_escape( $value ) {
