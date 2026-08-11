@@ -1,4 +1,4 @@
-name: File 08 Tenth Review R10 Closure Retry
+name: File 08 Tenth Review R10 Closure Retry v2
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
           php-version: '8.3'
           coverage: none
           extensions: zip
-      - name: Apply T10-R10 release identity and permanent regression evidence
+      - name: Apply T10-R10 release identity and literal-safe regression evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -38,6 +38,13 @@ jobs:
           new='## 1.2.10 — 2026-08-11'
           if old not in s:
               raise SystemExit('T10 changelog date correction anchor missing')
+          p.write_text(s.replace(old,new,1))
+          p=Path('tests/tenth-ten-review-regressions.php')
+          s=p.read_text()
+          old="t10has('opaque cursor state',$rest,\"'wca_clinic_cursor_' . md5( $cursor )\");"
+          new="t10has('opaque cursor state',$rest,\"'wca_clinic_cursor_' . md5(\");"
+          if old not in s:
+              raise SystemExit('T10 cursor regression literal anchor missing')
           p.write_text(s.replace(old,new,1))
           PY
       - name: Full corrected T10-R10 QA
