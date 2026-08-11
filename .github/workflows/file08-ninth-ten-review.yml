@@ -1,4 +1,4 @@
-name: File 08 Ninth Fresh Ten-Round Sequential Review
+name: File 08 Ninth Review R10 Retry
 
 on:
   push:
@@ -11,166 +11,26 @@ permissions:
   contents: write
 
 jobs:
-  review-fix-retest:
+  r10:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout exact review branch
+      - name: Checkout exact R9-corrected branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: codex/file08-new-governing-plans-completion-2026
           fetch-depth: 0
-
       - name: Setup PHP 8.3
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with:
           php-version: '8.3'
           coverage: none
           extensions: zip
-
-      - name: Decode review patches
+      - name: Apply R10 corrections
+        run: python3 tools/ninth-r10-close.py
+      - name: Full corrected-state QA
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/f08-n9
-          base64 -d tools/ninth-review-patches.tgz.b64 > /tmp/f08-n9/patches.tgz
-          tar -xzf /tmp/f08-n9/patches.tgz -C /tmp/f08-n9
-          test -f /tmp/f08-n9/r1.patch
-          test -f /tmp/f08-n9/r9.patch
-
-      - name: Sequential review fix and retest rounds 1-9
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          qa() {
-            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
-            php tests/run-all.php
-            node --check assets/js/clinic.js
-            node --check assets/js/continuity.js
-            node --check assets/js/future24.js
-            test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' \) -print -quit)"
-            test -z "$(find . -type l -print -quit)"
-            test ! -e .gitmodules
-            ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
-          }
-          round() {
-            n="$1"; msg="$2"
-            echo "===== N9-R${n}: apply correction ====="
-            git apply --check "/tmp/f08-n9/r${n}.patch"
-            git apply "/tmp/f08-n9/r${n}.patch"
-            echo "===== N9-R${n}: full corrected-state QA before next review ====="
-            qa
-            git add includes
-            git commit -m "$msg"
-            git push origin HEAD:codex/file08-new-governing-plans-completion-2026
-          }
-          round 1 'File 08 N9-R1: enforce opaque browser practitioner references'
-          round 2 'File 08 N9-R2: remove global doctor enumeration from mutations'
-          round 3 'File 08 N9-R3: make locked appointment mutations transactional'
-          round 4 'File 08 N9-R4: fail closed on transition event and outbox failures'
-          round 5 'File 08 N9-R5: fail closed on Future24 governance audit storage'
-          round 6 'File 08 N9-R6: serialize and atomically project waitlist offers'
-          round 7 'File 08 N9-R7: make support participant revocation atomic'
-          round 8 'File 08 N9-R8: make virtual room request projection atomic'
-          round 9 'File 08 N9-R9: make group cancellation atomic and audited'
-
-      - name: N9-R10 release identity permanent regression gate and final retest
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          def rep(path, old, new, count=-1, required=True):
-              p=Path(path); s=p.read_text()
-              if old not in s:
-                  if required: raise SystemExit(f'missing expected pattern in {path}: {old}')
-                  return
-              p.write_text(s.replace(old,new,count))
-
-          rep('worldwide-clinic.php','Version: 1.2.8','Version: 1.2.9',1)
-          rep('worldwide-clinic.php',"define( 'WCA_VERSION', '1.2.8' );","define( 'WCA_VERSION', '1.2.9' );",1)
-          rep('includes/class-wca-contracts.php',"const RUNTIME_VERSION                 = '1.2.8';","const RUNTIME_VERSION                 = '1.2.9';",1)
-
-          for p in Path('tests').glob('*.php'):
-              s=p.read_text()
-              s=s.replace('Version: 1.2.8','Version: 1.2.9')
-              s=s.replace("define( 'WCA_VERSION', '1.2.8' )","define( 'WCA_VERSION', '1.2.9' )")
-              s=s.replace("RUNTIME_VERSION                 = '1.2.8'","RUNTIME_VERSION                 = '1.2.9'")
-              s=s.replace("'1.2.8' === WCA_Contracts::RUNTIME_VERSION","'1.2.9' === WCA_Contracts::RUNTIME_VERSION")
-              s=s.replace('runtime contract is 1.2.8','runtime contract is 1.2.9')
-              s=s.replace('plugin version is 1.2.8','plugin version is 1.2.9')
-              s=s.replace('plugin 1.2.8','plugin 1.2.9')
-              s=s.replace('runtime 1.2.8','runtime 1.2.9')
-              s=s.replace('readme stable 1.2.8','readme stable 1.2.9')
-              s=s.replace('repository readme 1.2.8','repository readme 1.2.9')
-              s=s.replace('status 1.2.8','status 1.2.9')
-              p.write_text(s)
-
-          p=Path('README.md'); s=p.read_text().replace('Runtime candidate: **1.2.8**','Runtime candidate: **1.2.9**',1)
-          ninth='''\nThe **ninth fresh 10-round corrective audit** closes residual browser-reference, authorization-scale and mutation-atomicity gaps: legacy browser booking now uses opaque practitioner references; mutation authorization no longer enumerates all doctors; locked appointment mutations roll back on fail-closed errors; appointment transitions require event, outbox, notification, communication, review-eligibility and audit persistence; Future24 record creation requires governance audit persistence; waitlist offer creation is serialized and atomic with File19 projection; participant revocation and virtual-room requests are atomic with File17 projection; and group-session cancellation is atomic across session/member state and governance audit.\n'''
-          if 'The **ninth fresh 10-round corrective audit**' not in s:
-              marker='The **eighth fresh 10-round corrective audit**'
-              pos=s.find(marker)
-              if pos<0: raise SystemExit('README eighth audit marker missing')
-              end=s.find('\n',pos)
-              s=s[:end]+ninth+s[end:]
-          p.write_text(s)
-
-          p=Path('STATUS.md'); s=p.read_text().replace('Runtime candidate: **1.2.8**','Runtime candidate: **1.2.9**',1)
-          a=s.find('## Eighth fresh 10-round corrective audit'); b=s.find('## Evidence-state classification')
-          if a<0 or b<0 or b<=a: raise SystemExit('STATUS eighth section anchors missing')
-          section='''## Ninth fresh 10-round corrective audit\n\nA ninth fresh sequential review-and-correct cycle was run against the exact v1.2.8 corrected repository state. Each supported defect was corrected and the complete source QA suite passed before the next round began. The cycle closes opaque browser practitioner-reference leakage, O(N) doctor enumeration in mutation authorization, fail-open locked mutation audit behavior, transition event/outbox/review-eligibility partial commits, Future24 governance-audit fail-open record creation, waitlist-offer duplicate/projection races, support-participant revocation projection gaps, virtual-room projection gaps, and non-atomic group cancellation. Runtime is 1.2.9 while core schema remains 3.2.0, continuity schema 1.1.0 and Future24 schema 1.0.0. Repository evidence does not prove Hostinger staging or live state.\n\n'''
-          s=s[:a]+section+s[b:]
-          s=s.replace('eighth-cycle source corrections are present','ninth-cycle source corrections are present')
-          s=s.replace('No older v1.2.1/v1.2.2/v1.2.3/v1.2.4/v1.2.5/v1.2.6/v1.2.7 artifact or older CI run may be used as evidence for the v1.2.8 candidate.','No older v1.2.1/v1.2.2/v1.2.3/v1.2.4/v1.2.5/v1.2.6/v1.2.7/v1.2.8 artifact or older CI run may be used as evidence for the v1.2.9 candidate.')
-          p.write_text(s)
-
-          p=Path('readme.txt'); s=p.read_text()
-          s=s.replace('Stable tag: 1.2.8','Stable tag: 1.2.9',1)
-          s=s.replace('Version 1.2.8 implements','Version 1.2.9 implements',1)
-          s=s.replace('File 08 v1.2.8 candidate whose manifest','File 08 v1.2.9 candidate whose manifest',1)
-          if '= 1.2.9 =' not in s:
-              marker='== Changelog ==\n'
-              entry='''\n= 1.2.9 =\n* Completed the ninth fresh sequential 10-round corrective audit.\n* Browser practitioner references are opaque and mutation authorization avoids global doctor enumeration.\n* Locked appointment mutations and canonical transition side effects now fail closed transactionally.\n* Future24 audit-backed records, waitlist offers, participant revocation, virtual-room requests and group cancellation are atomic with required projections/audit state.\n* Runtime 1.2.9; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.\n* Repository/CI/package evidence remains distinct from staging/live evidence.\n'''
-              if marker not in s: raise SystemExit('readme changelog marker missing')
-              s=s.replace(marker,marker+entry,1)
-          p.write_text(s)
-
-          p=Path('CHANGELOG.md'); s=p.read_text()
-          if '## 1.2.9 — 2026-08-11' not in s:
-              entry='''## 1.2.9 — 2026-08-11\n\n- Completed the ninth fresh sequential 10-round corrective cycle against exact v1.2.8 repository state.\n- Replaced browser-visible practitioner numeric references with opaque references and removed global doctor enumeration from mutation authorization.\n- Made locked appointment mutations transactional and transition events/outbox/review eligibility/audit fail closed.\n- Made Future24 governance-audited record creation fail closed and corrected waitlist offer, support participant revocation, virtual-room and group-cancellation atomicity.\n- Runtime 1.2.9; core schema remains 3.2.0; continuity schema 1.1.0; Future24 schema 1.0.0.\n- Added a permanent ninth-ten-review regression gate; staging/live evidence remains separate.\n\n'''
-              s=s.replace('# Changelog\n\n','# Changelog\n\n'+entry,1)
-          p.write_text(s)
-
-          gate=r'''<?php
-          /** File 08 ninth fresh ten-round corrective regression gate. */
-          $root=dirname(__DIR__); $failures=array(); $checks=0;
-          function n9src($p){global $root,$failures;$f=$root.'/'.$p;if(!is_file($f)){$failures[]='Missing '.$p;return '';} $s=file_get_contents($f);return is_string($s)?$s:'';}
-          function n9has($l,$s,$n){global $failures,$checks;$checks++;if(false===strpos($s,$n)){$failures[]=$l.' missing: '.$n;}}
-          function n9lacks($l,$s,$n){global $failures,$checks;$checks++;if(false!==strpos($s,$n)){$failures[]=$l.' forbidden: '.$n;}}
-          $boot=n9src('worldwide-clinic.php'); $contracts=n9src('includes/class-wca-contracts.php'); $helpers=n9src('includes/class-swc-helpers.php'); $front=n9src('includes/class-swc-frontend.php'); $appointments=n9src('includes/class-swc-appointments.php'); $admin=n9src('includes/class-swc-admin.php'); $service=n9src('includes/class-wca-service.php'); $future=n9src('includes/class-wca-future24.php');
-          n9has('browser uses opaque doctor field',$front,'name="doctor_ref"'); n9lacks('browser hides numeric doctor field',$front,'name="doctor_id" required'); n9has('opaque doctor resolver',$appointments,'SWC_Helpers::practitioner_id( $doctor_ref )');
-          n9has('submit direct eligibility',$appointments,'SWC_Helpers::doctor_is_requestable( $doctor )'); n9has('reassignment direct eligibility',$appointments,'SWC_Helpers::doctor_is_requestable( $new_doctor )'); n9has('admin direct eligibility',$admin,'SWC_Helpers::doctor_is_requestable( $doctor )');
-          n9has('appointment DB transaction',$helpers,'with_database_transaction'); n9has('transaction rollback',$helpers,"query( 'ROLLBACK' )"); n9has('postmeta cache invalidation',$helpers,'wp_cache_delete(');
-          n9has('transition event checked',$service,'event_record = WCA_Repository::append_event'); n9has('transition outbox checked',$service,'outbox_event = WCA_Repository::enqueue'); n9has('transition notification checked',$service,'notification = WCA_Repository::enqueue'); n9has('transition communication checked',$service,'communication = WCA_Repository::enqueue'); n9has('completion eligibility fail closed',$service,'if ( is_wp_error( $eligibility ) ) { return $eligibility; }'); n9has('transition audit fail closed',$service,'wca_transition_audit');
-          n9has('future record id captured',$future,'record_id = (int) $wpdb->insert_id;'); n9has('future audit unavailable error',$future,'wca_future24_audit_unavailable'); n9has('future audit returns event result',$future,"return WCA_Repository::append_event( 'Future24GovernanceRecorded.v1'");
-          n9has('waitlist offer semantic lock',$future,"semantic_lock( 'waitlist-offer'"); n9has('waitlist enqueue checked',$future,'if ( is_wp_error( $queued ) )');
-          n9has('participant revoke semantic lock',$future,"semantic_lock( 'support-participant-revoke'"); n9has('participant revoke version CAS',$future,"AND version=%d");
-          n9has('virtual room transaction',$future,"semantic_lock('virtual-room',$id)"); n9has('virtual room enqueue checked',$future,'if(is_wp_error($queued))');
-          n9has('group cancellation member failure',$future,'wca_group_member_cancel_failed'); n9has('group cancellation audit checked',$future,'if ( is_wp_error( $audit ) )');
-          n9has('plugin 1.2.9',$boot,'Version: 1.2.9'); n9has('runtime 1.2.9',$contracts,"RUNTIME_VERSION                 = '1.2.9'"); n9has('schema remains 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
-          $runtime=implode("\n",array($boot,$contracts,$helpers,$front,$appointments,$admin,$service,$future)); foreach(array('eval(','base64_decode(','shell_exec(','unserialize(') as $t){n9lacks('forbidden runtime primitive',$runtime,$t);} if($failures){fwrite(STDERR,"File 08 ninth-ten-review regression gate failed:\n- ".implode("\n- ",$failures)."\n");exit(1);} echo 'File 08 ninth fresh ten-round regression assertions passed: '.$checks.'/'.$checks.".\n";
-          '''
-          gate='\n'.join(line[10:] if line.startswith('          ') else line for line in gate.splitlines())+'\n'
-          Path('tests/ninth-ten-review-regressions.php').write_text(gate)
-          p=Path('tests/run-all.php'); s=p.read_text()
-          if "'ninth-ten-review-regressions.php'" not in s:
-              s=s.replace("'eighth-ten-review-regressions.php' );","'eighth-ten-review-regressions.php', 'ninth-ten-review-regressions.php' );",1)
-          p.write_text(s)
-          PY
-
-          rm -f tools/ninth-review-patches.tgz.b64
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
           php tests/run-all.php
           node --check assets/js/clinic.js
@@ -180,6 +40,12 @@ jobs:
           test -z "$(find . -type l -print -quit)"
           test ! -e .gitmodules
           ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
-          git add worldwide-clinic.php includes/class-wca-contracts.php README.md STATUS.md readme.txt CHANGELOG.md tests tools/ninth-review-patches.tgz.b64
+      - name: Commit exact R10 corrected source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worldwide-clinic.php includes/class-wca-contracts.php README.md STATUS.md readme.txt CHANGELOG.md tests tools/ninth-review-patches.tgz.b64 tools/ninth-r10-close.py
           git commit -m 'File 08 N9-R10: close ninth review as v1.2.9 candidate'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
