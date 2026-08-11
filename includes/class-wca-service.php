@@ -390,6 +390,8 @@ final class WCA_Service {
 			WCA_Observability::metric( 'emergency_diversion_total', 1, array( 'category' => $red_flag['category'] ) );
 			return new WP_Error( 'wca_emergency_diversion', $red_flag['message'], array( 'status' => 422, 'emergency' => true, 'category' => $red_flag['category'] ) );
 		}
+		if ( ! self::affirmative( $data['privacy_consent'] ?? null ) ) { return new WP_Error( 'wca_privacy_consent_required', __( 'Current appointment-processing and privacy consent is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( ! self::affirmative( $data['emergency_acknowledged'] ?? null ) ) { return new WP_Error( 'wca_emergency_ack_required', __( 'You must acknowledge that this booking service is not emergency care.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$idempotency_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
 		if ( ! $idempotency_key ) { return new WP_Error( 'wca_idempotency_required', __( 'An idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$hold = WCA_Repository::get_slot_hold( (string) ( $data['hold_token'] ?? '' ) );
@@ -402,6 +404,9 @@ final class WCA_Service {
 		$service = $hold['service_id'] ? WCA_Repository::get_service( $hold['service_id'], true ) : null;
 		$clinic  = WCA_Repository::get_clinic( $hold['clinic_id'], true );
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_unavailable', __( 'The clinic is not currently available.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$type = sanitize_key( $service['consultation_type'] ?? '' );
+		$remote = in_array( $type, array( 'online', 'hybrid' ), true );
+		if ( $remote && ! self::affirmative( $data['telehealth_consent'] ?? null ) ) { return new WP_Error( 'wca_teleconsult_consent_required', __( 'Explicit remote-consultation consent is required for the selected online or hybrid service.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 
 		$claim = WCA_Repository::claim_idempotency( 'request_appointment', $idempotency_key, $actor_user_id, self::appointment_request_fingerprint( $data ) );
 		if ( is_wp_error( $claim ) ) { return $claim; }
@@ -457,7 +462,7 @@ final class WCA_Service {
 			'terms_version'      => self::TERMS_VERSION,
 			'terms_text'         => $terms,
 			'legal_basis'        => 'consent',
-			'metadata'           => array( 'telehealth' => ! empty( $data['telehealth_consent'] ), 'privacy' => true, 'emergency_acknowledged' => true ),
+			'metadata'           => array( 'telehealth' => $remote ? true : false, 'privacy' => true, 'emergency_acknowledged' => true ),
 		) );
 		if ( is_wp_error( $consent ) ) { WCA_Repository::release_appointment_slot( $appointment_id ); wp_delete_post( $appointment_id, true ); WCA_Repository::release_idempotency( $claim['id'] ); return $consent; }
 
@@ -733,6 +738,12 @@ final class WCA_Service {
 			}
 		}
 		return null;
+	}
+
+	private static function affirmative( $value ) {
+		if ( true === $value || 1 === $value ) { return true; }
+		$value = strtolower( trim( (string) $value ) );
+		return in_array( $value, array( '1', 'true', 'yes', 'on' ), true );
 	}
 
 	private static function appointment_request_fingerprint( $data ) {
