@@ -49,14 +49,14 @@ final class WCA_Frontend {
 			<section aria-labelledby="wca-services-title">
 				<h2 id="wca-services-title"><?php esc_html_e( 'Services', 'worldwide-clinic-appointments' ); ?></h2>
 				<div class="wca-grid">
-				<?php foreach ( (array) $clinic['services'] as $service ) : ?>
-					<article class="wca-card">
-						<h3><?php echo esc_html( $service['name'] ); ?></h3>
-						<p><?php echo esc_html( sprintf( __( '%1$d minutes · %2$s', 'worldwide-clinic-appointments' ), absint( $service['duration_minutes'] ), ucfirst( $service['consultation_type'] ) ) ); ?></p>
-						<p class="wca-price"><?php echo esc_html( self::money( $service['fee_minor'], $service['currency'] ) ); ?></p>
-						<a class="wca-button" href="<?php echo esc_url( home_url( '/appointments/book/' . rawurlencode( $clinic['public_ref'] ) . '/?service=' . rawurlencode( $service['public_ref'] ) ) ); ?>"><?php esc_html_e( 'Choose appointment', 'worldwide-clinic-appointments' ); ?></a>
-					</article>
-				<?php endforeach; ?>
+					<?php foreach ( (array) $clinic['services'] as $service ) : ?>
+						<article class="wca-card">
+							<h3><?php echo esc_html( $service['name'] ); ?></h3>
+							<p><?php echo esc_html( sprintf( __( '%1$d minutes · %2$s', 'worldwide-clinic-appointments' ), absint( $service['duration_minutes'] ), ucfirst( $service['consultation_type'] ) ) ); ?></p>
+							<p class="wca-price"><?php echo esc_html( self::money( $service['fee_minor'], $service['currency'] ) ); ?></p>
+							<a class="wca-button" href="<?php echo esc_url( home_url( '/appointments/book/' . rawurlencode( $clinic['public_ref'] ) . '/?service=' . rawurlencode( $service['public_ref'] ) ) ); ?>"><?php esc_html_e( 'Choose appointment', 'worldwide-clinic-appointments' ); ?></a>
+						</article>
+					<?php endforeach; ?>
 				</div>
 			</section>
 			<section aria-labelledby="wca-branches-title">
@@ -105,13 +105,23 @@ final class WCA_Frontend {
 		$user_id  = get_current_user_id();
 		$page     = max( 1, absint( wp_unslash( $_GET['wca_page'] ?? 1 ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only pagination.
 		$per_page = 30;
+		$meta_query = array(
+			'relation' => 'OR',
+			array( 'key' => '_swc_patient_user_id', 'value' => $user_id ),
+			array( 'key' => '_swc_doctor_id', 'value' => $user_id ),
+			array( 'key' => '_swc_guardian_user_id', 'value' => $user_id ),
+		);
+		$delegated_clinics = WCA_Authorization::delegated_clinic_ids( $user_id, 'appointments' );
+		if ( $delegated_clinics ) {
+			$meta_query[] = array( 'key' => '_swc_clinic_id', 'value' => array_map( 'absint', $delegated_clinics ), 'compare' => 'IN', 'type' => 'NUMERIC' );
+		}
 		$query = new WP_Query( array(
 			'post_type'      => SWC_Helpers::TYPE,
 			'post_status'    => array( 'private', 'publish' ),
 			'posts_per_page' => $per_page,
 			'paged'          => $page,
 			'fields'         => 'ids',
-			'meta_query'     => array( 'relation' => 'OR', array( 'key' => '_swc_patient_user_id', 'value' => $user_id ), array( 'key' => '_swc_doctor_id', 'value' => $user_id ), array( 'key' => '_swc_guardian_user_id', 'value' => $user_id ) ),
+			'meta_query'     => $meta_query,
 			'orderby'        => 'meta_value',
 			'meta_key'       => '_swc_preferred_at_utc',
 			'order'          => 'DESC',
@@ -147,7 +157,7 @@ final class WCA_Frontend {
 		<article class="wca-card wca-appointment" data-wca-appointment-ref="<?php echo esc_attr( strtolower( $ref ) ); ?>" data-wca-version="<?php echo esc_attr( SWC_Helpers::record_version( $id ) ); ?>" data-wca-status="<?php echo esc_attr( $status ); ?>">
 			<header><h2><?php echo esc_html( ucfirst( str_replace( '_', ' ', $status ) ) ); ?></h2><p><time datetime="<?php echo esc_attr( $when ? gmdate( 'c', strtotime( $when . ' UTC' ) ) : '' ); ?>"><?php echo esc_html( $when ? get_date_from_gmt( $when, 'F j, Y g:i a' ) : __( 'Time pending', 'worldwide-clinic-appointments' ) ); ?></time></p></header>
 			<?php if ( $detailed ) : ?><dl><dt><?php esc_html_e( 'Reference', 'worldwide-clinic-appointments' ); ?></dt><dd><?php echo esc_html( strtolower( $ref ) ); ?></dd><dt><?php esc_html_e( 'Consultation', 'worldwide-clinic-appointments' ); ?></dt><dd><?php echo esc_html( (string) SWC_Helpers::meta( $id, 'consultation_type' ) ); ?></dd></dl><?php endif; ?>
-			<div class="wca-actions"><?php foreach ( $actions as $action ) : ?><button type="button" class="wca-button wca-button-secondary" data-wca-transition="<?php echo esc_attr( $action ); ?>"><?php echo esc_html( ucfirst( str_replace( '_', ' ', $action ) ) ); ?></button><?php endforeach; ?><?php if ( ! $detailed ) : ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointments/' . rawurlencode( strtolower( $ref ) ) . '/' ) ); ?>"><?php esc_html_e( 'View details', 'worldwide-clinic-appointments' ); ?></a><?php endif; ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( rest_url( 'wca/v1/appointment-refs/' . rawurlencode( strtolower( $ref ) ) . '/calendar.ics' ) ); ?>"><?php esc_html_e( 'Calendar file', 'worldwide-clinic-appointments' ); ?></a></div>
+			<div class="wca-actions"><?php foreach ( $actions as $action ) : ?><button type="button" class="wca-button wca-button-secondary" data-wca-transition="<?php echo esc_attr( $action ); ?>"><?php echo esc_html( ucfirst( str_replace( '_', ' ', $action ) ) ); ?></button><?php endforeach; ?><?php if ( ! $detailed ) : ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointment/' . rawurlencode( strtolower( $ref ) ) . '/' ) ); ?>"><?php esc_html_e( 'View details', 'worldwide-clinic-appointments' ); ?></a><?php endif; ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( rest_url( 'wca/v1/appointment-refs/' . rawurlencode( strtolower( $ref ) ) . '/calendar.ics' ) ); ?>"><?php esc_html_e( 'Calendar file', 'worldwide-clinic-appointments' ); ?></a></div>
 			<p data-wca-status role="status" aria-live="polite"></p>
 		</article>
 		<?php return ob_get_clean();
@@ -156,10 +166,22 @@ final class WCA_Frontend {
 	private static function dashboard() {
 		$claims = WCA_Authorization::claims();
 		if ( is_wp_error( $claims ) || ! in_array( $claims['role'], array( 'doctor','founder','administrator','clinic_staff' ), true ) ) { return self::notice( __( 'Verified clinic access is required.', 'worldwide-clinic-appointments' ), 'error' ); }
-		$clinics = WCA_Repository::list_clinics( array( 'owner_user_id' => get_current_user_id(), 'status' => '', 'per_page' => 50 ) );
+		$user_id = get_current_user_id();
+		$clinics = WCA_Repository::list_clinics( array( 'owner_user_id' => $user_id, 'status' => '', 'per_page' => 50 ) );
+		$seen = array();
+		foreach ( $clinics as $clinic ) { $seen[ absint( $clinic['id'] ) ] = true; }
+		foreach ( WCA_Authorization::delegated_clinic_ids( $user_id, 'clinic_manage' ) as $clinic_id ) {
+			$clinic_id = absint( $clinic_id );
+			if ( ! $clinic_id || isset( $seen[ $clinic_id ] ) ) { continue; }
+			$clinic = WCA_Repository::get_clinic( $clinic_id, false );
+			if ( ! $clinic || is_wp_error( WCA_Authorization::can_manage_clinic( $clinic, $user_id ) ) ) { continue; }
+			$clinics[] = $clinic;
+			$seen[ $clinic_id ] = true;
+		}
 		ob_start(); ?>
 		<main class="wca-shell" aria-labelledby="wca-dashboard-title"><h1 id="wca-dashboard-title"><?php esc_html_e( 'Clinic dashboard', 'worldwide-clinic-appointments' ); ?></h1>
-		<p><?php esc_html_e( 'Manage clinic identity, branches, services, fees, availability and appointment operations. Platform commission is always 0%.', 'worldwide-clinic-appointments' ); ?></p>
+		<p><?php esc_html_e( 'Manage only clinics you own or for which you hold a current explicit clinic-management delegation. Platform commission is always 0%.', 'worldwide-clinic-appointments' ); ?></p>
+		<?php if ( ! $clinics ) : ?><p><?php esc_html_e( 'No manageable clinics were found.', 'worldwide-clinic-appointments' ); ?></p><?php endif; ?>
 		<div class="wca-grid"><?php foreach ( $clinics as $clinic ) : ?><article class="wca-card"><h2><?php echo esc_html( $clinic['name'] ); ?></h2><p><?php echo esc_html( ucfirst( $clinic['status'] ) ); ?> · v<?php echo esc_html( $clinic['version'] ); ?></p><a class="wca-button" href="<?php echo esc_url( home_url( '/clinic/' . rawurlencode( $clinic['slug'] ) . '/' ) ); ?>"><?php esc_html_e( 'View public clinic', 'worldwide-clinic-appointments' ); ?></a></article><?php endforeach; ?></div>
 		</main><?php return ob_get_clean();
 	}
