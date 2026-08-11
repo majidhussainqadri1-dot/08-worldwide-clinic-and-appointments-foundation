@@ -3,88 +3,60 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.0**
+- Runtime candidate: **1.2.1**
 - Core File 08 schema: **3.1.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
 - File plan contract: **SSH-F08-PLAN-2026-v1.0**
-- Future24 amendment: **SSH-F08-FUT24-2026-v1.0**
+- Future24 amendment contract: **1.0.0**
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Platform commission: **0%**
 
-The runtime-source commit reviewed after Future24 hardening is `b87313cb27521ca39b94abba43a5bee2a1d6d8e1`. Documentation-only commits may move the branch HEAD without changing that reviewed runtime source. The final branch HEAD, exact GitHub Actions run, deterministic artifact manifest and package SHA-256 remain the immutable repository release evidence.
+The authoritative repository release identity is the exact final branch HEAD together with its exact-head GitHub Actions run, deterministic candidate manifest, artifact digest, and candidate SHA-256. Documentation history, older commits, older artifacts, or prior green CI are not substitutes for that exact final identity.
 
 ## Source implementation state
 
-The candidate retains the complete File 08 implementation for `F08-FR-001` through `F08-FR-018` and `F08-NFR-001` through `F08-NFR-010`, plus the approved Future Clinic Intelligence & Interoperability layer `F08-FUT-01` through `F08-FUT-24`.
+The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving the File 08 ownership boundary. The runtime includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback metadata, accessibility/localization, and the Future24 scheduling/interoperability layer.
 
-Future24 includes:
+## Ten-round post-closure hardening
 
-- smart cancellation waitlist with short-lived offer-only recovery and no automatic booking;
-- flexible request windows and bounded recurring/series intents;
-- capacity-guarded multi-resource and group scheduling primitives;
-- compensation-safe one-tap reschedule over the canonical appointment state machine;
-- server-enforced buffer/travel/continuous-consultation policies for slot/hold paths;
-- privacy-safe capacity heatmap, advisory optimization and aggregate no-show forecasting with minimum-sample suppression;
-- service-specific dynamic pre-visit questionnaire metadata whose answers remain in encrypted `WCA_Continuity` intake;
-- appointment readiness with current guardian/consent/prerequisite/runtime checks;
-- prerequisite/document-evidence rules that require matching evidence rather than count-only bypass;
-- family/guardian hub with fresh File 00 guardian revalidation per returned appointment;
-- bounded digital arrival and privacy-preserving live queue position;
-- clinic disruption/recovery with File 19 notification requests and no silent auto-cancellation;
-- appointment-bound support/interpreter participant add/revoke contracts, with File 17 remaining transport owner;
-- virtual-room request contract requiring current teleconsult consent and never assuming recording consent;
-- privacy-safe FHIR-style appointment/clinic projections;
-- SMART Find → Hold → Book compatibility over current File 08 authoritative slot/hold/booking paths;
-- expiring external-calendar busy projections without provider-token storage;
-- same-patient/doctor/clinic episode/follow-up chains without public or clinical narrative storage;
-- Future24 governance manifest prohibiting automated diagnosis/prescribing, emergency replacement, paid/donor visibility advantage, hidden patient scoring and direct companion-table writes.
+A separate sequential 10-round review-and-correct cycle was performed after the earlier 80-round closure. Runtime/source defects were corrected in the early/middle passes before the required final two fresh post-final-code review gates. The corrections include:
 
-## Fresh post-code review evidence
+- canonical singular appointment-detail routing plus an opaque-UUID plural compatibility redirect;
+- default suppression of legacy numeric browser mutation/shortcode workflows;
+- delegated clinic-staff appointment and clinic-management visibility;
+- explicit core-mutation idempotency keys, full-request replay fingerprints and bounded rate limiting;
+- appointment transition expected-status/expected-version preconditions;
+- payment-intent authority restricted to patient/currently authorized guardian;
+- doctor-to-clinic availability-scope validation;
+- display-timezone date-window slot discovery and cross-timezone/DST-boundary hold reprojection;
+- branch-change audit/domain evidence and File 26 projection invalidation;
+- current runtime/release/staging documentation parity.
 
-Two fresh post-final-runtime-code reviews are recorded in:
-
-`docs/FUTURE24-TWO-FRESH-REVIEWS-2026-08-10.md`
-
-- Review 1 — security/privacy/authorization/ownership/concurrency: **PASS** after correction.
-- Review 2 — migration/rollback/compatibility/accessibility/performance/degraded mode: **PASS** after correction.
-- Known unresolved repository-level blocker/critical defect after those two reviews: **0**.
-
-Any later runtime/source code change, security finding, dependency change, failing exact-head workflow, staging defect or live defect reopens the review cycle.
-
-## Automated repository verification
-
-The canonical GitHub Actions quality workflow is configured to run:
-
-- PHP 7.4 and PHP 8.3 syntax verification;
-- complete File 08 source-contract/state/security/Future24 tests;
-- JavaScript syntax verification for `clinic.js`, `continuity.js` and `future24.js`;
-- repository hygiene checks;
-- deterministic double build and byte comparison;
-- embedded/detached manifest and checksum verification;
-- independent candidate reopening/verification;
-- exact-head artifact upload.
-
-A green exact-head workflow proves repository source/package reproducibility only. It does not substitute for real staging/live acceptance.
+The permanent `tests/ten-review-regressions.php` suite guards these invariants and is included in `tests/run-all.php`.
 
 ## Evidence-state classification
 
 | State | Current repository evidence |
 |---|---|
-| Specified | **Complete** — File 08 plan + approved Future24 amendment mapped. |
-| Coded | **Complete candidate** — `F08-FUT-01…24` implemented in repository source. |
-| Fresh post-code reviews | **Complete — PASS/PASS** for reviewed runtime-source commit. |
-| Packaged | **Requires final exact-head CI artifact confirmation.** |
-| Automated-QA Green | **Requires final exact-head workflow confirmation.** |
+| Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
+| Coded | **Complete candidate** — current source includes the 10-round corrections. |
+| Fresh post-final-code reviews | **Must be evidenced after the final runtime/source commit.** |
+| Packaged | **Requires exact-final-HEAD CI artifact confirmation.** |
+| Automated-QA Green | **Requires exact-final-HEAD workflow confirmation.** |
 | Staging-Accepted | **Pending / not claimed.** |
-| Live-Deployed | **Not claimed / not authorized from repository evidence alone.** |
+| Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
+
+Do not promote the repository to Packaged or Automated-QA Green based on an older `1.2.1` artifact after any source change. Rebuild and reverify from the exact final HEAD.
 
 ## Mandatory staging / production gates
 
-Before production, the exact final candidate artifact must be installed on canonical Hostinger staging and verified against the actually deployed database/configuration. Required external acceptance includes fresh install and real upgrade/migration; backup restore, encryption-key decrypt and rollback; exact Files 00/03/07/09/17/19/20/24/25/26 package integration; patient/guardian/doctor/delegated-staff/admin journeys; last-slot concurrency, stale/duplicate/retry/provider-outage/dead-letter scenarios; File 17/File 19/File 26 integration; private cache/no-store/noindex behavior; mobile/tablet/desktop, Urdu/Arabic RTL, English LTR, keyboard, screen-reader, 200–400% zoom/reflow, forced-colors and reduced-motion acceptance; Founder acceptance; controlled production deployment; live re-test and repository/deployed parity confirmation.
+The exact final CI artifact must be installed on canonical Hostinger staging. Record the exact package checksum, plugin version, core/continuity/Future24 schemas, DB/migration state, active configuration and exact companion versions for Files 00/03/07/09/17/19/20/24/25/26. Staging acceptance must cover fresh install and real upgrade/migration; backup/restore and rollback; patient/guardian/doctor/delegated-staff/admin journeys; allowed and forbidden transitions; stale/duplicate/replay and concurrency cases; payment-payer and doctor/clinic-scope denial cases; timezone/DST boundaries; File17/File19/File26 integration; provider outage/dead-letter behavior; private no-store/noindex/cache behavior; mobile/desktop, Urdu/Arabic RTL, English LTR, keyboard/screen-reader/zoom/reflow/forced-colors/reduced-motion; and Founder acceptance.
+
+Only after controlled production deployment may live re-test and repository/deployed parity confirmation begin.
 
 ## Live truth
 
-This repository status does not prove the current staging or live installation. Exact deployed plugin files/version, database/schema version, migration state, active configuration/dependencies and post-deploy behavior must be frozen and independently verified before any live/operational assertion.
+This repository status does not prove the current staging or live installation. Exact deployed plugin files/version, database/schema version, migration state, active configuration/dependencies, deployed artifact checksum, and post-deploy behavior must be independently frozen and verified before any live/operational assertion.
