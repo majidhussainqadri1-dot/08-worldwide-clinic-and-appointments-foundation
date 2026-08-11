@@ -1,4 +1,4 @@
-name: File 08 Twelfth Review R11-R20 Continuation
+name: File 08 Twelfth Review R13-R20 Continuation
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - name: Continue R11 through R20
+      - name: Continue R13 through R20
         shell: bash
         run: |
           set -euo pipefail
@@ -45,7 +45,7 @@ jobs:
             test ! -e .gitmodules
             ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
           }
-          for n in $(seq 11 20); do
+          for n in $(seq 13 20); do
             printf -v rr '%02d' "$n"
             echo "===== T12-R${rr} review -> correction -> corrected-state QA ====="
             python3 tools/twelfth-twenty-review-patcher.py "$n"
