@@ -73,7 +73,7 @@ final class WCA_Outbox {
 					if ( ! is_array( $payload ) ) {
 						throw new RuntimeException( 'Invalid outbox payload.' );
 					}
-					$result = self::dispatch( (string) $item['topic'], (string) $item['aggregate_ref'], $payload, (string) $item['trace_id'] );
+					$result = self::dispatch( (string) $item['message_id'], (string) $item['topic'], (string) $item['aggregate_ref'], $payload, (string) $item['trace_id'] );
 					if ( is_wp_error( $result ) ) {
 						throw new RuntimeException( $result->get_error_message() );
 					}
@@ -96,8 +96,9 @@ final class WCA_Outbox {
 		}
 	}
 
-	private static function dispatch( $topic, $aggregate_ref, $payload, $trace_id ) {
+	private static function dispatch( $message_id, $topic, $aggregate_ref, $payload, $trace_id ) {
 		$envelope = array(
+			'message_id'    => sanitize_text_field( $message_id ),
 			'topic'         => $topic,
 			'aggregate_ref' => $aggregate_ref,
 			'payload'       => $payload,
