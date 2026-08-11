@@ -27,13 +27,13 @@ t310lacks('no stale auto takeover comment',$repo,'Reclaim a stale processing lea
 t310lacks('no stale takeover SQL',$repo,'SET updated_at=%s,expires_at=%s WHERE id=%d AND status=\'processing\'');
 
 // T3-R2: HTTP stale guard queries the same canonical scope used by HTTP reservations.
-t310has('HTTP stale scope',$second,"$scope = 'http_' . substr( hash( 'sha256', $route ), 0, 24 );");
-t310lacks('no stale scope mismatch',$second,"$scope = 'tenreview_' . substr( hash( 'sha256', $route ), 0, 24 );");
+t310has('HTTP stale scope',$second,'$scope = \'http_\' . substr( hash( \'sha256\', $route ), 0, 24 );');
+t310lacks('no stale scope mismatch',$second,'$scope = \'tenreview_\' . substr( hash( \'sha256\', $route ), 0, 24 );');
 
 // T3-R3: payment authority is enforced at the canonical service root.
 t310has('payer error',$service,'wca_payment_payer_required');
-t310has('patient binding',$service,"SWC_Helpers::meta( $appointment_id, 'patient_user_id'");
-t310has('guardian binding',$service,"SWC_Helpers::meta( $appointment_id, 'guardian_user_id'");
+t310has('patient binding',$service,'SWC_Helpers::meta( $appointment_id, \'patient_user_id\'');
+t310has('guardian binding',$service,'SWC_Helpers::meta( $appointment_id, \'guardian_user_id\'');
 t310has('guardian live recheck',$service,'WCA_Central_Governance::validate_patient_guardian');
 
 // T3-R4: direct/internal transition callers cannot omit optimistic-concurrency preconditions.
@@ -51,10 +51,10 @@ t310has('pragma no-cache',$rest,"'Pragma', 'no-cache'");
 t310has('strict UTC calendar parser',$service,'strict_utc_timestamp');
 t310has('invalid stored calendar error',$service,'wca_calendar_time_invalid');
 t310has('calendar chronological guard',$service,'$end_ts <= $start_ts');
-t310has('validated DTSTART',$service,"gmdate( 'Ymd\\THis\\Z', $start_ts )");
-t310has('validated DTEND',$service,"gmdate( 'Ymd\\THis\\Z', $end_ts )");
-t310lacks('no permissive DTSTART parse',$service,"strtotime( $start . ' UTC' )");
-t310lacks('no permissive DTEND parse',$service,"strtotime( $end . ' UTC' )");
+t310has('validated DTSTART',$service,'gmdate( \'Ymd\\THis\\Z\', $start_ts )');
+t310has('validated DTEND',$service,'gmdate( \'Ymd\\THis\\Z\', $end_ts )');
+t310lacks('no permissive DTSTART parse',$service,'strtotime( $start . \' UTC\' )');
+t310lacks('no permissive DTEND parse',$service,'strtotime( $end . \' UTC\' )');
 
 // T3-R7: outbox row claims re-check eligibility atomically at UPDATE time.
 t310has('conditional outbox claim',$repo,"WHERE id=%d AND status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s)");
@@ -66,7 +66,7 @@ t310has('root clinic service helper',$service,'private static function doctor_ma
 t310has('service doctor scope error',$service,'wca_service_doctor_scope');
 t310has('availability doctor scope error',$service,'wca_availability_doctor_scope');
 t310has('doctor clinic integration filter',$service,'wca_doctor_may_serve_clinic');
-t310has('doctor scheduling delegation',$service,"delegated_clinic_ids( $doctor_id, 'schedule' )");
+t310has('doctor scheduling delegation',$service,'delegated_clinic_ids( $doctor_id, \'schedule\' )');
 
 // T3-R9: release identity advances without schema inflation.
 t310has('plugin header 1.2.3',$bootstrap,'Version: 1.2.3');
