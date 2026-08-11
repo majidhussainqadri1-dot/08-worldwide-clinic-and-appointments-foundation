@@ -22,6 +22,21 @@ for test in Path('tests').glob('*.php'):
     if '1.2.11' in text:
         test.write_text(text.replace('1.2.11', '1.2.12'))
 
+# The release transformer appends current-cycle release checks. Keep those
+# assertions bound to the exact corrected R19 implementation and canonical
+# contract declaration rather than stale development literals.
+tp = Path('tests/twelfth-twenty-review-regressions.php')
+ts = tp.read_text()
+ts = ts.replace(
+    "t12_has('R19 core numeric validation','includes/class-wca-repository.php','wca_repository_service_duration');",
+    "t12_has('R19 core numeric validation','includes/class-wca-service.php','wca_service_duration_range');"
+)
+ts = ts.replace(
+    "t12_has('release runtime constant 1.2.12','includes/class-wca-contracts.php',\"RUNTIME_VERSION = '1.2.12'\");",
+    "t12_has('release runtime constant 1.2.12','includes/class-wca-contracts.php',\"RUNTIME_VERSION                 = '1.2.12'\");"
+)
+tp.write_text(ts)
+
 # Changelog release dates are canonical UTC release dates; Pakistan-local date
 # may already be the next day and must not make executable gates ambiguous.
 cp = Path('CHANGELOG.md')
