@@ -1223,8 +1223,10 @@ final class WCA_Future24 {
 		$service_ref = strtolower( sanitize_text_field( $data['service_ref'] ?? '' ) );
 		$service = self::service_for_clinic( $clinic_id, $service_ref );
 		if ( is_wp_error( $service ) ) { return $service; }
+		$raw_requirements = (array) ( $data['requirements'] ?? array() );
+		if ( count( $raw_requirements ) > 20 ) { return new WP_Error( 'wca_prerequisite_rules_limit', __( 'No more than 20 prerequisite rules may be saved in one policy.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) ); }
 		$requirements = array();
-		foreach ( array_slice( (array) ( $data['requirements'] ?? array() ), 0, 20 ) as $item ) {
+		foreach ( $raw_requirements as $item ) {
 			if ( ! is_array( $item ) ) { continue; }
 			$type = sanitize_key( $item['type'] ?? 'document' );
 			$label = substr( sanitize_text_field( $item['label'] ?? '' ), 0, 120 );
