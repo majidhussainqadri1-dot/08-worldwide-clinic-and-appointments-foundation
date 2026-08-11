@@ -740,13 +740,11 @@ final class WCA_Repository {
 			}
 			$existing['response'] = self::decode( $existing['response_json'] );
 			$existing['claimed_new'] = false;
-			/* A crashed worker must not block an idempotent command for a full day. Reclaim a stale processing lease atomically. */
+			/* Fail closed on stale processing reservations: the domain side effect may already have committed. */
 			if ( 'processing' === (string) $existing['status'] && strtotime( (string) $existing['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {
-				$now = self::now();
-				$claimed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET updated_at=%s,expires_at=%s WHERE id=%d AND status='processing' AND updated_at=%s", $now, gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ), absint( $existing['id'] ), (string) $existing['updated_at'] ) );
-				if ( 1 === (int) $claimed ) {
-					$existing['updated_at'] = $now;
-					$existing['claimed_new'] = true;
+				$existing['stale_processing'] = true;
+				if ( class_exists( 'WCA_Observability' ) ) {
+					WCA_Observability::metric( 'idempotency_stale_processing_total', 1, array( 'scope' => $scope ) );
 				}
 			}
 			return $existing;
