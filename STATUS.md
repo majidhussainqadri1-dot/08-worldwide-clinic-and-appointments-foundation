@@ -3,7 +3,7 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.12**
+- Runtime candidate: **1.2.13**
 - Core File 08 schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -55,3 +55,12 @@ Only after controlled production deployment may live re-test and repository/depl
 ## Live truth
 
 This repository status does not prove the current staging or live installation. Exact deployed plugin files/version, database/schema version, migration state, active configuration/dependencies, deployed artifact checksum, and post-deploy behavior must be independently frozen and verified before any live/operational assertion.
+
+
+## Thirteenth fresh 20-round corrected-state closure
+
+- Main review rounds: T13-R01 through T13-R20; all 20 contained a supported repository defect/gap and were corrected sequentially.
+- Post-final corrective sweeps: legacy mutation persistence, repair/purge failure visibility, and canonical purge fail-closed semantics corrected.
+- Two fresh post-coding source reviews: PASS / PASS, no new supported defect.
+- Runtime: 1.2.13; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.
+- Staging-Accepted: false; Live-Deployed: unverified; Operational: not claimed.

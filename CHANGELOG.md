@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.13 — 2026-08-11
+
+- Completed the thirteenth fresh sequential 20-round review/fix/retest cycle from exact v1.2.12 source.
+- Hardened appointment authoritative meta persistence, reschedule slot release, check-in/completion/status/version writes, Future24 record/audit atomicity, maintenance failure propagation, privacy export/erasure, retention cleanup, payment/review validation and capacity validation.
+- Post-final corrective sweeps hardened legacy mutation persistence plus repair and destructive purge failure semantics.
+- Two fresh post-coding source reviews completed without a new supported defect.
+- Runtime advanced to 1.2.13 with no schema inflation: core 3.2.0, continuity 1.1.0, Future24 1.0.0.
+
+
 ## 1.2.12 — 2026-08-11
 
 - Twelfth fresh sequential 20-round corrective review completed.

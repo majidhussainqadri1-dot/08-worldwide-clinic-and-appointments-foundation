@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class WCA_Contracts {
 	const PLAN_ID                         = 'SSH-F08-PLAN-2026-v1.0';
-	const RUNTIME_VERSION                 = '1.2.12';
+	const RUNTIME_VERSION                 = '1.2.13';
 	const API_VERSION                     = '1.0.0';
 	const PUBLIC_CLINIC_CONTRACT_VERSION  = '1.1.0';
 	const CF01_CONTEXT_CONTRACT_VERSION   = '1.1.0';

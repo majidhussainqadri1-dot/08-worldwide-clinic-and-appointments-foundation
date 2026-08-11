@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.12**
+- Runtime candidate: **1.2.13**
 - Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -79,3 +79,8 @@ The GitHub Actions quality workflow repeats PHP 7.4/8.3 syntax and source-contra
 The repository candidate may be called **Coded**, **Packaged**, or **Automated-QA Green** only after those respective exact-head gates actually pass. It is not `Staging-Accepted`, `Live-Deployed`, or `Operational` from repository evidence alone.
 
 Before production, complete `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, including actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback, Founder acceptance, controlled deployment, and post-deploy live parity re-test.
+
+
+## Thirteenth fresh 20-round corrective review
+
+Fresh sequential review of the exact v1.2.12 source corrected 20 supported repository defects/gaps before advancing each round. Post-final corrective sweeps then hardened legacy mutation durability and destructive purge failure semantics; two fresh post-coding source reviews completed without a new supported defect. Runtime 1.2.13 keeps core schema 3.2.0, continuity 1.1.0 and Future24 1.0.0. Staging/live acceptance remains separate.
