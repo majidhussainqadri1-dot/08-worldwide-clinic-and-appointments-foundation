@@ -9,6 +9,8 @@ function t310lacks( $label,$source,$needle ) { global $failures,$checks; $checks
 
 $bootstrap=t310src('worldwide-clinic.php');
 $contracts=t310src('includes/class-wca-contracts.php');
+$continuity=t310src('includes/class-wca-continuity-secure.php');
+$future=t310src('includes/class-wca-future24.php');
 $repo=t310src('includes/class-wca-repository.php');
 $second=t310src('includes/class-wca-second-ten-review-hardening.php');
 $service=t310src('includes/class-wca-service.php');
@@ -71,8 +73,8 @@ t310has('plugin header 1.2.3',$bootstrap,'Version: 1.2.3');
 t310has('runtime constant 1.2.3',$bootstrap,"WCA_VERSION', '1.2.3");
 t310has('contract runtime 1.2.3',$contracts,"RUNTIME_VERSION                 = '1.2.3'");
 t310has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.1.0'");
-t310has('continuity schema unchanged',$contracts,"CONTINUITY_SCHEMA_VERSION       = '1.1.0'");
-t310has('future schema unchanged',$contracts,"FUTURE24_SCHEMA_VERSION          = '1.0.0'");
+t310has('continuity schema unchanged',$continuity,"const SCHEMA_VERSION = '1.1.0'");
+t310has('future schema unchanged',$future,"const SCHEMA_VERSION   = '1.0.0'");
 t310has('readme stable 1.2.3',$readme,'Stable tag: 1.2.3');
 t310has('repository readme 1.2.3',$repo_readme,'Runtime candidate: **1.2.3**');
 t310has('status 1.2.3',$status,'Runtime candidate: **1.2.3**');

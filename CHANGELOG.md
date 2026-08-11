@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.3 — 2026-08-11
+
+- Completed a third fresh sequential 10-round review-and-correct cycle against the corrected v1.2.2 source state.
+- Removed canonical repository stale-idempotency auto-takeover and aligned the HTTP stale guard with the actual `http_` reservation scope.
+- Enforced patient/current-guardian payment authority and explicit expected-status/version transition preconditions at canonical service roots.
+- Applied private no-store/noindex headers to all protected core mutations and strictly validated persisted UTC appointment timestamps before ICS generation.
+- Made outbox row claiming atomic by rechecking pending/retry, schedule and lock eligibility in the claim UPDATE itself.
+- Required current doctor-to-clinic serving authority for service and availability assignment; global verification/eligibility alone is insufficient.
+- Advanced runtime/document identity to `1.2.3`; core schema remains `3.1.0`, restricted continuity schema `1.1.0`, Future24 schema `1.0.0`.
+- Added a permanent third-ten-review regression gate. Repository/package/CI, staging, live and operational evidence remain separate states.
+
 ## 1.2.2 — 2026-08-11
 
 - Opened and completed a second fresh sequential 10-round corrective audit after the v1.2.1 post-closure cycle; each discovered defect was corrected before the next review proceeded.

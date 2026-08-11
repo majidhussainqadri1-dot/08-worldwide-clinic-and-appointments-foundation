@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.2**
+- Runtime candidate: **1.2.3**
 - Core schema: **3.1.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -30,6 +30,8 @@ The current source implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-
 The first post-closure 10-round review corrected canonical detail routing, legacy native-ID browser mutation surfaces, delegated clinic-staff appointment/dashboard visibility, transition state/version preconditions, core mutation rate/replay behavior, payment-payer authority, doctor-to-clinic availability scope, display-timezone boundary slot discovery, hold reprojection across timezone/DST day boundaries, and branch-change audit/File26 projection events.
 
 The **second fresh 10-round corrective audit** further hardens administrator transition purpose/step-up checks, requires explicit slot-hold replay keys, namespaces hold replay identity by patient, fails closed on ambiguous stale mutation reservations, strictly validates Future24 date/time inputs, removes native numeric identifiers from Future24 REST DTOs, and serializes outbox dispatch so cron/shutdown workers cannot overlap. Every supported mutation entry point remains guarded by authorization, rate/replay controls, and state/object constraints.
+
+The **third fresh 10-round corrective audit** moves the same invariants to canonical roots where cross-cutting guards were insufficient: stale idempotency is fail-closed in the repository itself, payment and transition preconditions are enforced in the service root, protected mutations are no-store/noindex, ICS output strictly validates persisted UTC timestamps, outbox claims atomically re-check eligibility, and service/availability doctor assignment requires current clinic-serving authority rather than eligibility alone.
 
 ## Canonical routes
 
