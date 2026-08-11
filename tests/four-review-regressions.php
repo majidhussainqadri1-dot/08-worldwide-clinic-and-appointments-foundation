@@ -13,7 +13,7 @@ function wca4_not_contains( $path, $needle, $label ) {
 	if ( false !== strpos( $text, $needle ) ) { fwrite( STDERR, "FAIL {$label}\n" ); exit( 1 ); }
 	$checks++;
 }
-wca4_contains( 'worldwide-clinic.php', "define( 'WCA_VERSION', '1.2.10' )", 'runtime version' );
+wca4_contains( 'worldwide-clinic.php', "define( 'WCA_VERSION', '1.2.11' )", 'runtime version' );
 wca4_contains( 'includes/class-wca-service.php', 'submit_clinic_for_review', 'clinic review submission' );
 wca4_contains( 'includes/class-wca-service.php', 'wca_clinic_reviewer_required', 'institutional activation gate' );
 wca4_contains( 'includes/class-wca-authorization.php', 'wca_patient_actor_mismatch', 'patient actor binding' );

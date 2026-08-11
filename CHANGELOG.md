@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.11 — 2026-08-11
+
+- Completed the eleventh fresh sequential 20-round corrective cycle against exact v1.2.10 source.
+- Fail closed when SQL owner/appointment transactions cannot start or commit.
+- Replaced stale option-lock delete/recreate takeover with compare-and-swap and fenced outbox completion/failure by worker lease.
+- Made dispatcher durable-finalization failures visible and notification fallback all-recipient successful-or-retryable.
+- Hardened appointment replay keys, patient timezone, slot dates, inside-lock authorization, and check-in mode validation.
+- Removed native database IDs from protected appointment/payment/complaint REST response projections.
+- Made doctor-suspension hold + File19 projection atomic and added fail-closed service/branch/availability persistence validation.
+- Runtime 1.2.11; schemas remain core 3.2.0 / continuity 1.1.0 / Future24 1.0.0.
+- R17-R20 fresh corrected-state closure reviews remain required before final candidate closure; staging/live evidence remains separate.
+
 ## 1.2.10 — 2026-08-11
 
 - Completed the tenth fresh sequential 10-round corrective cycle against exact v1.2.9 repository state.

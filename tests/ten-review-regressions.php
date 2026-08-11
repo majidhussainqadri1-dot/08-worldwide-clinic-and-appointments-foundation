@@ -75,9 +75,9 @@ r10has('branch search projection enqueue',$hardening,"enqueue( 'File26.SearchPro
 r10lacks('no companion File26 table write',$hardening,'file26_');
 
 // Current release/document parity remains part of the permanent first-cycle gate.
-r10has('plugin readme current runtime',$readme,'Stable tag: 1.2.10');
-r10has('repo readme current runtime',$repo_readme,'Runtime candidate: **1.2.10**');
-r10has('status current runtime',$status,'Runtime candidate: **1.2.10**');
+r10has('plugin readme current runtime',$readme,'Stable tag: 1.2.11');
+r10has('repo readme current runtime',$repo_readme,'Runtime candidate: **1.2.11**');
+r10has('status current runtime',$status,'Runtime candidate: **1.2.11**');
 r10has('changelog current runtime',$changelog,'## 1.2.7 — 2026-08-11');
 r10has('current companion list',$staging,'Files 00, 03, 07, 09, 17, 19, 20, 24, 25, and 26');
 r10has('green acceptance token',$staging,'#087A4E');
