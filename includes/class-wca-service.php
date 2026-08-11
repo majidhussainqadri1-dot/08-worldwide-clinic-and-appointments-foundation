@@ -202,10 +202,17 @@ final class WCA_Service {
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$auth = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
+		$current = null;
 		if ( $service_id ) {
 			$current = WCA_Repository::get_service( $service_id, false );
 			if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_service_scope', __( 'The service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		}
+		$consultation_type = sanitize_key( $data['consultation_type'] ?? ( $current['consultation_type'] ?? '' ) );
+		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) { return new WP_Error( 'wca_service_consultation_type', __( 'A valid consultation type is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$currency = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) ( $data['currency'] ?? ( $current['currency'] ?? '' ) ) ) );
+		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) ) { return new WP_Error( 'wca_service_currency', __( 'A valid three-letter currency code is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$data['consultation_type'] = $consultation_type;
+		$data['currency'] = $currency;
 		if ( ! empty( $data['branch_id'] ) ) { $branch = WCA_Repository::get_branch( absint( $data['branch_id'] ) ); if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_branch_scope', __( 'The branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
 		if ( ! empty( $data['doctor_user_id'] ) ) {
 			$service_doctor_id = absint( $data['doctor_user_id'] );
