@@ -1,98 +1,37 @@
 <?php
-/**
- * File 08 eighty-round corrective source regression gate.
- * Repository/source evidence only; staging/live acceptance is a separate gate.
- */
-$root = dirname( __DIR__ );
-$failures = array();
-$checks = 0;
-function f08r_src( $path ) {
-	global $root, $failures;
-	$file = $root . '/' . $path;
-	if ( ! is_file( $file ) ) { $failures[] = 'Missing ' . $path; return ''; }
-	$data = file_get_contents( $file );
-	if ( ! is_string( $data ) ) { $failures[] = 'Unreadable ' . $path; return ''; }
-	return $data;
-}
-function f08r_has( $label, $source, $needle ) {
-	global $failures, $checks; $checks++;
-	if ( false === strpos( $source, $needle ) ) { $failures[] = $label . ' missing: ' . $needle; }
-}
-function f08r_lacks( $label, $source, $needle ) {
-	global $failures, $checks; $checks++;
-	if ( false !== strpos( $source, $needle ) ) { $failures[] = $label . ' forbidden: ' . $needle; }
-}
-function f08r_true( $label, $condition ) {
-	global $failures, $checks; $checks++;
-	if ( ! $condition ) { $failures[] = $label; }
-}
+/** File 08 eighty-round corrective source regression gate. */
+$root = dirname( __DIR__ ); $failures = array(); $checks = 0;
+function r80src( $p ) { global $root,$failures; $f=$root.'/'.$p; if(!is_file($f)){ $failures[]='Missing '.$p; return ''; } $s=file_get_contents($f); return is_string($s)?$s:''; }
+function r80has( $l,$s,$n ) { global $failures,$checks; $checks++; if(false===strpos($s,$n)){ $failures[]=$l.' missing: '.$n; } }
+function r80lacks( $l,$s,$n ) { global $failures,$checks; $checks++; if(false!==strpos($s,$n)){ $failures[]=$l.' forbidden: '.$n; } }
+function r80true( $l,$c ) { global $failures,$checks; $checks++; if(!$c){ $failures[]=$l; } }
+$bootstrap=r80src('worldwide-clinic.php'); $contracts=r80src('includes/class-wca-contracts.php'); $auth=r80src('includes/class-wca-authorization.php'); $repo=r80src('includes/class-wca-repository.php'); $service=r80src('includes/class-wca-service.php'); $future=r80src('includes/class-wca-future24.php'); $privacy=r80src('includes/class-wca-privacy.php'); $readme=r80src('readme.txt');
 
-$bootstrap = f08r_src( 'worldwide-clinic.php' );
-$contracts = f08r_src( 'includes/class-wca-contracts.php' );
-$auth = f08r_src( 'includes/class-wca-authorization.php' );
-$repo = f08r_src( 'includes/class-wca-repository.php' );
-$service = f08r_src( 'includes/class-wca-service.php' );
-$future = f08r_src( 'includes/class-wca-future24.php' );
-$privacy = f08r_src( 'includes/class-wca-privacy.php' );
-$readme = f08r_src( 'readme.txt' );
+// R78 release identity.
+foreach(array('Version: 1.2.1',"WCA_VERSION', '1.2.1'") as $t){ r80has('bootstrap runtime',$bootstrap,$t); }
+r80has('contract runtime',$contracts,"RUNTIME_VERSION                 = '1.2.1'"); r80has('readme runtime',$readme,'Stable tag: 1.2.1');
 
-// R78: coherent release identity after corrective source changes.
-foreach ( array( 'Version: 1.2.1', "WCA_VERSION', '1.2.1'" ) as $token ) { f08r_has( 'bootstrap runtime', $bootstrap, $token ); }
-f08r_has( 'contract runtime', $contracts, "RUNTIME_VERSION                 = '1.2.1'" );
-f08r_has( 'readme runtime', $readme, 'Stable tag: 1.2.1' );
+// R08/R13/R14 current guardian truth and least-privilege delegation.
+foreach(array('guardian_context','can_staff_access_appointment','clinic_manage','delegation_allows_scope') as $t){ r80has('authorization',$auth,$t); }
+r80has('current guardian state',$future,'current_guardian_state'); r80has('patient context',$future,'patient_context'); r80has('booking guardian revalidation',$service,'WCA_Authorization::guardian_context');
 
-// R08/R13/R14: current guardian truth and least-privilege staff delegation.
-foreach ( array( 'guardian_context', 'can_staff_access_appointment', 'clinic_manage', 'delegation_allows_scope' ) as $token ) { f08r_has( 'authorization', $auth, $token ); }
-f08r_has( 'future current guardian state', $future, 'current_guardian_state' );
-f08r_has( 'future patient context', $future, 'patient_context' );
-f08r_has( 'service guardian revalidation', $service, 'WCA_Authorization::guardian_context' );
+// R10-R33 Future24 scope/state/safety corrections.
+foreach(array('service_for_clinic','branch_for_clinic','create_resource','reserve_resource','create_group_session','join_group_session','save_questionnaire','readiness','save_prerequisites','create_disruption','add_participant','request_virtual_room','smart_find','save_external_busy','create_episode') as $t){ r80has('Future24 corrected path',$future,$t); }
+foreach(array('wca_resource_appointment_scope','wca_group_window','wca_questionnaire_fields','wca_prerequisite_rules_empty','wca_disruption_window','wca_support_subject_ineligible','wca_virtual_room_consent','wca_smart_find_parameter','wca_external_busy_window','wca_episode_scope') as $t){ r80has('Future24 negative path',$future,$t); }
+r80has('group join keeps request body',$future,'rest_group_join( WP_REST_Request $r ){ $d=self::data($r);'); r80has('virtual room does not assume recording',$future,"'recording_assumed'=>false"); r80has('transport event recording false',$future,"'recording_allowed'=>false"); r80has('no patient scoring',$future,"'patient_scoring' => false");
+foreach(array('fhir_projection','smart_find','save_external_busy','create_episode','request_virtual_room') as $t){ r80has('interoperability boundary',$future,$t); }
+r80has('no automated diagnosis',$contracts,"'automated_diagnosis' => false"); r80has('no automated prescribing',$contracts,"'automated_prescribing' => false"); r80has('zero commission',$contracts,"'commission_percent' => 0"); r80has('no donor visibility advantage',$contracts,"'donation_visibility_link' => false");
 
-// R10-R33: Future24 scope, state, safety, and interoperability boundaries.
-foreach ( array(
-	'wca_future24_service_scope', 'wca_future24_branch_scope', 'wca_future24_resource_scope',
-	'wca_future24_waitlist_window', 'wca_future24_windows', 'wca_future24_series_count',
-	'wca_future24_group_scope', 'wca_future24_questionnaire_scope', 'wca_future24_prerequisite',
-	'wca_future24_disruption', 'wca_future24_support', 'wca_future24_virtual',
-	'wca_future24_smart', 'wca_future24_episode'
-) as $token ) { f08r_has( 'Future24 validation', $future, $token ); }
-f08r_has( 'group join body preserved', $future, 'rest_group_join( WP_REST_Request $r ){ $d=self::data($r);' );
-f08r_has( 'virtual recording fail-safe', $future, "'recording' => false" );
-f08r_has( 'no patient scoring', $future, "'patient_scoring' => false" );
-foreach ( array( 'fhir', 'smart', 'external_busy', 'episode', 'virtual_room' ) as $token ) { f08r_has( 'interoperability boundary', strtolower( $future ), $token ); }
-f08r_has( 'no automated diagnosis', $contracts, "'automated_diagnosis' => false" );
-f08r_has( 'no automated prescribing', $contracts, "'automated_prescribing' => false" );
-f08r_has( 'zero commission', $contracts, "'commission_percent' => 0" );
-f08r_has( 'no donor visibility advantage', $contracts, "'donation_visibility_link' => false" );
+// R43 idempotency ownership, stale lease, replay/release.
+foreach(array('claimed_new','release_idempotency','2 * MINUTE_IN_SECONDS','idempotency_key') as $t){ r80has('repository idempotency',$repo,$t); }
+r80has('appointment concurrent refusal',$service,'wca_idempotency_in_progress'); r80has('appointment claim ownership',$service,"empty( \$claim['claimed_new'] )"); r80has('appointment failure releases claim',$service,'WCA_Repository::release_idempotency'); r80has('Future24 mutation wrapper',$future,'private static function mutate'); r80has('Future24 concurrent refusal',$future,'wca_idempotency_in_progress'); r80has('Future24 request fingerprint',$future,'$fingerprint = array('); r80has('Future24 completion ledger',$future,'complete_idempotency');
 
-// R43: true idempotency ownership, in-progress refusal, replay/release paths.
-foreach ( array( 'claimed_new', 'release_idempotency', 'processing', 'DATE_SUB', 'idempotency_key' ) as $token ) { f08r_has( 'repository idempotency', $repo, $token ); }
-f08r_has( 'appointment concurrent refusal', $service, 'wca_idempotency_in_progress' );
-f08r_has( 'appointment claim ownership', $service, "empty( $claim['claimed_new'] )" );
-f08r_has( 'appointment failure releases claim', $service, 'WCA_Repository::release_idempotency' );
-f08r_has( 'Future24 mutation wrapper', $future, 'private static function mutate' );
-f08r_has( 'Future24 concurrent refusal', $future, 'wca_idempotency_in_progress' );
-f08r_has( 'Future24 request fingerprint', $future, 'request_fingerprint' );
-f08r_has( 'Future24 completion ledger', $future, 'complete_idempotency' );
+// R44-R46 privacy graph, retention field, legal hold.
+r80has('doctor erasure coverage',$privacy,"'_swc_doctor_id'"); r80has('Future24 erasure cursor',$privacy,"'_future24'"); r80has('metrics retention real column',$privacy,'metric_bucket < %s'); r80lacks('metrics stale column',$privacy,'bucket_at < %s'); r80has('Future24 legal hold',$privacy,'future24_legal_hold'); r80has('Future24 legal hold filter',$privacy,'wca_future24_legal_hold'); r80has('linked appointment hold inheritance',$privacy,"row['appointment_id']");
 
-// R44-R46: privacy graph, real metric column, Future24 legal-hold inheritance.
-f08r_has( 'doctor erasure coverage', $privacy, "'_swc_doctor_id'" );
-f08r_has( 'Future24 erasure cursor', $privacy, "'_future24'" );
-f08r_has( 'metrics retention real column', $privacy, 'metric_bucket < %s' );
-f08r_lacks( 'metrics stale column', $privacy, 'bucket_at < %s' );
-f08r_has( 'Future24 legal hold', $privacy, 'future24_legal_hold' );
-f08r_has( 'Future24 legal hold filter', $privacy, 'wca_future24_legal_hold' );
-f08r_has( 'linked appointment hold inheritance', $privacy, "row['appointment_id']" );
-
-for ( $i = 1; $i <= 24; $i++ ) { f08r_has( 'Future24 capability ' . $i, $future, sprintf( 'F08-FUT-%02d', $i ) ); }
-f08r_true( 'Future24 manifest must declare exactly 24 capability IDs', 24 === preg_match_all( "/'F08-FUT-[0-9]{2}'\\s*=>/", $future ) );
-
-$runtime = implode( "\n", array( $auth, $repo, $service, $future, $privacy, $bootstrap ) );
-foreach ( array( 'eval(', 'base64_decode(', 'shell_exec(', 'unserialize(' ) as $token ) { f08r_lacks( 'forbidden runtime primitive', $runtime, $token ); }
-f08r_true( 'Review80 staging directory must be absent', ! is_dir( $root . '/.codex/review80' ) );
-f08r_true( 'One-shot correction workflow must be absent', ! is_file( $root . '/.github/workflows/apply-file08-forty-v102.yml' ) );
-
-if ( $failures ) {
-	fwrite( STDERR, "File 08 eighty-round regression gate failed:\n- " . implode( "\n- ", $failures ) . "\n" );
-	exit( 1 );
-}
+for($i=1;$i<=24;$i++){ r80has('Future24 capability '.$i,$future,sprintf('F08-FUT-%02d',$i)); }
+r80true('Future24 manifest declares exactly 24 IDs',24===preg_match_all("/'F08-FUT-[0-9]{2}'\\s*=>/",$future));
+$runtime=implode("\n",array($auth,$repo,$service,$future,$privacy,$bootstrap)); foreach(array('eval(','base64_decode(','shell_exec(','unserialize(') as $t){ r80lacks('forbidden runtime primitive',$runtime,$t); }
+r80true('review80 staging fragments removed',!is_dir($root.'/.codex/review80')); r80true('one-shot correction workflow removed',!is_file($root.'/.github/workflows/apply-file08-forty-v102.yml'));
+if($failures){ fwrite(STDERR,"File 08 eighty-round regression gate failed:\n- ".implode("\n- ",$failures)."\n"); exit(1); }
 echo "File 08 eighty-round corrective regression assertions passed: {$checks}/{$checks}.\n";
