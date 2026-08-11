@@ -167,6 +167,10 @@ final class WCA_Repository {
 	public static function create_branch( $data ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['branches'];
+		$timezone = (string) ( $data['timezone'] ?? '' );
+		if ( ! WCA_Service::valid_timezone( $timezone ) ) {
+			return new WP_Error( 'wca_repository_branch_timezone', __( 'Branch persistence requires a valid IANA time zone.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		$row   = array(
 			'public_ref'      => self::uuid(),
 			'clinic_id'       => absint( $data['clinic_id'] ?? 0 ),
@@ -176,7 +180,7 @@ final class WCA_Repository {
 			'city'            => sanitize_text_field( $data['city'] ?? '' ),
 			'address_public'  => sanitize_textarea_field( $data['address_public'] ?? '' ),
 			'address_private' => sanitize_textarea_field( $data['address_private'] ?? '' ),
-			'timezone'        => WCA_Service::valid_timezone( $data['timezone'] ?? 'UTC' ) ? (string) $data['timezone'] : 'UTC',
+			'timezone'        => $timezone,
 			'contacts_json'   => self::json( self::sanitize_contacts( (array) ( $data['contacts'] ?? array() ) ) ),
 			'visibility'      => in_array( $data['visibility'] ?? 'public', array( 'public', 'restricted', 'private' ), true ) ? $data['visibility'] : 'public',
 			'status'          => in_array( $data['status'] ?? 'active', array( 'active', 'paused', 'archived' ), true ) ? $data['status'] : 'active',
@@ -233,15 +237,22 @@ final class WCA_Repository {
 	public static function save_service( $data, $service_id = 0, $expected_version = 0 ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['services'];
-		$currency = strtoupper( preg_replace( '/[^A-Z]/', '', (string) ( $data['currency'] ?? 'PKR' ) ) );
+		$currency = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) ( $data['currency'] ?? '' ) ) );
+		$consultation_type = sanitize_key( $data['consultation_type'] ?? '' );
+		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) ) {
+			return new WP_Error( 'wca_repository_service_currency', __( 'Service persistence requires a valid three-letter currency code.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) {
+			return new WP_Error( 'wca_repository_service_type', __( 'Service persistence requires a valid consultation type.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		$row = array(
 			'clinic_id'                 => absint( $data['clinic_id'] ?? 0 ),
 			'branch_id'                 => absint( $data['branch_id'] ?? 0 ),
 			'doctor_user_id'            => absint( $data['doctor_user_id'] ?? 0 ),
 			'name'                      => sanitize_text_field( $data['name'] ?? '' ),
-			'consultation_type'         => in_array( $data['consultation_type'] ?? '', array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ? $data['consultation_type'] : 'online',
+			'consultation_type'         => $consultation_type,
 			'duration_minutes'          => min( 480, max( 10, absint( $data['duration_minutes'] ?? 30 ) ) ),
-			'currency'                  => 3 === strlen( $currency ) ? $currency : 'PKR',
+			'currency'                  => $currency,
 			'fee_minor'                 => max( 0, absint( $data['fee_minor'] ?? 0 ) ),
 			'fee_max_minor'             => max( 0, absint( $data['fee_max_minor'] ?? 0 ) ),
 			'tax_policy'                => sanitize_textarea_field( $data['tax_policy'] ?? '' ),
@@ -323,12 +334,16 @@ final class WCA_Repository {
 	public static function save_availability_rule( $data, $rule_id = 0, $expected_version = 0 ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['availability'];
+		$timezone = (string) ( $data['timezone'] ?? '' );
+		if ( ! WCA_Service::valid_timezone( $timezone ) ) {
+			return new WP_Error( 'wca_repository_availability_timezone', __( 'Availability persistence requires a valid IANA time zone.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		$row = array(
 			'clinic_id'      => absint( $data['clinic_id'] ?? 0 ),
 			'branch_id'      => absint( $data['branch_id'] ?? 0 ),
 			'service_id'     => absint( $data['service_id'] ?? 0 ),
 			'doctor_user_id' => absint( $data['doctor_user_id'] ?? 0 ),
-			'timezone'       => WCA_Service::valid_timezone( $data['timezone'] ?? '' ) ? (string) $data['timezone'] : 'UTC',
+			'timezone'       => $timezone,
 			'rrule_json'      => self::json( WCA_Service::sanitize_rrule( (array) ( $data['rrule'] ?? array() ) ) ),
 			'breaks_json'     => self::json( WCA_Service::sanitize_time_ranges( (array) ( $data['breaks'] ?? array() ) ) ),
 			'exceptions_json' => self::json( WCA_Service::sanitize_exceptions( (array) ( $data['exceptions'] ?? array() ) ) ),
