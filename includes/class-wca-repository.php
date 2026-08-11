@@ -31,6 +31,24 @@ final class WCA_Repository {
 		return is_array( $data ) ? $data : $default;
 	}
 
+	/** Execute one owner mutation and its required evidence/outbox writes atomically. */
+	public static function transaction( $callback, $error_code = 'wca_transaction_failed' ) {
+		global $wpdb;
+		$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		try {
+			$result = call_user_func( $callback );
+			if ( is_wp_error( $result ) ) {
+				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				return $result;
+			}
+			$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			return $result;
+		} catch ( Throwable $error ) {
+			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			return new WP_Error( sanitize_key( $error_code ), __( 'The mutation could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
+	}
+
 	/** @return array<string,mixed>|WP_Error */
 	public static function create_clinic( $data ) {
 		global $wpdb;

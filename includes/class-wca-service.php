@@ -432,78 +432,96 @@ final class WCA_Service {
 			return new WP_Error( 'wca_idempotency_in_progress', __( 'This appointment request is already being processed. Retry with the same idempotency key shortly.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'retry_after' => 2 ) );
 		}
 
-		$appointment_id = wp_insert_post(
-			array(
-				'post_type'   => SWC_Helpers::TYPE,
-				'post_status' => 'private',
-				'post_author' => $patient_user_id,
-				'post_title'  => sprintf( 'Appointment %s', gmdate( 'Y-m-d H:i', strtotime( $hold['start_utc'] . ' UTC' ) ) ),
-			),
-			true
-		);
-		if ( is_wp_error( $appointment_id ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $appointment_id; }
-		$public_ref = WCA_Repository::uuid();
-		$meta = array(
-			'public_ref'             => $public_ref,
-			'patient_user_id'        => $patient_user_id,
-			'guardian_user_id'       => $guardian_user_id,
-			'doctor_id'              => $doctor_id,
-			'clinic_id'              => absint( $hold['clinic_id'] ),
-			'service_id'             => absint( $hold['service_id'] ),
-			'branch_id'              => absint( $hold['branch_id'] ?? 0 ),
-			'status'                 => 'requested',
-			'preferred_at_utc'       => $hold['start_utc'],
-			'appointment_end_utc'    => $hold['end_utc'],
-			'patient_timezone'       => self::valid_timezone( $data['timezone'] ?? '' ) ? (string) $data['timezone'] : 'UTC',
-			'consultation_type'      => $service['consultation_type'] ?? sanitize_key( $data['consultation_type'] ?? 'online' ),
-			'appointment_duration'   => $service['duration_minutes'] ?? absint( ( strtotime( $hold['end_utc'] ) - strtotime( $hold['start_utc'] ) ) / 60 ),
-			'reason_category'        => sanitize_key( $data['category'] ?? 'general' ),
-			'reason'                 => SWC_Helpers::limit_text( $data['reason'] ?? '', 500, true ),
-			'consent_version'        => self::TERMS_VERSION,
-			'consent_at'             => WCA_Repository::now(),
-			'record_version'         => 1,
-			'created_via'            => 'wca_command',
-			'idempotency_key_hash'   => hash( 'sha256', $idempotency_key ),
-		);
-		foreach ( $meta as $key => $value ) { update_post_meta( $appointment_id, '_swc_' . $key, $value ); }
-		$booked = WCA_Repository::book_slot( $hold['hold_token'], $appointment_id );
-		if ( is_wp_error( $booked ) ) { wp_delete_post( $appointment_id, true ); WCA_Repository::release_idempotency( $claim['id'] ); return $booked; }
 
-		$terms = self::appointment_terms_text();
-		$consent = WCA_Repository::record_consent( array(
-			'appointment_id'     => $appointment_id,
-			'actor_user_id'      => $actor_user_id,
-			'actor_subject_uuid' => $claims['subject_uuid'],
-			'guardian_user_id'   => $guardian_user_id,
-			'scope'              => 'appointment_processing',
-			'terms_version'      => self::TERMS_VERSION,
-			'terms_text'         => $terms,
-			'legal_basis'        => 'consent',
-			'metadata'           => array( 'telehealth' => $remote ? true : false, 'privacy' => true, 'emergency_acknowledged' => true ),
-		) );
-		if ( is_wp_error( $consent ) ) { WCA_Repository::release_appointment_slot( $appointment_id ); wp_delete_post( $appointment_id, true ); WCA_Repository::release_idempotency( $claim['id'] ); return $consent; }
-
-		$trace = WCA_Observability::trace_id();
-		$payload = array(
-			'event_id'                => WCA_Repository::uuid(),
-			'occurred_at'             => gmdate( 'c' ),
-			'appointment_ref'         => $public_ref,
-			'patient_subject_uuid'    => WCA_Authorization::subject_uuid( $patient_user_id ),
-			'doctor_subject_uuid'     => WCA_Authorization::subject_uuid( $doctor_id ),
-			'clinic_ref'              => $clinic['public_ref'],
-			'scheduled_at_utc'        => $hold['start_utc'],
-			'consultation_type'       => $meta['consultation_type'],
-			'trace_id'                => $trace,
-		);
-		WCA_Repository::append_event( 'AppointmentRequested.v1', 'appointment', $public_ref, $payload, $actor_user_id, $trace );
-		WCA_Repository::enqueue( 'AppointmentRequested.v1', $public_ref, $payload, $trace );
-		WCA_Repository::enqueue( 'File19.NotificationRequested.v1', $public_ref, array( 'event' => 'appointment_requested', 'appointment_ref' => $public_ref, 'recipients' => array( $patient_user_id, $doctor_id ) ), $trace );
-		WCA_Repository::enqueue( 'File17.AppointmentContextChanged.v1', $public_ref, self::file17_context_payload( $appointment_id ), $trace );
-		SWC_Helpers::audit( $appointment_id, 'appointment-requested', array( 'new_status' => 'requested', 'details' => array( 'public_ref' => $public_ref, 'clinic_id' => absint( $hold['clinic_id'] ), 'service_id' => absint( $hold['service_id'] ) ) ) );
-		$response = array( 'appointment_id' => $appointment_id, 'public_ref' => $public_ref, 'status' => 'requested', 'trace_id' => $trace );
-		WCA_Repository::complete_idempotency( $claim['id'], 201, $response );
-		WCA_Observability::metric( 'appointment_requested_total', 1, array( 'mode' => $meta['consultation_type'] ) );
-		return $response;
+		$created_appointment_id = 0;
+		$result = WCA_Repository::transaction( function () use ( $patient_user_id, $guardian_user_id, $actor_user_id, $claims, $hold, $service, $clinic, $remote, $data, $idempotency_key, $claim, &$created_appointment_id ) {
+			$appointment_id = wp_insert_post(
+				array(
+					'post_type'   => SWC_Helpers::TYPE,
+					'post_status' => 'private',
+					'post_author' => $patient_user_id,
+					'post_title'  => sprintf( 'Appointment %s', gmdate( 'Y-m-d H:i', strtotime( $hold['start_utc'] . ' UTC' ) ) ),
+				),
+				true
+			);
+			if ( is_wp_error( $appointment_id ) ) { return $appointment_id; }
+			$created_appointment_id = absint( $appointment_id );
+			$public_ref = WCA_Repository::uuid();
+			$meta = array(
+				'public_ref'             => $public_ref,
+				'patient_user_id'        => $patient_user_id,
+				'guardian_user_id'       => $guardian_user_id,
+				'doctor_id'              => absint( $hold['doctor_user_id'] ),
+				'clinic_id'              => absint( $hold['clinic_id'] ),
+				'service_id'             => absint( $hold['service_id'] ),
+				'branch_id'              => absint( $hold['branch_id'] ?? 0 ),
+				'status'                 => 'requested',
+				'preferred_at_utc'       => $hold['start_utc'],
+				'appointment_end_utc'    => $hold['end_utc'],
+				'patient_timezone'       => self::valid_timezone( $data['timezone'] ?? '' ) ? (string) $data['timezone'] : 'UTC',
+				'consultation_type'      => $service['consultation_type'] ?? sanitize_key( $data['consultation_type'] ?? 'online' ),
+				'appointment_duration'   => $service['duration_minutes'] ?? absint( ( strtotime( $hold['end_utc'] ) - strtotime( $hold['start_utc'] ) ) / 60 ),
+				'reason_category'        => sanitize_key( $data['category'] ?? 'general' ),
+				'reason'                 => SWC_Helpers::limit_text( $data['reason'] ?? '', 500, true ),
+				'consent_version'        => self::TERMS_VERSION,
+				'consent_at'             => WCA_Repository::now(),
+				'record_version'         => 1,
+				'created_via'            => 'wca_command',
+				'idempotency_key_hash'   => hash( 'sha256', $idempotency_key ),
+			);
+			foreach ( $meta as $key => $value ) { update_post_meta( $appointment_id, '_swc_' . $key, $value ); }
+			$booked = WCA_Repository::book_slot( $hold['hold_token'], $appointment_id );
+			if ( is_wp_error( $booked ) ) { return $booked; }
+			$consent = WCA_Repository::record_consent( array(
+				'appointment_id'     => $appointment_id,
+				'actor_user_id'      => $actor_user_id,
+				'actor_subject_uuid' => $claims['subject_uuid'],
+				'guardian_user_id'   => $guardian_user_id,
+				'scope'              => 'appointment_processing',
+				'terms_version'      => self::TERMS_VERSION,
+				'terms_text'         => self::appointment_terms_text(),
+				'legal_basis'        => 'consent',
+				'metadata'           => array( 'telehealth' => $remote ? true : false, 'privacy' => true, 'emergency_acknowledged' => true ),
+			) );
+			if ( is_wp_error( $consent ) ) { return $consent; }
+			$trace = WCA_Observability::trace_id();
+			$payload = array(
+				'event_id'             => WCA_Repository::uuid(),
+				'occurred_at'          => gmdate( 'c' ),
+				'appointment_ref'      => $public_ref,
+				'patient_subject_uuid' => WCA_Authorization::subject_uuid( $patient_user_id ),
+				'doctor_subject_uuid'  => WCA_Authorization::subject_uuid( absint( $hold['doctor_user_id'] ) ),
+				'clinic_ref'           => $clinic['public_ref'],
+				'scheduled_at_utc'     => $hold['start_utc'],
+				'consultation_type'    => $meta['consultation_type'],
+				'trace_id'             => $trace,
+			);
+			$event = WCA_Repository::append_event( 'AppointmentRequested.v1', 'appointment', $public_ref, $payload, $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			foreach ( array(
+				array( 'AppointmentRequested.v1', $payload ),
+				array( 'File19.NotificationRequested.v1', array( 'event' => 'appointment_requested', 'appointment_ref' => $public_ref, 'recipients' => array( $patient_user_id, absint( $hold['doctor_user_id'] ) ) ) ),
+				array( 'File17.AppointmentContextChanged.v1', self::file17_context_payload( $appointment_id ) ),
+			) as $outbox ) {
+				$queued = WCA_Repository::enqueue( $outbox[0], $public_ref, $outbox[1], $trace );
+				if ( is_wp_error( $queued ) ) { return $queued; }
+			}
+			if ( ! SWC_Helpers::audit( $appointment_id, 'appointment-requested', array( 'new_status' => 'requested', 'details' => array( 'public_ref' => $public_ref, 'clinic_id' => absint( $hold['clinic_id'] ), 'service_id' => absint( $hold['service_id'] ) ) ) ) ) {
+				return new WP_Error( 'wca_appointment_request_audit', __( 'The appointment request could not be audited safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
+			$response = array( 'appointment_id' => $appointment_id, 'public_ref' => $public_ref, 'status' => 'requested', 'trace_id' => $trace );
+			if ( ! WCA_Repository::complete_idempotency( $claim['id'], 201, $response ) ) {
+				return new WP_Error( 'wca_appointment_idempotency_complete', __( 'The appointment request could not be finalized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
+			return $response;
+		}, 'wca_appointment_request_transaction' );
+		if ( is_wp_error( $result ) ) {
+			WCA_Repository::release_idempotency( $claim['id'] );
+			if ( $created_appointment_id ) { clean_post_cache( $created_appointment_id ); }
+			return $result;
+		}
+		WCA_Observability::metric( 'appointment_requested_total', 1, array( 'mode' => $service['consultation_type'] ?? 'unknown' ) );
+		return $result;
 	}
 
 	/** @return array<string,mixed>|WP_Error */
