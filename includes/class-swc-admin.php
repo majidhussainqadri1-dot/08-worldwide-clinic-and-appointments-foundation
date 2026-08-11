@@ -183,7 +183,7 @@ final class SWC_Admin {
 		$expected_status  = isset( $_POST['expected_status'] ) ? sanitize_key( wp_unslash( $_POST['expected_status'] ) ) : '';
 		$expected_version = isset( $_POST['expected_version'] ) ? absint( $_POST['expected_version'] ) : 0;
 		$note             = isset( $_POST['note'] ) ? SWC_Helpers::limit_text( $_POST['note'], 1000, true ) : '';
-		if ( '' === trim( $note ) || ! isset( SWC_Helpers::statuses()[ $next ] ) || ! in_array( $doctor, SWC_Helpers::doctor_ids(), true ) ) {
+		if ( '' === trim( $note ) || ! isset( SWC_Helpers::statuses()[ $next ] ) || ! SWC_Helpers::doctor_is_requestable( $doctor ) ) {
 			wp_die( esc_html__( 'Provide a valid doctor, status, and internal reason.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
 		}
 

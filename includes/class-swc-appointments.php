@@ -30,7 +30,7 @@ final class SWC_Appointments {
 
 		$doctor_ref = isset( $_POST['doctor_ref'] ) ? strtolower( sanitize_text_field( wp_unslash( $_POST['doctor_ref'] ) ) ) : '';
 		$doctor     = SWC_Helpers::practitioner_id( $doctor_ref );
-		if ( ! $doctor || ! in_array( $doctor, SWC_Helpers::requestable_doctor_ids(), true ) ) {
+		if ( ! $doctor || ! SWC_Helpers::doctor_is_requestable( $doctor ) ) {
 			wp_die( esc_html__( 'Choose an eligible verified doctor.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
 		}
 
@@ -205,7 +205,7 @@ final class SWC_Appointments {
 				}
 				$old_doctor = absint( SWC_Helpers::meta( $id, 'doctor_id' ) );
 				if ( $accept ) {
-					if ( ! in_array( $new_doctor, SWC_Helpers::doctor_ids(), true ) ) {
+					if ( ! SWC_Helpers::doctor_is_requestable( $new_doctor ) ) {
 						return new WP_Error( 'swc_doctor', __( 'The proposed doctor is no longer eligible.', 'worldwide-clinic-appointments' ) );
 					}
 					$mode = (string) SWC_Helpers::meta( $id, 'consultation_type' );
