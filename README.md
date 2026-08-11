@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.11**
+- Runtime candidate: **1.2.12**
 - Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -48,7 +48,7 @@ The **tenth fresh 10-round corrective audit** closes residual owner-transaction,
 
 
 
-The **eleventh fresh 20-round corrective audit** reviewed exact v1.2.10 source sequentially. R1-R15 corrected transaction-control, resource-lock takeover, outbox finalization, all-recipient fallback delivery, replay/timezone/date/check-in validation, inside-lock authorization, protected REST DTOs, doctor-suspension projection atomicity, and canonical service/branch/availability persistence. R16 aligns release identity and permanent evidence to v1.2.11. R17-R20 are fresh corrected-state privacy/Future24/migration/security/plan-parity reviews.
+The **eleventh fresh 20-round corrective audit** reviewed exact v1.2.10 source sequentially. R1-R15 corrected transaction-control, resource-lock takeover, outbox finalization, all-recipient fallback delivery, replay/timezone/date/check-in validation, inside-lock authorization, protected REST DTOs, doctor-suspension projection atomicity, and canonical service/branch/availability persistence. R16 aligns release identity and permanent evidence to v1.2.12. R17-R20 are fresh corrected-state privacy/Future24/migration/security/plan-parity reviews.
 
 ## Canonical routes
 

@@ -3,7 +3,7 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.11**
+- Runtime candidate: **1.2.12**
 - Core File 08 schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -29,7 +29,7 @@ A tenth fresh sequential review-and-correct cycle was run against exact v1.2.9 r
 
 ## Eleventh fresh 20-round corrective audit
 
-Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported repository defects; R16 aligns runtime/tests/docs and permanent regression evidence to v1.2.11 without schema inflation. R17-R20 are corrected-state closure reviews. Repository evidence remains distinct from staging/live evidence.
+Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported repository defects; R16 aligns runtime/tests/docs and permanent regression evidence to v1.2.12 without schema inflation. R17-R20 are corrected-state closure reviews. Repository evidence remains distinct from staging/live evidence.
 
 ## Evidence-state classification
 

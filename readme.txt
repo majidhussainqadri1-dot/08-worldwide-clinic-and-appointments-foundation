@@ -3,14 +3,14 @@ Contributors: majidhussainqadri1-dot
 Tags: clinic, appointments, doctors, scheduling, privacy, accessibility
 Requires at least: 6.6
 Requires PHP: 7.4
-Stable tag: 1.2.11
+Stable tag: 1.2.12
 License: GPLv2 or later
 
 Canonical File 08 clinic and appointment runtime for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Version 1.2.11 implements the File 08 Complete Master Plan, Future24 amendment, the earlier 80-round corrective closure, the first 10-round post-closure review-and-correct cycle, the second and third fresh 10-round corrective audits, and the fourth fresh sequential 10-round corrective audit. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
+Version 1.2.12 implements the File 08 Complete Master Plan, Future24 amendment, the earlier 80-round corrective closure, the first 10-round post-closure review-and-correct cycle, the second and third fresh 10-round corrective audits, and the fourth fresh sequential 10-round corrective audit. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
 
 The fourth fresh corrective audit binds branch identity to canonical slot holds and appointment/reschedule state, isolates public slot discovery by clinic, completes Future24 group leave/cancel semantics with current-state rechecks, strictly validates signed-link calendar timestamps, makes payment-intent uniqueness/idempotency migration-safe, enforces consent at the appointment service root, expands replay fingerprints, hardens clinic activation step-up/current-owner/publishable-inventory checks, and removes the 500-appointment doctor-suspension truncation through bounded paged reconciliation. Earlier authorization, concurrency, privacy, migration, package-parity, and Future24 gates remain in force.
 
@@ -25,7 +25,7 @@ Platform commission is always 0%. Donations are optional and never affect visibi
 == Installation ==
 
 1. Verify the exact required companion packages are installed and accepted for staging: Files 00, 03, 07, 09, 17, 19, 20, 24, 25, and 26.
-2. Download the exact CI-generated File 08 v1.2.11 candidate whose manifest commit, artifact digest, and detached SHA-256 match the approved repository HEAD.
+2. Download the exact CI-generated File 08 v1.2.12 candidate whose manifest commit, artifact digest, and detached SHA-256 match the approved repository HEAD.
 3. Install that exact candidate on the canonical Hostinger staging site only.
 4. Complete STAGING-ACCEPTANCE.md, including fresh install/upgrade/migration, DB/schema/migration-state evidence, rollback/restore, real-role journeys, concurrency/replay/provider-failure cases, privacy/cache/accessibility checks, and Founder acceptance.
 5. Do not deploy live until staging acceptance is complete and a controlled production deployment is explicitly authorized.
@@ -40,7 +40,7 @@ The eighth fresh corrective audit removes residual total-page ceilings from doct
 
 == Changelog ==
 
-= 1.2.11 =
+= 1.2.12 =
 * Completed the eleventh fresh sequential 20-round corrective audit.
 * Transaction start/commit failures fail closed in canonical owner and appointment mutations.
 * Stale scheduling lock takeover is compare-and-swap safe; outbox finalization is worker-fenced and durability-aware.
@@ -48,7 +48,7 @@ The eighth fresh corrective audit removes residual total-page ceilings from doct
 * Protected REST mutation/read DTOs use opaque references instead of native database IDs.
 * Doctor suspension reconciliation and required File19 projection are atomic.
 * Service/branch/availability canonical persistence rejects invalid values instead of silent normalization.
-* Runtime 1.2.11; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0. Repository/CI/package evidence remains distinct from staging/live evidence.
+* Runtime 1.2.12; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0. Repository/CI/package evidence remains distinct from staging/live evidence.
 
 = 1.2.10 =
 * Completed the tenth fresh sequential 10-round corrective audit.

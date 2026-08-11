@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.12 — 2026-08-11
+
+- Twelfth fresh sequential 20-round corrective review completed.
+- Corrected continuity and Future24 atomicity/finalization, REST abuse controls, cursor persistence, fail-closed bounded numeric semantics, and disruption projection atomicity.
+- Permanent twelfth 20-round regression gate added; schemas unchanged.
+
 ## 1.2.11 — 2026-08-11
 
 - Completed the eleventh fresh sequential 20-round corrective cycle against exact v1.2.10 source.

@@ -24,5 +24,13 @@
 | T12-R16 | DEFECT CORRECTED | Recurrence count/interval/custom-day inputs were silently clamped instead of rejected. |
 | T12-R17 | DEFECT CORRECTED | Future24 buffer/travel/continuous-consultation policy values were silently clamped. |
 | T12-R18 | DEFECT CORRECTED | Resource/group capacities were silently normalized, changing caller intent. |
+| T12-R19 | DEFECT CORRECTED | Core service fees/duration and availability buffers/capacity could be silently normalized, including negative fee coercion. |
+| T12-R20 | DEFECT CORRECTED | Clinic disruption state could commit while one or more required File19 notification projections failed. |
 
-Rounds T12-R19–T12-R20 remain unreviewed in this sequential cycle at this commit.
+All 20 substantive review rounds completed; each contained a supported repository defect and was corrected before the next round.
+
+## Post-round release closure
+- Runtime/test/document identity advanced to 1.2.12 without schema inflation.
+- Permanent twelfth-review regression gate added.
+- Core schema remains 3.2.0; restricted continuity 1.1.0; Future24 1.0.0.
+- Exact-head canonical CI/package evidence must be recorded separately after transient tooling removal.
