@@ -447,7 +447,10 @@ final class SWC_Helpers {
 	 */
 	private static function with_database_transaction( $appointment_id, $callback ) {
 		global $wpdb;
-		$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$started = $wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		if ( false === $started ) {
+			return new WP_Error( 'swc_transaction_start_failed', __( 'The appointment transaction could not be started safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
 		try {
 			$result = call_user_func( $callback );
 			if ( is_wp_error( $result ) ) {
@@ -455,7 +458,12 @@ final class SWC_Helpers {
 				wp_cache_delete( absint( $appointment_id ), 'post_meta' );
 				return $result;
 			}
-			$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$committed = $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			if ( false === $committed ) {
+				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				wp_cache_delete( absint( $appointment_id ), 'post_meta' );
+				return new WP_Error( 'swc_transaction_commit_failed', __( 'The appointment transaction could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
 			return $result;
 		} catch ( Throwable $error ) {
 			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
