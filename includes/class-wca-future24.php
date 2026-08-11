@@ -298,7 +298,15 @@ final class WCA_Future24 {
 			WCA_Repository::release_idempotency( $claim['id'] );
 			return $result;
 		}
-		WCA_Repository::complete_idempotency( $claim['id'], $status, $result );
+		$completed = WCA_Repository::complete_idempotency( $claim['id'], $status, $result );
+		if ( ! $completed ) {
+			WCA_Observability::log( 'error', 'future24_idempotency_finalize_failed', array( 'scope' => sanitize_key( $scope ), 'claim_id' => absint( $claim['id'] ) ) );
+			return new WP_Error(
+				'wca_idempotency_finalize_failed',
+				__( 'The scheduling mutation may have completed, but its replay record could not be finalized. Reconcile the same Idempotency-Key before retrying.', 'worldwide-clinic-appointments' ),
+				array( 'status' => 503, 'reconciliation_required' => true, 'retry_same_idempotency_key' => true )
+			);
+		}
 		return self::respond( $result, $status );
 	}
 

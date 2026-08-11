@@ -903,7 +903,12 @@ final class WCA_Repository {
 	public static function complete_idempotency( $id, $response_code, $response ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['idempotency'];
-		return false !== $wpdb->update( $table, array( 'status' => 'completed', 'response_code' => absint( $response_code ), 'response_json' => self::json( $response ), 'updated_at' => self::now() ), array( 'id' => absint( $id ) ) );
+		$updated = $wpdb->update(
+			$table,
+			array( 'status' => 'completed', 'response_code' => absint( $response_code ), 'response_json' => self::json( $response ), 'updated_at' => self::now() ),
+			array( 'id' => absint( $id ), 'status' => 'processing' )
+		);
+		return 1 === (int) $updated;
 	}
 
 	public static function metric( $key, $value = 1, $dimensions = array() ) {

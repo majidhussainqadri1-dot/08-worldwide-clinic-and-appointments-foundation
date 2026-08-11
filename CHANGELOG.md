@@ -9,6 +9,7 @@
 - Hardened appointment replay keys, patient timezone, slot dates, inside-lock authorization, and check-in mode validation.
 - Removed native database IDs from protected appointment/payment/complaint REST response projections.
 - Made doctor-suspension hold + File19 projection atomic and added fail-closed service/branch/availability persistence validation.
+- Future24 durable idempotency finalization now requires a successful processing-state CAS; a failed replay-record completion returns reconciliation-required 503 instead of false success.
 - Runtime 1.2.11; schemas remain core 3.2.0 / continuity 1.1.0 / Future24 1.0.0.
 - R17-R20 fresh corrected-state closure reviews remain required before final candidate closure; staging/live evidence remains separate.
 
