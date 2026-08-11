@@ -466,16 +466,25 @@ final class WCA_Continuity {
 		$follow_cutoff = gmdate( 'Y-m-d H:i:s', time() - $followup_days * DAY_IN_SECONDS );
 		$intake_table  = self::tables()['intake'];
 		$follow_table  = self::tables()['followups'];
-		$intakes = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$intake_table} WHERE updated_at<%s ORDER BY id ASC LIMIT 200", $intake_cutoff ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		foreach ( $intakes as $row ) {
-			if ( self::legal_hold( 'intake', $row ) ) { continue; }
-			$status = SWC_Helpers::status( absint( $row['appointment_id'] ) );
-			if ( WCA_Contracts::is_terminal( $status ) ) { $wpdb->delete( $intake_table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ); }
-		}
-		$followups = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id,status FROM {$follow_table} WHERE updated_at<%s AND status IN ('completed','cancelled') ORDER BY id ASC LIMIT 200", $follow_cutoff ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		foreach ( $followups as $row ) {
-			if ( ! self::legal_hold( 'followup', $row ) ) { $wpdb->delete( $follow_table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ); }
-		}
+		$batch = 200;
+		$cursor = 0;
+		do {
+			$intakes = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$intake_table} WHERE updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d", $intake_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			foreach ( $intakes as $row ) {
+				$cursor = max( $cursor, absint( $row['id'] ) );
+				if ( self::legal_hold( 'intake', $row ) ) { continue; }
+				$status = SWC_Helpers::status( absint( $row['appointment_id'] ) );
+				if ( WCA_Contracts::is_terminal( $status ) ) { $wpdb->delete( $intake_table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ); }
+			}
+		} while ( count( $intakes ) === $batch );
+		$cursor = 0;
+		do {
+			$followups = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id,status FROM {$follow_table} WHERE updated_at<%s AND status IN ('completed','cancelled') AND id>%d ORDER BY id ASC LIMIT %d", $follow_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			foreach ( $followups as $row ) {
+				$cursor = max( $cursor, absint( $row['id'] ) );
+				if ( ! self::legal_hold( 'followup', $row ) ) { $wpdb->delete( $follow_table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ); }
+			}
+		} while ( count( $followups ) === $batch );
 	}
 
 	public static function register_exporter( $exporters ) {
