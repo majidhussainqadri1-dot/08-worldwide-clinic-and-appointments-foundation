@@ -1487,16 +1487,28 @@ final class WCA_Future24 {
 		if ( is_wp_error( $id ) ) { return $id; }
 		$who = WCA_Authorization::appointment_actor( $id, $actor_id );
 		if ( ! in_array( $who, array( 'patient','guardian' ), true ) ) { return new WP_Error( 'wca_support_revoke_actor', __( 'Only the patient or verified guardian may revoke this participant.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
-		$row = self::get_record( $participant_ref, 'F08-FUT-18' );
-		if ( ! $row || absint( $row['appointment_id'] ) !== $id || 'participant_active' !== $row['status'] ) { return new WP_Error( 'wca_support_participant_missing', __( 'The active support participant was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
-		$table = self::tables()['records'];
-		$updated = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',version=version+1,expires_at=%s,updated_at=%s WHERE id=%d AND status='participant_active'", WCA_Repository::now(), WCA_Repository::now(), absint( $row['id'] ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( 1 !== $updated ) { return new WP_Error( 'wca_support_revoke_conflict', __( 'The support participant changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		$payload = json_decode( (string) $row['payload_json'], true );
-		$payload = is_array( $payload ) ? $payload : array();
-		WCA_Repository::enqueue( 'File17.AppointmentParticipantChanged.v1', strtolower( $appointment_ref ), array( 'appointment_ref' => strtolower( $appointment_ref ), 'participant_ref' => strtolower( $participant_ref ), 'subject_uuid' => sanitize_text_field( isset( $payload['subject_uuid'] ) ? $payload['subject_uuid'] : '' ), 'role' => sanitize_key( isset( $payload['role'] ) ? $payload['role'] : 'support' ), 'status' => 'revoked', 'transport_owner' => 'File17' ), WCA_Observability::trace_id() );
-		self::audit( 'F08-FUT-18', 'participant_revoked', strtolower( $participant_ref ), array( 'appointment_ref' => strtolower( $appointment_ref ) ), $actor_id, false );
-		return array( 'contract' => 'wca.support-participant', 'version' => self::CONTRACT_VERSION, 'participant_ref' => strtolower( $participant_ref ), 'status' => 'revoked' );
+		$participant_ref = strtolower( sanitize_text_field( $participant_ref ) );
+		$lock = self::semantic_lock( 'support-participant-revoke', $participant_ref );
+		if ( is_wp_error( $lock ) ) { return $lock; }
+		try {
+			$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$row = self::get_record( $participant_ref, 'F08-FUT-18' );
+			if ( ! $row || absint( $row['appointment_id'] ) !== $id || 'participant_active' !== $row['status'] ) { $wpdb->query( 'ROLLBACK' ); return new WP_Error( 'wca_support_participant_missing', __( 'The active support participant was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$table = self::tables()['records'];
+			$now = WCA_Repository::now();
+			$updated = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',version=version+1,expires_at=%s,updated_at=%s WHERE id=%d AND status='participant_active' AND version=%d", $now, $now, absint( $row['id'] ), absint( $row['version'] ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( 1 !== (int) $updated ) { $wpdb->query( 'ROLLBACK' ); return new WP_Error( 'wca_support_revoke_conflict', __( 'The support participant changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$payload = json_decode( (string) $row['payload_json'], true );
+			$payload = is_array( $payload ) ? $payload : array();
+			$queued = WCA_Repository::enqueue( 'File17.AppointmentParticipantChanged.v1', strtolower( $appointment_ref ), array( 'appointment_ref' => strtolower( $appointment_ref ), 'participant_ref' => $participant_ref, 'subject_uuid' => sanitize_text_field( isset( $payload['subject_uuid'] ) ? $payload['subject_uuid'] : '' ), 'role' => sanitize_key( isset( $payload['role'] ) ? $payload['role'] : 'support' ), 'status' => 'revoked', 'transport_owner' => 'File17' ), WCA_Observability::trace_id() );
+			if ( is_wp_error( $queued ) ) { $wpdb->query( 'ROLLBACK' ); return $queued; } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$audit = self::audit( 'F08-FUT-18', 'participant_revoked', $participant_ref, array( 'appointment_ref' => strtolower( $appointment_ref ) ), $actor_id, false );
+			if ( is_wp_error( $audit ) ) { $wpdb->query( 'ROLLBACK' ); return $audit; } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			return array( 'contract' => 'wca.support-participant', 'version' => self::CONTRACT_VERSION, 'participant_ref' => $participant_ref, 'status' => 'revoked' );
+		} finally {
+			self::release_semantic_lock( $lock );
+		}
 	}
 
 	/* FUT-19 */
