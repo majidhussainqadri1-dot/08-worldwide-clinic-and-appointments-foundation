@@ -1442,12 +1442,22 @@ final class WCA_Future24 {
 		if(is_wp_error($subject_claims)){return new WP_Error('wca_support_subject_ineligible',__('The selected support participant is not currently eligible.','worldwide-clinic-appointments'),array('status'=>409));}
 		$role=sanitize_key($data['role'] ?? 'support'); if(!in_array($role,array('support','interpreter'),true)){$role='support';}
 		$table=self::tables()['records'];
-		$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-18' AND appointment_id=%d AND subject_user_id=%d AND status='participant_active' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,$subject_user_id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if($existing){$payload=json_decode((string)$existing['payload_json'],true); if(is_array($payload)&&sanitize_key($payload['role'] ?? '')===$role){return self::public_record($existing);} return new WP_Error('wca_support_participant_conflict',__('This participant already has an active appointment role.','worldwide-clinic-appointments'),array('status'=>409));}
-		$end=self::utc(SWC_Helpers::meta($id,'appointment_end_utc','')); $expiry=$end?min(strtotime($end.' UTC')+DAY_IN_SECONDS,time()+30*DAY_IN_SECONDS):time()+7*DAY_IN_SECONDS;
-		$result=self::put_record('F08-FUT-18',array('appointment_id'=>$id,'clinic_id'=>absint(SWC_Helpers::meta($id,'clinic_id',0)),'subject_user_id'=>$subject_user_id,'status'=>'participant_active','expires_at'=>gmdate('Y-m-d H:i:s',$expiry),'payload'=>array('subject_uuid'=>$subject,'role'=>$role,'appointment_bound'=>true,'revocable'=>true,'clinical_write_authority'=>false)),$actor_id);
-		if(!is_wp_error($result)){WCA_Repository::enqueue('File17.AppointmentParticipantChanged.v1',strtolower($appointment_ref),array('appointment_ref'=>strtolower($appointment_ref),'participant_ref'=>$result['public_ref'],'subject_uuid'=>$subject,'role'=>$role,'status'=>'active','expires_at_utc'=>$result['expires_at'],'transport_owner'=>'File17','clinical_write_authority'=>false),WCA_Observability::trace_id());}
-		return $result;
+		$lock=self::semantic_lock('support-participant',$id.'|'.$subject_user_id);
+		if(is_wp_error($lock)){return $lock;}
+		try{
+			$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-18' AND appointment_id=%d AND subject_user_id=%d AND status='participant_active' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,$subject_user_id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if($existing){$payload=json_decode((string)$existing['payload_json'],true); if(is_array($payload)&&sanitize_key($payload['role'] ?? '')===$role){return self::public_record($existing);} return new WP_Error('wca_support_participant_conflict',__('This participant already has an active appointment role.','worldwide-clinic-appointments'),array('status'=>409));}
+			$end=self::utc(SWC_Helpers::meta($id,'appointment_end_utc','')); $expiry=$end?min(strtotime($end.' UTC')+DAY_IN_SECONDS,time()+30*DAY_IN_SECONDS):time()+7*DAY_IN_SECONDS;
+			$wpdb->query('START TRANSACTION'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$result=self::put_record('F08-FUT-18',array('appointment_id'=>$id,'clinic_id'=>absint(SWC_Helpers::meta($id,'clinic_id',0)),'subject_user_id'=>$subject_user_id,'status'=>'participant_active','expires_at'=>gmdate('Y-m-d H:i:s',$expiry),'payload'=>array('subject_uuid'=>$subject,'role'=>$role,'appointment_bound'=>true,'revocable'=>true,'clinical_write_authority'=>false)),$actor_id);
+			if(is_wp_error($result)){$wpdb->query('ROLLBACK'); return $result;} // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$queued=WCA_Repository::enqueue('File17.AppointmentParticipantChanged.v1',strtolower($appointment_ref),array('appointment_ref'=>strtolower($appointment_ref),'participant_ref'=>$result['public_ref'],'subject_uuid'=>$subject,'role'=>$role,'status'=>'active','expires_at_utc'=>$result['expires_at'],'transport_owner'=>'File17','clinical_write_authority'=>false),WCA_Observability::trace_id());
+			if(is_wp_error($queued)){$wpdb->query('ROLLBACK'); return $queued;} // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$wpdb->query('COMMIT'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			return $result;
+		} finally {
+			self::release_semantic_lock($lock);
+		}
 	}
 
 	public static function revoke_participant( $appointment_ref, $participant_ref, $actor = 0 ) {
