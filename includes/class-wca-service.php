@@ -748,11 +748,15 @@ final class WCA_Service {
 
 	private static function appointment_request_fingerprint( $data ) {
 		return array(
-			'hold_token'       => sanitize_text_field( $data['hold_token'] ?? '' ),
-			'patient_user_id'  => absint( $data['patient_user_id'] ?? 0 ),
-			'guardian_user_id' => absint( $data['guardian_user_id'] ?? 0 ),
-			'category'         => sanitize_key( $data['category'] ?? '' ),
-			'timezone'         => sanitize_text_field( $data['timezone'] ?? '' ),
+			'hold_token'             => sanitize_text_field( $data['hold_token'] ?? '' ),
+			'patient_user_id'        => absint( $data['patient_user_id'] ?? 0 ),
+			'guardian_user_id'       => absint( $data['guardian_user_id'] ?? 0 ),
+			'category'               => sanitize_key( $data['category'] ?? '' ),
+			'reason'                 => SWC_Helpers::limit_text( $data['reason'] ?? '', 500, true ),
+			'timezone'               => sanitize_text_field( $data['timezone'] ?? '' ),
+			'privacy_consent'        => self::affirmative( $data['privacy_consent'] ?? null ),
+			'emergency_acknowledged' => self::affirmative( $data['emergency_acknowledged'] ?? null ),
+			'telehealth_consent'     => self::affirmative( $data['telehealth_consent'] ?? null ),
 		);
 	}
 
