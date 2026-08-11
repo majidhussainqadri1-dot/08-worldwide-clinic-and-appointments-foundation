@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.7**
+- Runtime candidate: **1.2.8**
 - Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -40,6 +40,9 @@ The **fifth fresh 10-round corrective audit** closes a further set of canonical-
 The **sixth fresh 10-round corrective audit** hardens the remaining relationship, outbox-liveness, scale and recurrence edges: doctor-to-clinic serving truth now includes current doctor eligibility at its canonical root; outbox delivery exposes a stable message identity and abandoned processing leases can be recovered without silent permanent stalls; waitlist offers, questionnaire templates, prerequisite rules and follow-up lists no longer stop at arbitrary first-page ceilings; and monthly series retain their intended day-of-month across short months.
 
 The **seventh fresh 10-round corrective audit** closes privacy-lifecycle starvation, silent input truncation, evidence truncation, and high-volume analytics undercounting: continuity erasure and retention now traverse complete keyset-bounded sets without legal-hold starvation; Future24 retention does the same; scheduling windows, prerequisite policies, follow-up resources and episode chains reject oversized requests instead of silently discarding tail data; prerequisite evidence is evaluated completely; and heatmap/no-show aggregates no longer stop at 2,000 appointments.
+
+The **eighth fresh 10-round corrective audit** closes additional high-volume, concurrency and exact-slot correctness gaps: doctor-suspension and verification-reconciliation scans no longer have artificial total ceilings; due follow-up reminders traverse the complete due set transactionally; canonical Future24 operational writes reject oversized payloads instead of silently truncating them; first-time practitioner opaque references are serialized; slot discovery avoids multi-rule/timezone starvation; hold revalidation projects the exact rule/slot while preserving true idempotent replay; and waitlist, flexible-window and support-participant semantic duplicates are serialized, with support-participant File17 projection committed atomically.
+
 
 ## Canonical routes
 

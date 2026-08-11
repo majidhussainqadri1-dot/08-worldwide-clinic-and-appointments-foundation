@@ -11,7 +11,7 @@ This checklist must be completed against the **exact final File 08 candidate com
 - [ ] Full staging backup created and restoration tested.
 - [ ] Exact companion versions recorded for Files 00, 03, 07, 09, 17, 19, 20, 24, 25, and 26.
 - [ ] WordPress, PHP, database, theme, LiteSpeed, Hostinger runtime, timezone, cron and mail/provider configuration recorded.
-- [ ] File 08 core schema `3.1.0`, restricted continuity schema `1.1.0`, Future24 additive schema `1.0.0`, migration/options state and relevant tables/columns verified from the actual staging database.
+- [ ] File 08 core schema `3.2.0`, restricted continuity schema `1.1.0`, Future24 additive schema `1.0.0`, migration/options state and relevant tables/columns verified from the actual staging database.
 
 ## Installation, upgrade, migration and rollback
 

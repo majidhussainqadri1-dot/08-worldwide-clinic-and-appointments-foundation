@@ -2,7 +2,7 @@
 require __DIR__ . '/bootstrap.php';
 require dirname( __DIR__ ) . '/includes/class-wca-contracts.php';
 
-wca_test_assert( '1.2.7' === WCA_Contracts::RUNTIME_VERSION, 'runtime contract is 1.2.7' );
+wca_test_assert( '1.2.8' === WCA_Contracts::RUNTIME_VERSION, 'runtime contract is 1.2.8' );
 wca_test_assert( 18 === count( WCA_Contracts::functional_requirements() ), 'all 18 functional requirements are catalogued' );
 wca_test_assert( 10 === count( WCA_Contracts::nonfunctional_requirements() ), 'all 10 nonfunctional requirements are catalogued' );
 wca_test_assert( 24 === count( WCA_Contracts::future_requirements() ), 'all 24 future requirements are catalogued' );

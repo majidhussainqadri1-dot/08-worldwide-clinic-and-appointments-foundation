@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.8 — 2026-08-11
+
+- Completed the eighth fresh sequential 10-round corrective cycle.
+- Removed artificial total-page ceilings from doctor-suspension and verification reconciliation.
+- Made due follow-up reminders complete, transactionally claimed and failure-aware.
+- Replaced silent Future24 operational payload truncation with explicit overflow errors.
+- Serialized practitioner-reference, waitlist, flexible-window and support-participant semantic creation.
+- Corrected multi-rule/timezone slot starvation and exact held-slot replay/reprojection.
+- Support/interpreter participant creation is atomic with File17 projection.
+- Runtime 1.2.8; core schema 3.2.0; continuity schema 1.1.0; Future24 schema 1.0.0.
+- Added a permanent eighth-ten-review regression gate; staging/live evidence remains separate.
+
 ## 1.2.7 — 2026-08-11
 
 - Completed a seventh fresh sequential 10-round review-and-correct cycle against exact v1.2.6 repository state.

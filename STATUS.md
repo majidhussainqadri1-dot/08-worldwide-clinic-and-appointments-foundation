@@ -3,7 +3,7 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.7**
+- Runtime candidate: **1.2.8**
 - Core File 08 schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -19,24 +19,16 @@ The authoritative repository release identity is the exact final branch HEAD tog
 
 The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving the File 08 ownership boundary. The runtime includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback metadata, accessibility/localization, and the Future24 scheduling/interoperability layer.
 
-## Seventh fresh 10-round corrective audit
+## Eighth fresh 10-round corrective audit
 
-A seventh fresh sequential review-and-correct cycle was run against the corrected v1.2.6 repository state. Every proved defect was corrected before the next review proceeded. The cycle closes:
+An eighth fresh sequential review-and-correct cycle was run against the corrected v1.2.7 repository state. Every proved defect was corrected and the complete source QA suite passed before the next review proceeded. The cycle closes complete doctor-suspension and verification-reconciliation traversal; complete transactionally claimed due follow-up reminders; explicit failure for oversized canonical Future24 operational payloads; serialized practitioner opaque-reference creation; slot discovery without multi-rule/timezone starvation; exact held-slot reprojection with canonical service duration and true namespaced replay; semantic de-duplication for waitlist and flexible windows; and atomic de-duplicated support/interpreter participant creation with File17 projection. Runtime is 1.2.8 while core schema remains 3.2.0, continuity schema 1.1.0 and Future24 schema 1.0.0. Repository evidence does not prove Hostinger staging or live state.
 
-- paged continuity privacy erasure with truthful `done` state beyond 100 records;
-- legal-hold-safe complete retention traversal for continuity and Future24 records;
-- explicit overflow rejection instead of silent tail truncation for scheduling windows, prerequisite policies, follow-up resources, and episode chains;
-- complete prerequisite-evidence evaluation beyond the former first 100 entries;
-- complete high-volume heatmap and no-show aggregate traversal beyond the former 2,000-appointment ceiling;
-- release/test/document identity for runtime candidate 1.2.7 while retaining core schema 3.2.0, continuity schema 1.1.0, and Future24 schema 1.0.0.
-
-Supported public/cross-file mutation paths remain authorization-, idempotency-, rate-, scope-, consent-, and state-guarded. Repository evidence still does not prove Hostinger staging or live state.
 ## Evidence-state classification
 
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — seventh-cycle source corrections are present. |
+| Coded | **Corrected candidate** — eighth-cycle source corrections are present. |
 | Fresh post-final-code reviews | **Complete at repository/source-review level.** |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
@@ -44,7 +36,7 @@ Supported public/cross-file mutation paths remain authorization-, idempotency-, 
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
 
-No older v1.2.1/v1.2.2/v1.2.3/v1.2.4/v1.2.5/v1.2.6 artifact or older CI run may be used as evidence for the v1.2.7 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
+No older v1.2.1/v1.2.2/v1.2.3/v1.2.4/v1.2.5/v1.2.6/v1.2.7 artifact or older CI run may be used as evidence for the v1.2.8 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
 
 ## Mandatory staging / production gates
 
