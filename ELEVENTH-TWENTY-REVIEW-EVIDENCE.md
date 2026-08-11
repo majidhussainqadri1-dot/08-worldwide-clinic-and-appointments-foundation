@@ -20,9 +20,9 @@ Sequence law: each supported finding was corrected and full source QA re-run bef
 - E11-R14 service mutation explicit type/currency validation.
 - E11-R15 repository branch/service/availability persistence fail-closed validation.
 - E11-R16 runtime/test/document identity and permanent regression evidence aligned to v1.2.11 without schema inflation.
-- E11-R17 privacy/retention/legal-hold corrected-state review.
+- E11-R17 privacy/retention/legal-hold corrected-state review — no additional supported repository defect.
 - E11-R18 Future24 durable replay-finalization defect: successful mutations could return success even when the durable idempotency completion write failed; repository completion also treated a zero-row update as success. Fixed with processing-state CAS/one-row completion and fail-closed 503 reconciliation semantics.
-- E11-R19 migration/security/accessibility/repository-hygiene corrected-state review.
-- E11-R20 final governing-plan/ownership/package/release-parity review.
+- E11-R19 migration/security/accessibility/repository-hygiene corrected-state review — no additional supported repository defect.
+- E11-R20 final governing-plan/ownership/package/release-parity review — no additional supported repository defect.
 
 Staging/live/operational acceptance is not established by this repository record.
