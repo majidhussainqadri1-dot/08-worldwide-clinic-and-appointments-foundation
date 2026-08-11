@@ -13,5 +13,6 @@
 | T12-R05 | DEFECT CORRECTED | Due-follow-up reminder processing used unchecked manual transaction start/commit calls. |
 | T12-R06 | DEFECT CORRECTED | Waitlist offer creation/projection used unchecked manual transaction start/commit calls. |
 | T12-R07 | DEFECT CORRECTED | Leaving a group session could commit membership state without governance audit evidence. |
+| T12-R08 | DEFECT CORRECTED | Group-session cancellation used unchecked manual transaction start/commit calls. |
 
-Rounds T12-R08–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R09–T12-R20 remain unreviewed in this sequential cycle at this commit.

@@ -936,17 +936,19 @@ final class WCA_Future24 {
 		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
 		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		try {
-			$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$session = self::get_record( $session_ref, 'F08-FUT-05' );
-			if ( ! $session || 'group_open' !== (string) $session['status'] ) { $wpdb->query( 'ROLLBACK' ); return new WP_Error( 'wca_group_cancel_conflict', __( 'Group session changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$now = WCA_Repository::now();
-			$ok = $wpdb->update( $table, array( 'status' => 'group_cancelled', 'version' => absint( $session['version'] ) + 1, 'updated_at' => $now ), array( 'id' => absint( $session['id'] ), 'status' => 'group_open', 'version' => absint( $session['version'] ) ) );
-			if ( 1 !== (int) $ok ) { $wpdb->query( 'ROLLBACK' ); return new WP_Error( 'wca_group_cancel_conflict', __( 'Group session changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$members = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='group_cancelled',version=version+1,updated_at=%s WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND status='group_member'", $now, strtolower( $session_ref ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( false === $members ) { $wpdb->query( 'ROLLBACK' ); return new WP_Error( 'wca_group_member_cancel_failed', __( 'Group members could not be cancelled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$audit = self::audit( 'F08-FUT-05', 'group_session_cancelled', strtolower( $session_ref ), array( 'reason_code' => sanitize_key( isset( $data['reason_code'] ) ? $data['reason_code'] : 'operator_cancelled' ), 'members_cancelled' => (int) $members ), $actor, false );
-			if ( is_wp_error( $audit ) ) { $wpdb->query( 'ROLLBACK' ); return $audit; } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$result = WCA_Repository::transaction( function () use ( $table, $session_ref, $data, $actor ) {
+				global $wpdb;
+				$session = self::get_record( $session_ref, 'F08-FUT-05' );
+				if ( ! $session || 'group_open' !== (string) $session['status'] ) { return new WP_Error( 'wca_group_cancel_conflict', __( 'Group session changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+				$now = WCA_Repository::now();
+				$ok = $wpdb->update( $table, array( 'status' => 'group_cancelled', 'version' => absint( $session['version'] ) + 1, 'updated_at' => $now ), array( 'id' => absint( $session['id'] ), 'status' => 'group_open', 'version' => absint( $session['version'] ) ) );
+				if ( 1 !== (int) $ok ) { return new WP_Error( 'wca_group_cancel_conflict', __( 'Group session changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+				$members = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='group_cancelled',version=version+1,updated_at=%s WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND status='group_member'", $now, strtolower( $session_ref ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				if ( false === $members ) { return new WP_Error( 'wca_group_member_cancel_failed', __( 'Group members could not be cancelled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				$audit = self::audit( 'F08-FUT-05', 'group_session_cancelled', strtolower( $session_ref ), array( 'reason_code' => sanitize_key( isset( $data['reason_code'] ) ? $data['reason_code'] : 'operator_cancelled' ), 'members_cancelled' => (int) $members ), $actor, false );
+				return is_wp_error( $audit ) ? $audit : true;
+			}, 'wca_group_cancel_transaction' );
+			if ( is_wp_error( $result ) ) { return $result; }
 			return self::public_record( self::get_record( $session_ref, 'F08-FUT-05' ) );
 		} finally {
 			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
