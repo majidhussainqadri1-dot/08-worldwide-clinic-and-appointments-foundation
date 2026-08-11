@@ -1235,7 +1235,7 @@ final class WCA_Future24 {
 		$service_id = absint( SWC_Helpers::meta( $appointment_id, 'service_id', 0 ) );
 		$service = $service_id ? WCA_Repository::get_service( $service_id, false ) : null;
 		$service_ref = $service && ! empty( $service['public_ref'] ) ? strtolower( (string) $service['public_ref'] ) : '';
-		$rules = (array) $wpdb->get_results( $wpdb->prepare( "SELECT payload_json FROM {$table} WHERE feature_id='F08-FUT-13' AND clinic_id=%d AND status='rule_active' ORDER BY id DESC LIMIT 20", $clinic_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rules = array_reverse( self::feature_rows_for_clinic( 'F08-FUT-13', $clinic_id, 'rule_active', 'payload' ) );
 		$requirements = array();
 		foreach ( $rules as $row ) {
 			$p = json_decode( (string) $row['payload_json'], true );
