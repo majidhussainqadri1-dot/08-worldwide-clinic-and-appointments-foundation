@@ -231,7 +231,7 @@ final class WCA_REST {
 	public static function request_appointment( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'request_appointment', 10, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		return self::respond( WCA_Service::request_appointment( self::data( $request ) ), 201 );
+		return self::respond( self::protected_mutation_projection( WCA_Service::request_appointment( self::data( $request ) ), 'appointment' ), 201 );
 	}
 
 	public static function appointment( WP_REST_Request $request ) {
@@ -242,6 +242,8 @@ final class WCA_REST {
 	}
 
 	private static function appointment_projection( $id ) {
+		$clinic = WCA_Repository::get_clinic( absint( SWC_Helpers::meta( $id, 'clinic_id' ) ), false );
+		$service = WCA_Repository::get_service( absint( SWC_Helpers::meta( $id, 'service_id' ) ), false );
 		return array(
 			'public_ref'        => (string) SWC_Helpers::meta( $id, 'public_ref', 'appointment-' . $id ),
 			'status'            => SWC_Helpers::status( $id ),
@@ -250,11 +252,25 @@ final class WCA_REST {
 			'end_at_utc'        => (string) SWC_Helpers::meta( $id, 'appointment_end_utc' ),
 			'timezone'          => (string) SWC_Helpers::meta( $id, 'patient_timezone' ),
 			'consultation_type' => (string) SWC_Helpers::meta( $id, 'consultation_type' ),
-			'clinic_id'         => absint( SWC_Helpers::meta( $id, 'clinic_id' ) ),
-			'service_id'        => absint( SWC_Helpers::meta( $id, 'service_id' ) ),
+			'clinic_ref'        => $clinic ? (string) $clinic['public_ref'] : '',
+			'service_ref'       => $service ? (string) $service['public_ref'] : '',
 			'allowed_actions'   => WCA_Contracts::allowed_transitions( WCA_Authorization::appointment_actor( $id, get_current_user_id() ), SWC_Helpers::status( $id ) ),
 			'clinical_authority'=> false,
 		);
+	}
+
+	private static function protected_mutation_projection( $result, $type ) {
+		if ( is_wp_error( $result ) || ! is_array( $result ) ) { return $result; }
+		if ( 'appointment' === $type ) {
+			return array_intersect_key( $result, array_flip( array( 'public_ref','status','version','trace_id' ) ) );
+		}
+		if ( 'payment' === $type ) {
+			return array_intersect_key( $result, array_flip( array( 'public_ref','status','currency','amount_minor','platform_commission_minor','version','created_at','updated_at' ) ) );
+		}
+		if ( 'complaint' === $type ) {
+			return array_intersect_key( $result, array_flip( array( 'public_ref','category','status','version','created_at','updated_at' ) ) );
+		}
+		return array();
 	}
 
 	public static function transition( WP_REST_Request $request ) {
@@ -263,7 +279,7 @@ final class WCA_REST {
 		if ( ! WCA_Contracts::is_appointment_status( $raw_next, true ) ) {
 			return new WP_Error( 'wca_invalid_status', __( 'A valid target status is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		return self::respond( WCA_Service::transition_appointment( absint( $request['id'] ), $raw_next, $data ) );
+		return self::respond( self::protected_mutation_projection( WCA_Service::transition_appointment( absint( $request['id'] ), $raw_next, $data ), 'appointment' ) );
 	}
 
 	public static function calendar( WP_REST_Request $request ) {
@@ -277,13 +293,13 @@ final class WCA_REST {
 	}
 
 	public static function payment_intent( WP_REST_Request $request ) {
-		return self::respond( WCA_Service::create_payment_intent( absint( $request['id'] ), sanitize_key( $request->get_param( 'provider' ) ?: 'manual' ), get_current_user_id(), trim( (string) $request->get_header( 'Idempotency-Key' ) ) ), 201 );
+		return self::respond( self::protected_mutation_projection( WCA_Service::create_payment_intent( absint( $request['id'] ), sanitize_key( $request->get_param( 'provider' ) ?: 'manual' ), get_current_user_id(), trim( (string) $request->get_header( 'Idempotency-Key' ) ) ), 'payment' ), 201 );
 	}
 
 	public static function complaint( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'complaint', 10, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		return self::respond( WCA_Service::create_complaint( self::data( $request ) ), 201 );
+		return self::respond( self::protected_mutation_projection( WCA_Service::create_complaint( self::data( $request ) ), 'complaint' ), 201 );
 	}
 
 	public static function health() {
