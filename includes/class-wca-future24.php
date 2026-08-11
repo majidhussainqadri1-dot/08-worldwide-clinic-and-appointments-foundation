@@ -648,10 +648,12 @@ final class WCA_Future24 {
 		if ( is_wp_error( $service ) ) { return $service; }
 		$timezone = sanitize_text_field( isset( $data['timezone'] ) ? $data['timezone'] : 'UTC' );
 		if ( ! WCA_Service::valid_timezone( $timezone ) ) { return new WP_Error( 'wca_windows_timezone', __( 'A valid time zone is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$raw_windows = (array) ( isset( $data['windows'] ) ? $data['windows'] : array() );
+		if ( count( $raw_windows ) > 12 ) { return new WP_Error( 'wca_windows_limit', __( 'No more than 12 scheduling windows may be saved in one request.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) ); }
 		$windows = array();
 		$latest_end = 0;
 		$now = time();
-		foreach ( array_slice( (array) ( isset( $data['windows'] ) ? $data['windows'] : array() ), 0, 12 ) as $window ) {
+		foreach ( $raw_windows as $window ) {
 			if ( ! is_array( $window ) ) { continue; }
 			$start = self::utc( isset( $window['start'] ) ? $window['start'] : '' );
 			$end = self::utc( isset( $window['end'] ) ? $window['end'] : '' );
