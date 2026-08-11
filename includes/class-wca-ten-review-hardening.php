@@ -38,6 +38,15 @@ final class WCA_Ten_Review_Hardening {
 			),
 			true
 		);
+		register_rest_route(
+			'wca/v1',
+			'/mutation-status',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( __CLASS__, 'mutation_status' ),
+				'permission_callback' => array( 'WCA_REST', 'authenticated' ),
+			)
+		);
 	}
 
 	/** Redirect the accidentally emitted plural detail URL without rewrite-flush dependency. */
@@ -141,11 +150,32 @@ final class WCA_Ten_Review_Hardening {
 		if ( ! ( $response instanceof WP_REST_Response ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $response; }
 		$status = absint( $response->get_status() );
 		if ( $status >= 200 && $status < 400 ) {
-			WCA_Repository::complete_idempotency( $claim['id'], $status, $response->get_data() );
+			if ( ! WCA_Repository::complete_idempotency( $claim['id'], $status, $response->get_data() ) ) {
+				WCA_Observability::metric( 'http_idempotency_finalize_failed_total', 1, array( 'route_scope' => substr( hash( 'sha256', $claim['route'] ), 0, 12 ) ) );
+				return new WP_Error( 'wca_idempotency_finalize_failed', __( 'The mutation may have completed, but replay evidence could not be finalized. Query mutation status before retrying.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'reconciliation_required' => true ) );
+			}
 		} else {
 			WCA_Repository::release_idempotency( $claim['id'] );
 		}
 		$response->header( 'X-WCA-Idempotency-Key', $claim['key'] );
+		return $response;
+	}
+
+	/** Authoritative status lookup for an explicit mutation idempotency key. */
+	public static function mutation_status( WP_REST_Request $request ) {
+		$actor = absint( get_current_user_id() );
+		$route = (string) $request->get_param( 'route' );
+		$key = trim( (string) $request->get_header( 'Idempotency-Key' ) );
+		if ( ! $key ) { $key = trim( (string) $request->get_param( 'idempotency_key' ) ); }
+		if ( ! self::is_core_mutation_route( $route ) || ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $key ) ) {
+			return new WP_Error( 'wca_mutation_status_request', __( 'A valid mutation route and idempotency key are required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$scope = 'http_' . substr( hash( 'sha256', $route ), 0, 24 );
+		$result = WCA_Repository::idempotency_status( $scope, $key, $actor );
+		if ( is_wp_error( $result ) ) { return $result; }
+		$response = rest_ensure_response( $result );
+		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
+		$response->header( 'X-Request-ID', WCA_Observability::trace_id() );
 		return $response;
 	}
 

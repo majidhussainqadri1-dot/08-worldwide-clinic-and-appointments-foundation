@@ -844,6 +844,25 @@ final class WCA_Repository {
 		return array_merge( array( 'id' => (int) $wpdb->insert_id, 'response' => array(), 'claimed_new' => true ), $row );
 	}
 
+	/** Read-only authoritative replay status for a caller-owned mutation key. */
+	public static function idempotency_status( $scope, $key, $actor_user_id ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['idempotency'];
+		$scope = sanitize_key( $scope );
+		$key_hash = hash( 'sha256', (string) $key );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT status,response_code,response_json,updated_at,expires_at FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1", $scope, $key_hash, absint( $actor_user_id ) ), ARRAY_A );
+		if ( ! $row ) { return new WP_Error( 'wca_idempotency_not_found', __( 'No mutation reservation was found for this key.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+		$response = self::decode( $row['response_json'] );
+		return array(
+			'status'                  => (string) $row['status'],
+			'response_code'           => absint( $row['response_code'] ),
+			'response'                => 'completed' === (string) $row['status'] ? $response : array(),
+			'updated_at_utc'          => (string) $row['updated_at'],
+			'expires_at_utc'          => (string) $row['expires_at'],
+			'reconciliation_required' => 'processing' === (string) $row['status'] && strtotime( (string) $row['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS,
+		);
+	}
+
 	public static function release_idempotency( $id ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['idempotency'];
