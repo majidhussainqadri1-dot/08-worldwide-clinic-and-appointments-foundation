@@ -245,6 +245,8 @@ final class WCA_REST {
 	}
 
 	public static function appointment( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'appointment_read', 120, 60 );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		$id = absint( $request['id'] );
 		$access = WCA_Authorization::can_view_appointment( $id, 0, sanitize_key( $request->get_header( 'X-WCA-Access-Purpose' ) ) );
 		if ( is_wp_error( $access ) ) { return $access; }
@@ -295,6 +297,8 @@ final class WCA_REST {
 	}
 
 	public static function calendar( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'appointment_calendar', 60, 60 );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		$ics = WCA_Service::appointment_ics( absint( $request['id'] ) );
 		if ( is_wp_error( $ics ) ) { return $ics; }
 		$response = new WP_REST_Response( $ics, 200 );

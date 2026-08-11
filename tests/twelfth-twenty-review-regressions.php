@@ -15,5 +15,6 @@ t12_has('R9 participant add transaction','includes/class-wca-future24.php','wca_
 t12_has('R10 participant revoke transaction','includes/class-wca-future24.php','wca_support_revoke_transaction');
 t12_has('R11 virtual room transaction','includes/class-wca-future24.php','wca_virtual_room_transaction');
 t12_has('R12 protected mutation rate limits','includes/class-wca-rest.php',"'clinic_review', 20, HOUR_IN_SECONDS");
+t12_has('R13 sensitive read rate limits','includes/class-wca-rest.php',"'appointment_read', 120, 60");
 if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
 echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";
