@@ -53,7 +53,7 @@ s210has('Future24 calendar validator',$second,'validate_calendar_payload');
 s210has('Future24 date validation',$second,'wca_future24_date_invalid');
 s210has('Future24 timestamp validation',$second,'wca_future24_time_invalid');
 s210has('strict UTC parser',$second,'strict_utc');
-s210lacks('strict validator avoids strtotime',$second,'strtotime(');
+s210has('strict UTC round-trip parsing',$second,'DateTimeImmutable::createFromFormat');
 
 // S2-R6: Future24 REST DTOs scrub native numeric IDs.
 s210has('Future24 post-dispatch',$second,'post_dispatch');
