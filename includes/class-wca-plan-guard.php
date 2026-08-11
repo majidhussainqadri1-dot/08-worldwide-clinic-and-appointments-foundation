@@ -11,18 +11,24 @@ final class WCA_Plan_Guard {
 	const REVIEW_ELIGIBILITY_DAYS = 180;
 
 	public static function practitioner_ref( $user_id ) {
+		global $wpdb;
 		$user_id = absint( $user_id );
-		if ( ! $user_id || ! SWC_Doctor_Authority::is_eligible( $user_id ) ) {
-			return '';
-		}
-		$ref = (string) get_user_meta( $user_id, '_wca_practitioner_ref', true );
-		if ( ! preg_match( '/^[0-9a-f-]{36}$/i', $ref ) ) {
-			$ref = WCA_Repository::uuid();
-			if ( ! update_user_meta( $user_id, '_wca_practitioner_ref', $ref ) ) {
-				return '';
+		if ( ! $user_id || ! SWC_Doctor_Authority::is_eligible( $user_id ) ) { return ''; }
+		$ref = strtolower( (string) get_user_meta( $user_id, '_wca_practitioner_ref', true ) );
+		if ( preg_match( '/^[0-9a-f-]{36}$/', $ref ) ) { return $ref; }
+		$lock = 'wca-practitioner-ref-' . $user_id;
+		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,3)', $lock ) ) ) { return ''; }
+		try {
+			$ref = strtolower( (string) get_user_meta( $user_id, '_wca_practitioner_ref', true ) );
+			if ( ! preg_match( '/^[0-9a-f-]{36}$/', $ref ) ) {
+				$candidate = WCA_Repository::uuid();
+				update_user_meta( $user_id, '_wca_practitioner_ref', $candidate );
+				$ref = strtolower( (string) get_user_meta( $user_id, '_wca_practitioner_ref', true ) );
 			}
+			return preg_match( '/^[0-9a-f-]{36}$/', $ref ) ? $ref : '';
+		} finally {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		}
-		return strtolower( $ref );
 	}
 
 	public static function practitioner_id( $ref ) {
