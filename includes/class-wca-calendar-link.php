@@ -69,13 +69,15 @@ final class WCA_Calendar_Link {
 		if ( ! in_array( $status, array( 'confirmed', 'reschedule_pending', 'checked_in', 'completed' ), true ) ) { return new WP_Error( 'wca_calendar_state', __( 'Calendar export is unavailable for this appointment state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$start = (string) SWC_Helpers::meta( $id, 'preferred_at_utc', '' );
 		$end = (string) SWC_Helpers::meta( $id, 'appointment_end_utc', '' );
-		if ( ! $start || ! $end ) { return new WP_Error( 'wca_calendar_time', __( 'Confirmed appointment time is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$start_ts = self::strict_utc_timestamp( $start );
+		$end_ts = self::strict_utc_timestamp( $end );
+		if ( false === $start_ts || false === $end_ts || $end_ts <= $start_ts ) { return new WP_Error( 'wca_calendar_time_invalid', __( 'Stored appointment time is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$uid = strtolower( $ref ) . '@' . sanitize_key( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
 		$ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Sabri Social Homeopathy Platform//File 08//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\n";
 		$ics .= 'UID:' . self::ics( $uid ) . "\r\n";
 		$ics .= 'DTSTAMP:' . gmdate( 'Ymd\THis\Z' ) . "\r\n";
-		$ics .= 'DTSTART:' . gmdate( 'Ymd\THis\Z', strtotime( $start . ' UTC' ) ) . "\r\n";
-		$ics .= 'DTEND:' . gmdate( 'Ymd\THis\Z', strtotime( $end . ' UTC' ) ) . "\r\n";
+		$ics .= 'DTSTART:' . gmdate( 'Ymd\THis\Z', $start_ts ) . "\r\n";
+		$ics .= 'DTEND:' . gmdate( 'Ymd\THis\Z', $end_ts ) . "\r\n";
 		$ics .= 'SUMMARY:' . self::ics( __( 'Clinic appointment', 'worldwide-clinic-appointments' ) ) . "\r\n";
 		$ics .= 'DESCRIPTION:' . self::ics( __( 'Private appointment schedule. Open the platform for current status and instructions.', 'worldwide-clinic-appointments' ) ) . "\r\n";
 		$ics .= "END:VEVENT\r\nEND:VCALENDAR\r\n";
@@ -102,6 +104,18 @@ final class WCA_Calendar_Link {
 	private static function appointment_id( $ref ) {
 		$ids = get_posts( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => 'any', 'fields' => 'ids', 'posts_per_page' => 2, 'no_found_rows' => true, 'meta_key' => '_swc_public_ref', 'meta_value' => strtolower( sanitize_text_field( $ref ) ) ) );
 		return 1 === count( $ids ) ? absint( $ids[0] ) : 0;
+	}
+
+	private static function strict_utc_timestamp( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value ) { return false; }
+		$utc = new DateTimeZone( 'UTC' );
+		foreach ( array( array( '!Y-m-d H:i:s', 'Y-m-d H:i:s' ), array( '!Y-m-d H:i', 'Y-m-d H:i' ), array( '!Y-m-d\TH:i:s\Z', 'Y-m-d\TH:i:s\Z' ), array( '!Y-m-d\TH:i\Z', 'Y-m-d\TH:i\Z' ) ) as $entry ) {
+			$dt = DateTimeImmutable::createFromFormat( $entry[0], $value, $utc );
+			$errors = DateTimeImmutable::getLastErrors();
+			if ( $dt && ( false === $errors || ( 0 === $errors['warning_count'] && 0 === $errors['error_count'] ) ) && $dt->format( $entry[1] ) === $value ) { return $dt->getTimestamp(); }
+		}
+		return false;
 	}
 
 	private static function ics( $value ) {
