@@ -633,11 +633,13 @@ final class WCA_Continuity {
 
 	/** @return array<string,mixed>|WP_Error */
 	private static function sanitize_followup( $data ) {
+		$resources = (array) ( isset( $data['resources'] ) ? $data['resources'] : array() );
+		if ( count( $resources ) > 20 ) { return new WP_Error( 'wca_followup_resource_limit', __( 'No more than 20 follow-up resources may be saved in one plan.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) ); }
 		$out = array(
 			'purpose'      => self::bounded_text( isset( $data['purpose'] ) ? $data['purpose'] : '', 191 ),
 			'instructions' => self::bounded_textarea( isset( $data['instructions'] ) ? $data['instructions'] : '', 5000 ),
 			'limitations'  => self::bounded_textarea( isset( $data['limitations'] ) ? $data['limitations'] : '', 1500 ),
-			'resources'    => self::sanitize_resource_refs( isset( $data['resources'] ) ? $data['resources'] : array() ),
+			'resources'    => self::sanitize_resource_refs( $resources ),
 		);
 		if ( '' === $out['purpose'] ) { return new WP_Error( 'wca_followup_purpose', __( 'A follow-up purpose is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		return self::payload_size_ok( $out ) ? $out : new WP_Error( 'wca_followup_size', __( 'Follow-up plan is too large.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) );
@@ -647,7 +649,7 @@ final class WCA_Continuity {
 	private static function sanitize_resource_refs( $resources ) {
 		$out = array();
 		$home_host = strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
-		foreach ( array_slice( (array) $resources, 0, 20 ) as $resource ) {
+		foreach ( (array) $resources as $resource ) {
 			if ( ! is_array( $resource ) ) { continue; }
 			$type = sanitize_key( isset( $resource['type'] ) ? $resource['type'] : 'educational' );
 			$ref  = sanitize_text_field( isset( $resource['ref'] ) ? $resource['ref'] : '' );
