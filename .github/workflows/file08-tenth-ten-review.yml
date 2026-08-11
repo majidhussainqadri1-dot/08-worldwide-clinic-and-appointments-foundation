@@ -1,4 +1,4 @@
-name: File 08 Tenth Fresh Ten-Round Sequential Review
+name: File 08 Tenth Review R10 Closure Retry
 
 on:
   push:
@@ -11,10 +11,10 @@ permissions:
   contents: write
 
 jobs:
-  review-fix-retest:
+  r10-close:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout exact v1.2.9 review branch
+      - name: Checkout exact R9-corrected branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: codex/file08-new-governing-plans-completion-2026
@@ -25,58 +25,22 @@ jobs:
           php-version: '8.3'
           coverage: none
           extensions: zip
-      - name: Decode T10 review patches
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/f08-t10
-          base64 -d tools/tenth-review-patches.tgz.b64 > /tmp/f08-t10/patches.tgz
-          tar -xzf /tmp/f08-t10/patches.tgz -C /tmp/f08-t10
-          for n in $(seq 1 9); do test -s "/tmp/f08-t10/r${n}.patch"; done
-      - name: T10-R1 through T10-R9 sequential correction and full retest
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          qa() {
-            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
-            php tests/run-all.php
-            node --check assets/js/clinic.js
-            node --check assets/js/continuity.js
-            node --check assets/js/future24.js
-            test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' \) -print -quit)"
-            test -z "$(find . -type l -print -quit)"
-            test ! -e .gitmodules
-            ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
-          }
-          messages=(
-            'make appointment request state and evidence atomic'
-            'make clinic lifecycle state and event/outbox atomic'
-            'make branch creation canonical timezone-valid and atomic'
-            'make service mutation event/outbox atomic'
-            'validate availability windows and make event/outbox atomic'
-            'make complaint state event and projections atomic'
-            'make payment intent outbox and replay finalization atomic'
-            'fail closed on HTTP replay finalization and add status query'
-            'add opaque cursor pagination and conditional clinic caching'
-          )
-          for n in $(seq 1 9); do
-            echo "===== T10-R${n}: apply supported correction ====="
-            git apply --check "/tmp/f08-t10/r${n}.patch"
-            git apply "/tmp/f08-t10/r${n}.patch"
-            echo "===== T10-R${n}: full corrected-state QA before next review ====="
-            qa
-            git add includes
-            git commit -m "File 08 T10-R${n}: ${messages[$((n-1))]}"
-            git push origin HEAD:codex/file08-new-governing-plans-completion-2026
-          done
-      - name: T10-R10 release identity docs and permanent regression gate
+      - name: Apply T10-R10 release identity and permanent regression evidence
         shell: bash
         run: |
           set -euo pipefail
           python3 tools/tenth-r10-close.py
-      - name: T10-R10 full corrected-state QA
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('CHANGELOG.md')
+          s=p.read_text()
+          old='## 1.2.10 — 2026-08-12'
+          new='## 1.2.10 — 2026-08-11'
+          if old not in s:
+              raise SystemExit('T10 changelog date correction anchor missing')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Full corrected T10-R10 QA
         shell: bash
         run: |
           set -euo pipefail
@@ -89,7 +53,7 @@ jobs:
           test -z "$(find . -type l -print -quit)"
           test ! -e .gitmodules
           ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
-      - name: Remove transient T10 tooling re-test and publish final candidate source
+      - name: Remove transient T10 tooling and re-run exact final QA
         shell: bash
         run: |
           set -euo pipefail
@@ -103,6 +67,8 @@ jobs:
           test -z "$(find . -type l -print -quit)"
           test ! -e .gitmodules
           ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'File 08 T10-R10: close tenth review as v1.2.10 candidate'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
