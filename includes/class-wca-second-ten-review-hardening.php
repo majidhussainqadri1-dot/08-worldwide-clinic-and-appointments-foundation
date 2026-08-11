@@ -50,7 +50,7 @@ final class WCA_Second_Ten_Review_Hardening {
 
 		global $wpdb;
 		$table = WCA_Schema::tables()['idempotency'];
-		$scope = 'tenreview_' . substr( hash( 'sha256', $route ), 0, 24 );
+		$scope = 'http_' . substr( hash( 'sha256', $route ), 0, 24 );
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT id,status,updated_at FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1",
