@@ -599,6 +599,8 @@ final class WCA_Service {
 		return SWC_Helpers::with_lock( $appointment_id, function () use ( $appointment_id, $next, $data, $actor_user_id, $expected_status, $expected_version ) {
 			$check = SWC_Helpers::assert_expected( $appointment_id, $expected_status, $expected_version );
 			if ( is_wp_error( $check ) ) { return $check; }
+			$current_auth = WCA_Authorization::can_transition_appointment( $appointment_id, $next, $actor_user_id );
+			if ( is_wp_error( $current_auth ) ) { return $current_auth; }
 			$current = SWC_Helpers::status( $appointment_id );
 			$actor = WCA_Authorization::appointment_actor( $appointment_id, $actor_user_id );
 			if ( ! WCA_Contracts::can_transition( $actor, $current, $next ) ) { return new WP_Error( 'wca_transition', __( 'That transition is not permitted.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
