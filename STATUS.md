@@ -23,6 +23,8 @@ The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F
 
 An eighth fresh sequential review-and-correct cycle was run against the corrected v1.2.7 repository state. Every proved defect was corrected and the complete source QA suite passed before the next review proceeded. The cycle closes complete doctor-suspension and verification-reconciliation traversal; complete transactionally claimed due follow-up reminders; explicit failure for oversized canonical Future24 operational payloads; serialized practitioner opaque-reference creation; slot discovery without multi-rule/timezone starvation; exact held-slot reprojection with canonical service duration and true namespaced replay; semantic de-duplication for waitlist and flexible windows; and atomic de-duplicated support/interpreter participant creation with File17 projection. Runtime is 1.2.8 while core schema remains 3.2.0, continuity schema 1.1.0 and Future24 schema 1.0.0. Repository evidence does not prove Hostinger staging or live state.
 
+Repository-source sequential review workflow `31503985463` completed **SUCCESS**. The v1.2.8 release-source closure workflow `31506569346` also completed **SUCCESS** before transient review-workflow cleanup. Those runs are source-review/release-construction evidence only; **Automated-QA Green remains tied exclusively to the canonical quality workflow on the current exact final HEAD**.
+
 ## Evidence-state classification
 
 | State | Current repository evidence |
