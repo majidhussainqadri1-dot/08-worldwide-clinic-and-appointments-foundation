@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -20,5 +21,14 @@ for test in Path('tests').glob('*.php'):
     text = test.read_text()
     if '1.2.11' in text:
         test.write_text(text.replace('1.2.11', '1.2.12'))
+
+# Changelog release dates are canonical UTC release dates; Pakistan-local date
+# may already be the next day and must not make executable gates ambiguous.
+cp = Path('CHANGELOG.md')
+cs = cp.read_text()
+cs, n = re.subn(r'## 1\.2\.12 — 2026-08-\d{2}', '## 1.2.12 — 2026-08-11', cs, count=1)
+if n != 1:
+    raise SystemExit('v1.2.12 changelog heading missing')
+cp.write_text(cs)
 
 print('Twelfth release identity/evidence closure applied')
