@@ -628,7 +628,12 @@ final class WCA_Service {
 				update_post_meta( $appointment_id, '_swc_branch_id', absint( $hold['branch_id'] ?? 0 ) );
 				foreach ( array( 'proposed_at_utc','proposed_end_utc','proposed_branch_id','proposed_hold_token','proposed_by_user_id','proposed_expires_at' ) as $key ) { delete_post_meta( $appointment_id, '_swc_' . $key ); }
 			}
-			if ( 'checked_in' === $next ) { update_post_meta( $appointment_id, '_swc_checked_in_at_utc', WCA_Repository::now() ); update_post_meta( $appointment_id, '_swc_actual_mode', sanitize_key( $data['actual_mode'] ?? SWC_Helpers::meta( $appointment_id, 'consultation_type' ) ) ); }
+			if ( 'checked_in' === $next ) {
+				$actual_mode = sanitize_key( $data['actual_mode'] ?? SWC_Helpers::meta( $appointment_id, 'consultation_type' ) );
+				if ( ! in_array( $actual_mode, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) { return new WP_Error( 'wca_actual_mode_invalid', __( 'A valid consultation mode is required for check-in.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+				update_post_meta( $appointment_id, '_swc_checked_in_at_utc', WCA_Repository::now() );
+				update_post_meta( $appointment_id, '_swc_actual_mode', $actual_mode );
+			}
 			if ( 'completed' === $next ) {
 				if ( ! SWC_Helpers::meta( $appointment_id, 'checked_in_at_utc' ) ) { return new WP_Error( 'wca_checkin_required', __( 'The appointment must be checked in before completion.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 				update_post_meta( $appointment_id, '_swc_completed_at_utc', WCA_Repository::now() );
