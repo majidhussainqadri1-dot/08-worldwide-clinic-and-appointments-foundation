@@ -1218,15 +1218,21 @@ final class WCA_Future24 {
 		$actor = absint( $actor ?: get_current_user_id() );
 		$claims = WCA_Authorization::claims( $actor ); if ( is_wp_error( $claims ) ) { return $claims; }
 		if ( empty( $claims['guardian'] ) ) { return array( 'contract' => 'wca.family-hub', 'version' => self::CONTRACT_VERSION, 'guardian' => false, 'appointments' => array() ); }
-		$q = new WP_Query( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => array( 'private','publish' ), 'fields' => 'ids', 'posts_per_page' => 100, 'no_found_rows' => true, 'meta_key' => '_swc_guardian_user_id', 'meta_value' => $actor ) );
 		$out = array();
-		foreach ( (array) $q->posts as $id ) {
-			$patient_id = absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) );
-			$guard = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_id, $actor, $actor ) : new WP_Error( 'wca_guardian_recheck_unavailable', 'unavailable' );
-			if ( is_wp_error( $guard ) ) { continue; }
-			$out[] = array( 'appointment_ref' => self::appointment_ref( $id ), 'status' => SWC_Helpers::status( $id ), 'scheduled_at_utc' => (string) SWC_Helpers::meta( $id, 'preferred_at_utc', '' ) );
-		}
-		return array( 'contract' => 'wca.family-hub', 'version' => self::CONTRACT_VERSION, 'guardian' => true, 'appointments' => $out, 'relationship_recheck' => 'performed_for_each_returned_appointment' );
+		$page = 1;
+		$batch = 200;
+		do {
+			$q = new WP_Query( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => array( 'private','publish' ), 'fields' => 'ids', 'posts_per_page' => $batch, 'paged' => $page, 'orderby' => 'ID', 'order' => 'ASC', 'no_found_rows' => true, 'meta_key' => '_swc_guardian_user_id', 'meta_value' => $actor ) );
+			$ids = array_map( 'absint', (array) $q->posts );
+			foreach ( $ids as $id ) {
+				$patient_id = absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) );
+				$guard = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_id, $actor, $actor ) : new WP_Error( 'wca_guardian_recheck_unavailable', 'unavailable' );
+				if ( is_wp_error( $guard ) ) { continue; }
+				$out[] = array( 'appointment_ref' => self::appointment_ref( $id ), 'status' => SWC_Helpers::status( $id ), 'scheduled_at_utc' => (string) SWC_Helpers::meta( $id, 'preferred_at_utc', '' ) );
+			}
+			$page++;
+		} while ( count( $ids ) === $batch );
+		return array( 'contract' => 'wca.family-hub', 'version' => self::CONTRACT_VERSION, 'guardian' => true, 'appointments' => $out, 'relationship_recheck' => 'performed_for_each_returned_appointment', 'pagination_complete' => true );
 	}
 
 	/* FUT-15 */
