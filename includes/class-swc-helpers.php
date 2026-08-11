@@ -429,13 +429,39 @@ final class SWC_Helpers {
 		$doctor_id      = absint( self::meta( $appointment_id, 'doctor_id' ) );
 		return self::with_resource_lock(
 			'appointment-' . $appointment_id,
-			function () use ( $doctor_id, $callback ) {
+			function () use ( $appointment_id, $doctor_id, $callback ) {
+				$mutation = function () use ( $appointment_id, $callback ) {
+					return self::with_database_transaction( $appointment_id, $callback );
+				};
 				if ( $doctor_id ) {
-					return self::with_resource_lock( 'doctor-' . $doctor_id, $callback );
+					return self::with_resource_lock( 'doctor-' . $doctor_id, $mutation );
 				}
-				return call_user_func( $callback );
+				return call_user_func( $mutation );
 			}
 		);
+	}
+
+	/**
+	 * Keep an appointment mutation and its mandatory audit/outbox side effects atomic.
+	 * WP_Error means fail-closed and rolls back the SQL mutation before the lock is released.
+	 */
+	private static function with_database_transaction( $appointment_id, $callback ) {
+		global $wpdb;
+		$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		try {
+			$result = call_user_func( $callback );
+			if ( is_wp_error( $result ) ) {
+				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				wp_cache_delete( absint( $appointment_id ), 'post_meta' );
+				return $result;
+			}
+			$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			return $result;
+		} catch ( Throwable $error ) {
+			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			wp_cache_delete( absint( $appointment_id ), 'post_meta' );
+			return new WP_Error( 'swc_transaction_failed', __( 'The appointment update could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
 	}
 
 	/**
