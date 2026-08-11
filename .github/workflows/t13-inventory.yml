@@ -1,0 +1,18 @@
+name: File 08 T13 Release Inventory
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Current release identity references
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== 1.2.12 references ==='
+          grep -RIn --exclude-dir=.git --exclude='*.zip' '1\.2\.12' . || true
