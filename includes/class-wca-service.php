@@ -226,6 +226,7 @@ final class WCA_Service {
 	public static function search_slots( $args ) {
 		$doctor_id = absint( $args['doctor_user_id'] ?? 0 );
 		$service_id = absint( $args['service_id'] ?? 0 );
+		$clinic_id = absint( $args['clinic_id'] ?? 0 );
 		$timezone = (string) ( $args['timezone'] ?? 'UTC' );
 		if ( ! $doctor_id || ! self::valid_timezone( $timezone ) || ! SWC_Doctor_Authority::is_eligible( $doctor_id ) ) {
 			return new WP_Error( 'wca_slot_query', __( 'Valid doctor and time zone are required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
@@ -237,11 +238,14 @@ final class WCA_Service {
 		if ( $to_date < $from_date || $to_date->diff( $from_date )->days > self::SLOT_HORIZON_DAYS ) {
 			return new WP_Error( 'wca_slot_range', __( 'Slot search range is invalid or too large.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		$rules = WCA_Repository::list_availability_rules( $doctor_id, $service_id );
-		if ( ! $rules ) {
-			return array( 'slots' => array(), 'freshness_version' => hash( 'sha256', 'none|' . $doctor_id ), 'generated_at_utc' => gmdate( 'c' ) );
-		}
 		$service = $service_id ? WCA_Repository::get_service( $service_id, true ) : null;
+		if ( $service_id && ( ! $service || ( $clinic_id && absint( $service['clinic_id'] ) !== $clinic_id ) ) ) {
+			return new WP_Error( 'wca_slot_service_scope', __( 'The requested service is not active for this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+		$rules = WCA_Repository::list_availability_rules( $doctor_id, $service_id, $clinic_id );
+		if ( ! $rules ) {
+			return array( 'slots' => array(), 'freshness_version' => hash( 'sha256', 'none|' . $doctor_id . '|' . $clinic_id . '|' . $service_id ), 'generated_at_utc' => gmdate( 'c' ) );
+		}
 		$duration = $service ? absint( $service['duration_minutes'] ) : absint( $args['duration_minutes'] ?? 30 );
 		$duration = min( 480, max( 10, $duration ) );
 		$limit = min( 500, max( 1, absint( $args['limit'] ?? 100 ) ) );
@@ -256,7 +260,7 @@ final class WCA_Service {
 		WCA_Observability::metric( 'slot_search_total', 1, array( 'result_bucket' => count( $slots ) ? 'non_empty' : 'empty' ) );
 		return array(
 			'slots'             => array_slice( $slots, 0, $limit ),
-			'freshness_version' => hash( 'sha256', implode( '|', $versions ) . '|' . WCA_Repository::now() . '|' . $doctor_id . '|' . $service_id ),
+			'freshness_version' => hash( 'sha256', implode( '|', $versions ) . '|' . WCA_Repository::now() . '|' . $doctor_id . '|' . $clinic_id . '|' . $service_id ),
 			'generated_at_utc'  => gmdate( 'c' ),
 			'timezone'          => $timezone,
 		);

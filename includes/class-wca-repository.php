@@ -345,12 +345,13 @@ final class WCA_Repository {
 	}
 
 	/** @return array<int,array<string,mixed>> */
-	public static function list_availability_rules( $doctor_user_id, $service_id = 0 ) {
+	public static function list_availability_rules( $doctor_user_id, $service_id = 0, $clinic_id = 0 ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['availability'];
 		$where = 'doctor_user_id=%d AND status=%s';
 		$params = array( absint( $doctor_user_id ), 'active' );
 		if ( $service_id ) { $where .= ' AND (service_id=0 OR service_id=%d)'; $params[] = absint( $service_id ); }
+		if ( $clinic_id ) { $where .= ' AND clinic_id=%d'; $params[] = absint( $clinic_id ); }
 		$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY id ASC", $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		return array_map( static function ( $row ) {
 			foreach ( array( 'rrule', 'breaks', 'exceptions' ) as $key ) { $row[ $key ] = self::decode( $row[ $key . '_json' ] ); unset( $row[ $key . '_json' ] ); }
