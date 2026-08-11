@@ -484,30 +484,31 @@ final class WCA_Future24 {
 			$offer_lock = self::semantic_lock( 'waitlist-offer', (string) $wait['public_ref'] . '|' . $start . '|' . $end );
 			if ( is_wp_error( $offer_lock ) ) { continue; }
 			try {
-				$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$duplicate = $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$table} WHERE feature_id='F08-FUT-01' AND parent_ref=%s AND status='offer_pending' AND starts_at=%s AND ends_at=%s AND (expires_at IS NULL OR expires_at>%s) LIMIT 1", (string) $wait['public_ref'], $start, $end, WCA_Repository::now() ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				if ( $duplicate ) { $wpdb->query( 'COMMIT' ); continue; } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$offer = self::put_system_record( 'F08-FUT-01', array(
-					'clinic_id' => $clinic_id,
-					'subject_user_id' => absint( $wait['subject_user_id'] ),
-					'parent_ref' => (string) $wait['public_ref'],
-					'status' => 'offer_pending',
-					'starts_at' => $start,
-					'ends_at' => $end,
-					'expires_at' => gmdate( 'Y-m-d H:i:s', time() + 15 * MINUTE_IN_SECONDS ),
-					'payload' => array( 'service_ref' => $service_ref, 'released_slot' => true, 'auto_book' => false, 'confirmation_required' => true ),
-				) );
-				if ( is_wp_error( $offer ) ) { $wpdb->query( 'ROLLBACK' ); continue; } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$queued = WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) $offer['public_ref'], array(
-					'event' => 'waitlist_offer_available',
-					'appointment_ref' => '',
-					'recipients' => array( $recipient_id ),
-					'offer_ref' => (string) $offer['public_ref'],
-					'delivery_owner' => 'File19',
-				), WCA_Observability::trace_id() );
-				if ( is_wp_error( $queued ) ) { $wpdb->query( 'ROLLBACK' ); continue; } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$offered++;
+				$outcome = WCA_Repository::transaction( function () use ( $table, $wait, $start, $end, $clinic_id, $service_ref, $recipient_id ) {
+					global $wpdb;
+					$duplicate = $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$table} WHERE feature_id='F08-FUT-01' AND parent_ref=%s AND status='offer_pending' AND starts_at=%s AND ends_at=%s AND (expires_at IS NULL OR expires_at>%s) LIMIT 1", (string) $wait['public_ref'], $start, $end, WCA_Repository::now() ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( $duplicate ) { return false; }
+					$offer = self::put_system_record( 'F08-FUT-01', array(
+						'clinic_id' => $clinic_id,
+						'subject_user_id' => absint( $wait['subject_user_id'] ),
+						'parent_ref' => (string) $wait['public_ref'],
+						'status' => 'offer_pending',
+						'starts_at' => $start,
+						'ends_at' => $end,
+						'expires_at' => gmdate( 'Y-m-d H:i:s', time() + 15 * MINUTE_IN_SECONDS ),
+						'payload' => array( 'service_ref' => $service_ref, 'released_slot' => true, 'auto_book' => false, 'confirmation_required' => true ),
+					) );
+					if ( is_wp_error( $offer ) ) { return $offer; }
+					$queued = WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) $offer['public_ref'], array(
+						'event' => 'waitlist_offer_available',
+						'appointment_ref' => '',
+						'recipients' => array( $recipient_id ),
+						'offer_ref' => (string) $offer['public_ref'],
+						'delivery_owner' => 'File19',
+					), WCA_Observability::trace_id() );
+					return is_wp_error( $queued ) ? $queued : true;
+				}, 'wca_waitlist_offer_transaction' );
+				if ( true === $outcome ) { $offered++; }
 			} finally {
 				self::release_semantic_lock( $offer_lock );
 			}

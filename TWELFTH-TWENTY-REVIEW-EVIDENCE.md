@@ -11,5 +11,6 @@
 | T12-R03 | DEFECT CORRECTED | Follow-up creation could persist state without its required domain event. |
 | T12-R04 | DEFECT CORRECTED | Follow-up completion could persist state without its required domain event. |
 | T12-R05 | DEFECT CORRECTED | Due-follow-up reminder processing used unchecked manual transaction start/commit calls. |
+| T12-R06 | DEFECT CORRECTED | Waitlist offer creation/projection used unchecked manual transaction start/commit calls. |
 
-Rounds T12-R06–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R07–T12-R20 remain unreviewed in this sequential cycle at this commit.
