@@ -251,14 +251,19 @@ final class WCA_Privacy {
 		$table = self::future24_table();
 		if ( $table ) {
 			$cutoff = gmdate( 'Y-m-d H:i:s', time() - max( 1, absint( $policy['future24_operational_days'] ) ) * DAY_IN_SECONDS );
-			$rows = (array) $wpdb->get_results(
-				$wpdb->prepare( "SELECT * FROM {$table} WHERE expires_at IS NOT NULL AND expires_at<%s AND updated_at<%s ORDER BY id ASC LIMIT 500", WCA_Repository::now(), $cutoff ),
-				ARRAY_A
-			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			foreach ( $rows as $row ) {
-				if ( self::future24_legal_hold( $row ) ) { continue; }
-				$wpdb->delete( $table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) );
-			}
+			$cursor = 0;
+			$batch = 250;
+			do {
+				$rows = (array) $wpdb->get_results(
+					$wpdb->prepare( "SELECT * FROM {$table} WHERE expires_at IS NOT NULL AND expires_at<%s AND updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d", WCA_Repository::now(), $cutoff, $cursor, $batch ),
+					ARRAY_A
+				); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				foreach ( $rows as $row ) {
+					$cursor = max( $cursor, absint( $row['id'] ) );
+					if ( self::future24_legal_hold( $row ) ) { continue; }
+					$wpdb->delete( $table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) );
+				}
+			} while ( count( $rows ) === $batch );
 		}
 	}
 }
