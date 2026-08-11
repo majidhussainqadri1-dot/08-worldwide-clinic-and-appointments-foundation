@@ -36,6 +36,7 @@ $wca_files = array(
 	'includes/class-wca-authorization.php',
 	'includes/class-wca-central-governance.php',
 	'includes/class-wca-repository.php',
+	'includes/class-wca-idempotency.php',
 	'includes/class-wca-plan-guard.php',
 	'includes/class-wca-service.php',
 	'includes/class-wca-appointment-command.php',
@@ -50,6 +51,7 @@ $wca_files = array(
 	'includes/class-wca-calendar-link.php',
 	'includes/class-wca-future24.php',
 	'includes/class-wca-ten-review-hardening.php',
+	'includes/class-wca-second-ten-review-hardening.php',
 	'includes/class-wca-routes.php',
 	'includes/class-wca-frontend.php',
 	'includes/class-wca-admin.php',
@@ -95,6 +97,7 @@ function wca_start_plugin() {
 	WCA_Future24::boot();
 	( new SWC_Plugin() )->run();
 	WCA_Ten_Review_Hardening::boot();
+	WCA_Second_Ten_Review_Hardening::boot();
 }
 add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
 
