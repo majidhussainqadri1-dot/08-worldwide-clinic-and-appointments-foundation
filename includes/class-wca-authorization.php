@@ -135,7 +135,12 @@ final class WCA_Authorization {
 	/** @return true|WP_Error */
 	public static function can_transition_appointment( $appointment_id, $next, $user_id = 0 ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
-		$view = self::can_view_appointment( $appointment_id, $user_id );
+		/* The transition matrix grants the canonical clinic administrator an explicit
+		 * actor class. Purpose-limited appointment access must therefore be revalidated
+		 * with the operations purpose (and its step-up requirement) before that actor
+		 * can reach the matrix. Operations-only users are not promoted to admin here. */
+		$purpose = user_can( $user_id, 'manage_worldwide_clinic' ) ? 'operations' : '';
+		$view = self::can_view_appointment( $appointment_id, $user_id, $purpose );
 		if ( is_wp_error( $view ) ) { return $view; }
 		$actor = self::appointment_actor( $appointment_id, $user_id );
 		$current = SWC_Helpers::status( $appointment_id );
