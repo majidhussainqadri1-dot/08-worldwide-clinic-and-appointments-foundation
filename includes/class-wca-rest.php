@@ -256,7 +256,7 @@ final class WCA_REST {
 	}
 
 	public static function payment_intent( WP_REST_Request $request ) {
-		return self::respond( WCA_Service::create_payment_intent( absint( $request['id'] ), sanitize_key( $request->get_param( 'provider' ) ?: 'manual' ) ), 201 );
+		return self::respond( WCA_Service::create_payment_intent( absint( $request['id'] ), sanitize_key( $request->get_param( 'provider' ) ?: 'manual' ), get_current_user_id(), trim( (string) $request->get_header( 'Idempotency-Key' ) ) ), 201 );
 	}
 
 	public static function complaint( WP_REST_Request $request ) {

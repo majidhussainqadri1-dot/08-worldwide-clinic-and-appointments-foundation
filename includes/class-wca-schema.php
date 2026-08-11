@@ -289,7 +289,8 @@ final class WCA_Schema {
 				public_ref char(36) NOT NULL,
 				appointment_id bigint(20) unsigned NOT NULL,
 				provider varchar(60) NOT NULL DEFAULT 'manual',
-				provider_ref varchar(191) NOT NULL DEFAULT '',
+				provider_ref varchar(191) NULL DEFAULT NULL,
+				request_key char(64) NULL DEFAULT NULL,
 				currency char(3) NOT NULL,
 				amount_minor bigint(20) unsigned NOT NULL,
 				platform_commission_minor bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -301,6 +302,7 @@ final class WCA_Schema {
 				PRIMARY KEY  (id),
 				UNIQUE KEY public_ref (public_ref),
 				UNIQUE KEY provider_ref (provider,provider_ref),
+				UNIQUE KEY appointment_request (appointment_id,provider,request_key),
 				KEY appointment_id (appointment_id),
 				KEY status (status)
 			) {$collate};",

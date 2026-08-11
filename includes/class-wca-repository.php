@@ -660,11 +660,20 @@ final class WCA_Repository {
 	public static function create_payment_intent( $data ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['payment_intents'];
+		$request_key_plain = sanitize_text_field( $data['request_key'] ?? '' );
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $request_key_plain ) ) { return new WP_Error( 'wca_payment_idempotency_required', __( 'A valid payment idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$request_key = hash( 'sha256', $request_key_plain );
+		$provider_ref = sanitize_text_field( $data['provider_ref'] ?? '' );
+		$appointment_id = absint( $data['appointment_id'] ?? 0 );
+		$provider = sanitize_key( $data['provider'] ?? 'manual' );
+		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND provider=%s AND request_key=%s LIMIT 1", $appointment_id, $provider, $request_key ), ARRAY_A );
+		if ( $existing ) { return $existing; }
 		$row = array(
 			'public_ref'                 => self::uuid(),
-			'appointment_id'             => absint( $data['appointment_id'] ?? 0 ),
-			'provider'                   => sanitize_key( $data['provider'] ?? 'manual' ),
-			'provider_ref'               => sanitize_text_field( $data['provider_ref'] ?? '' ),
+			'appointment_id'             => $appointment_id,
+			'provider'                   => $provider,
+			'provider_ref'               => '' !== $provider_ref ? $provider_ref : null,
+			'request_key'                => $request_key,
 			'currency'                   => strtoupper( sanitize_text_field( $data['currency'] ?? 'PKR' ) ),
 			'amount_minor'               => max( 0, absint( $data['amount_minor'] ?? 0 ) ),
 			'platform_commission_minor'  => 0,
@@ -675,7 +684,11 @@ final class WCA_Repository {
 			'updated_at'                 => self::now(),
 		);
 		if ( ! $row['appointment_id'] || 3 !== strlen( $row['currency'] ) ) { return new WP_Error( 'wca_payment_required', __( 'Valid appointment and currency are required.', 'worldwide-clinic-appointments' ) ); }
-		if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_payment_insert', __( 'Payment intent could not be recorded.', 'worldwide-clinic-appointments' ) ); }
+		if ( false === $wpdb->insert( $table, $row ) ) {
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND provider=%s AND request_key=%s LIMIT 1", $appointment_id, $provider, $request_key ), ARRAY_A );
+			if ( $existing ) { return $existing; }
+			return new WP_Error( 'wca_payment_insert', __( 'Payment intent could not be recorded.', 'worldwide-clinic-appointments' ) );
+		}
 		return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
 	}
 

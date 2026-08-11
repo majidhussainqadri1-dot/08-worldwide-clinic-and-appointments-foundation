@@ -623,8 +623,10 @@ final class WCA_Service {
 	}
 
 	/** @return array<string,mixed>|WP_Error */
-	public static function create_payment_intent( $appointment_id, $provider = 'manual', $actor_user_id = 0 ) {
+	public static function create_payment_intent( $appointment_id, $provider = 'manual', $actor_user_id = 0, $idempotency_key = '' ) {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
+		$idempotency_key = sanitize_text_field( $idempotency_key );
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $idempotency_key ) ) { return new WP_Error( 'wca_payment_idempotency_required', __( 'A valid payment idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$patient_user_id  = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
 		$guardian_user_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );
 		if ( $actor_user_id !== $patient_user_id && ( ! $guardian_user_id || $actor_user_id !== $guardian_user_id ) ) {
@@ -639,9 +641,15 @@ final class WCA_Service {
 		$service_id = absint( SWC_Helpers::meta( $appointment_id, 'service_id' ) );
 		$service = $service_id ? WCA_Repository::get_service( $service_id, false ) : null;
 		if ( ! $service ) { return new WP_Error( 'wca_service_missing', __( 'Appointment service is unavailable.', 'worldwide-clinic-appointments' ) ); }
-		$result = WCA_Repository::create_payment_intent( array( 'appointment_id' => $appointment_id, 'provider' => $provider, 'currency' => $service['currency'], 'amount_minor' => $service['fee_minor'], 'status' => 'pending', 'metadata' => array( 'service_ref' => $service['public_ref'], 'commission_percent' => 0 ) ) );
-		if ( is_wp_error( $result ) ) { return $result; }
-		WCA_Repository::enqueue( 'CF03.PaymentIntentRequested.v1', $result['public_ref'], array( 'payment_intent_ref' => $result['public_ref'], 'appointment_ref' => SWC_Helpers::meta( $appointment_id, 'public_ref' ), 'currency' => $result['currency'], 'amount_minor' => $result['amount_minor'], 'platform_commission_minor' => 0 ), WCA_Observability::trace_id() );
+		$claim = WCA_Repository::claim_idempotency( 'payment_intent', $idempotency_key, $actor_user_id, array( 'appointment_id' => absint( $appointment_id ), 'provider' => sanitize_key( $provider ), 'service_ref' => (string) $service['public_ref'], 'currency' => (string) $service['currency'], 'amount_minor' => absint( $service['fee_minor'] ) ) );
+		if ( is_wp_error( $claim ) ) { return $claim; }
+		if ( 'completed' === (string) ( $claim['status'] ?? '' ) ) { return $claim['response']; }
+		if ( empty( $claim['claimed_new'] ) ) { return new WP_Error( 'wca_idempotency_in_progress', __( 'This payment request is already being processed.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'retry_after' => 2 ) ); }
+		$result = WCA_Repository::create_payment_intent( array( 'appointment_id' => $appointment_id, 'provider' => $provider, 'request_key' => $idempotency_key, 'currency' => $service['currency'], 'amount_minor' => $service['fee_minor'], 'status' => 'pending', 'metadata' => array( 'service_ref' => $service['public_ref'], 'commission_percent' => 0 ) ) );
+		if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $result; }
+		$queued = WCA_Repository::enqueue( 'CF03.PaymentIntentRequested.v1', $result['public_ref'], array( 'payment_intent_ref' => $result['public_ref'], 'appointment_ref' => SWC_Helpers::meta( $appointment_id, 'public_ref' ), 'currency' => $result['currency'], 'amount_minor' => $result['amount_minor'], 'platform_commission_minor' => 0 ), WCA_Observability::trace_id() );
+		if ( is_wp_error( $queued ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $queued; }
+		WCA_Repository::complete_idempotency( $claim['id'], 201, $result );
 		return $result;
 	}
 
