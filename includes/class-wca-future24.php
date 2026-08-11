@@ -684,16 +684,22 @@ final class WCA_Future24 {
 		sort( $windows, SORT_STRING );
 		$fingerprint = hash( 'sha256', implode( '|', array( $clinic_id, $context['patient_user_id'], $service_ref, $timezone, implode( ',', $windows ) ) ) );
 		$table = self::tables()['records'];
-		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-02' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='open' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( $existing ) { return self::public_record( $existing ); }
-		return self::put_record( 'F08-FUT-02', array(
-			'clinic_id' => $clinic_id,
-			'subject_user_id' => $context['patient_user_id'],
-			'parent_ref' => $fingerprint,
-			'status' => 'open',
-			'expires_at' => gmdate( 'Y-m-d H:i:s', min( $latest_end + DAY_IN_SECONDS, $now + 181 * DAY_IN_SECONDS ) ),
-			'payload' => array( 'windows' => $windows, 'service_ref' => $service_ref, 'timezone' => $timezone, 'guardian_user_id' => $context['guardian_user_id'], 'auto_book' => false ),
-		), $context['actor_user_id'] );
+		$lock = self::semantic_lock( 'windows', $fingerprint );
+		if ( is_wp_error( $lock ) ) { return $lock; }
+		try {
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-02' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='open' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $existing ) { return self::public_record( $existing ); }
+			return self::put_record( 'F08-FUT-02', array(
+				'clinic_id' => $clinic_id,
+				'subject_user_id' => $context['patient_user_id'],
+				'parent_ref' => $fingerprint,
+				'status' => 'open',
+				'expires_at' => gmdate( 'Y-m-d H:i:s', min( $latest_end + DAY_IN_SECONDS, $now + 181 * DAY_IN_SECONDS ) ),
+				'payload' => array( 'windows' => $windows, 'service_ref' => $service_ref, 'timezone' => $timezone, 'guardian_user_id' => $context['guardian_user_id'], 'auto_book' => false ),
+			), $context['actor_user_id'] );
+		} finally {
+			self::release_semantic_lock( $lock );
+		}
 	}
 
 
