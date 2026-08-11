@@ -65,7 +65,7 @@ final class WCA_Verification_Reconciliation {
 				), $trace );
 			}
 			$page++;
-		} while ( count( (array) $clinics ) === 100 && $page <= 100 );
+		} while ( count( (array) $clinics ) === 100 );
 		WCA_Observability::metric( 'verification_reconciliation_total', 1, array( 'eligible' => $eligible ? 'yes' : 'no' ) );
 	}
 }
