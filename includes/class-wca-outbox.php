@@ -143,14 +143,16 @@ final class WCA_Outbox {
 		// Privacy-minimal fallback: no clinical reason, note, phone, or appointment time.
 		$subject = __( 'Clinic appointment update', 'worldwide-clinic-appointments' );
 		$message = __( 'There is an update to your clinic appointment. Sign in to the platform to view it securely.', 'worldwide-clinic-appointments' );
-		$sent    = false;
-		foreach ( array_unique( array_filter( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ) ) ) as $user_id ) {
+		$recipients = array_unique( array_filter( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ) ) );
+		if ( empty( $recipients ) ) { return true; }
+		$all_sent = true;
+		foreach ( $recipients as $user_id ) {
 			$user = get_userdata( $user_id );
-			if ( $user && is_email( $user->user_email ) ) {
-				$sent = wp_mail( $user->user_email, $subject, $message ) || $sent;
+			if ( ! $user || ! is_email( $user->user_email ) || ! wp_mail( $user->user_email, $subject, $message ) ) {
+				$all_sent = false;
 			}
 		}
-		return $sent || empty( $payload['recipients'] ) ? true : new WP_Error( 'wca_mail_delivery', 'Notification fallback delivery failed.' );
+		return $all_sent ? true : new WP_Error( 'wca_mail_delivery', 'Notification fallback did not deliver to every intended recipient.' );
 	}
 
 	public static function maintenance() {
