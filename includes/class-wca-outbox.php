@@ -79,10 +79,13 @@ final class WCA_Outbox {
 					if ( is_wp_error( $result ) ) {
 						throw new RuntimeException( $result->get_error_message() );
 					}
-					WCA_Repository::complete_outbox( absint( $item['id'] ) );
+					if ( ! WCA_Repository::complete_outbox( absint( $item['id'] ), $worker ) ) {
+						throw new RuntimeException( 'Outbox delivery completed externally but durable worker-fenced finalization failed.' );
+					}
 					WCA_Observability::metric( 'outbox_delivered_total', 1, array( 'topic' => self::metric_topic( $item['topic'] ) ) );
 				} catch ( Throwable $error ) {
-					WCA_Repository::fail_outbox( absint( $item['id'] ), $error->getMessage(), $attempts );
+					$failed = WCA_Repository::fail_outbox( absint( $item['id'] ), $error->getMessage(), $attempts, $worker );
+					if ( ! $failed ) { WCA_Observability::metric( 'outbox_finalize_contention_total', 1 ); }
 					WCA_Observability::log( 'error', 'outbox_delivery_failed', array(
 						'topic'       => self::metric_topic( $item['topic'] ),
 						'aggregate'   => (string) $item['aggregate_ref'],
