@@ -397,15 +397,42 @@ final class WCA_Repository {
 		$end   = WCA_Plan_Guard::strict_utc( $data['end_utc'] ?? '' );
 		$doctor_id = absint( $data['doctor_user_id'] ?? 0 );
 		$patient_id = absint( $data['patient_user_id'] ?? 0 );
+		$clinic_id = absint( $data['clinic_id'] ?? 0 );
+		$service_id = absint( $data['service_id'] ?? 0 );
+		$idempotency_plain = sanitize_text_field( $data['idempotency_key'] ?? '' );
+		if ( ! $idempotency_plain ) {
+			return new WP_Error( 'wca_idempotency_required', __( 'An idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$idempotency_key = hash( 'sha256', $idempotency_plain );
 		if ( ! $start || ! $end || ! $doctor_id || ! $patient_id || strtotime( $end . ' UTC' ) <= strtotime( $start . ' UTC' ) ) {
 			return new WP_Error( 'wca_slot_time', __( 'Invalid canonical slot request.', 'worldwide-clinic-appointments' ) );
 		}
+
+		$replay = static function ( $row ) use ( $clinic_id, $service_id, $doctor_id, $patient_id, $start, $end ) {
+			if ( ! $row ) { return null; }
+			$same = absint( $row['clinic_id'] ) === $clinic_id
+				&& absint( $row['service_id'] ) === $service_id
+				&& absint( $row['doctor_user_id'] ) === $doctor_id
+				&& absint( $row['patient_user_id'] ) === $patient_id
+				&& (string) $row['start_utc'] === $start
+				&& (string) $row['end_utc'] === $end;
+			return $same ? $row : new WP_Error( 'wca_idempotency_conflict', __( 'This idempotency key was already used for a different slot request.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		};
+
+		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE idempotency_key=%s LIMIT 1", $idempotency_key ), ARRAY_A );
+		$existing = $replay( $existing );
+		if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
+
 		$lock_name = 'wca-slot-' . substr( hash( 'sha256', $doctor_id . '|' . substr( $start, 0, 10 ) ), 0, 48 );
 		$locked = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,5)', $lock_name ) );
 		if ( 1 !== $locked ) {
 			return new WP_Error( 'wca_slot_lock', __( 'The scheduling resource is busy. Please try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		try {
+			/* Recheck inside the lock so concurrent retries replay the winner instead of failing or duplicating. */
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE idempotency_key=%s LIMIT 1", $idempotency_key ), ARRAY_A );
+			$existing = $replay( $existing );
+			if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 			$conflict = $wpdb->get_var( $wpdb->prepare(
 				"SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1",
 				$doctor_id, self::now(), $end, $start
@@ -417,9 +444,9 @@ final class WCA_Repository {
 			$hold_token = hash( 'sha256', self::uuid() . '|' . wp_salt( 'nonce' ) . '|' . microtime( true ) );
 			$row = array(
 				'hold_token'      => $hold_token,
-				'idempotency_key' => hash( 'sha256', (string) ( $data['idempotency_key'] ?? self::uuid() ) ),
-				'clinic_id'       => absint( $data['clinic_id'] ?? 0 ),
-				'service_id'      => absint( $data['service_id'] ?? 0 ),
+				'idempotency_key' => $idempotency_key,
+				'clinic_id'       => $clinic_id,
+				'service_id'      => $service_id,
 				'doctor_user_id'  => $doctor_id,
 				'patient_user_id' => $patient_id,
 				'start_utc'       => $start,
@@ -431,6 +458,9 @@ final class WCA_Repository {
 				'updated_at'      => self::now(),
 			);
 			if ( false === $wpdb->insert( $table, $row ) ) {
+				$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE idempotency_key=%s LIMIT 1", $idempotency_key ), ARRAY_A );
+				$existing = $replay( $existing );
+				if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 				return new WP_Error( 'wca_slot_hold', __( 'The slot could not be held.', 'worldwide-clinic-appointments' ) );
 			}
 			return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
@@ -700,18 +730,29 @@ final class WCA_Repository {
 	public static function claim_idempotency( $scope, $key, $actor_user_id, $request ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['idempotency'];
+		$scope = sanitize_key( $scope );
 		$key_hash = hash( 'sha256', (string) $key );
 		$request_hash = hash( 'sha256', self::json( $request ) );
-		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1", sanitize_key( $scope ), $key_hash, absint( $actor_user_id ) ), ARRAY_A );
+		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1", $scope, $key_hash, absint( $actor_user_id ) ), ARRAY_A );
 		if ( $existing ) {
 			if ( ! hash_equals( (string) $existing['request_hash'], $request_hash ) ) {
 				return new WP_Error( 'wca_idempotency_conflict', __( 'This idempotency key was used for a different request.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 			}
 			$existing['response'] = self::decode( $existing['response_json'] );
+			$existing['claimed_new'] = false;
+			/* A crashed worker must not block an idempotent command for a full day. Reclaim a stale processing lease atomically. */
+			if ( 'processing' === (string) $existing['status'] && strtotime( (string) $existing['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {
+				$now = self::now();
+				$claimed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET updated_at=%s,expires_at=%s WHERE id=%d AND status='processing' AND updated_at=%s", $now, gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ), absint( $existing['id'] ), (string) $existing['updated_at'] ) );
+				if ( 1 === (int) $claimed ) {
+					$existing['updated_at'] = $now;
+					$existing['claimed_new'] = true;
+				}
+			}
 			return $existing;
 		}
 		$row = array(
-			'scope'          => sanitize_key( $scope ),
+			'scope'          => $scope,
 			'key_hash'       => $key_hash,
 			'actor_user_id'  => absint( $actor_user_id ),
 			'request_hash'   => $request_hash,
@@ -722,8 +763,23 @@ final class WCA_Repository {
 			'created_at'     => self::now(),
 			'updated_at'     => self::now(),
 		);
-		if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_idempotency_insert', __( 'The request could not be reserved.', 'worldwide-clinic-appointments' ) ); }
-		return array_merge( array( 'id' => (int) $wpdb->insert_id, 'response' => array() ), $row );
+		if ( false === $wpdb->insert( $table, $row ) ) {
+			/* A concurrent request can win the unique key race after our initial read. Resolve it as an in-progress replay, not a 500. */
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1", $scope, $key_hash, absint( $actor_user_id ) ), ARRAY_A );
+			if ( $existing && hash_equals( (string) $existing['request_hash'], $request_hash ) ) {
+				$existing['response'] = self::decode( $existing['response_json'] );
+				$existing['claimed_new'] = false;
+				return $existing;
+			}
+			return new WP_Error( 'wca_idempotency_insert', __( 'The request could not be reserved.', 'worldwide-clinic-appointments' ) );
+		}
+		return array_merge( array( 'id' => (int) $wpdb->insert_id, 'response' => array(), 'claimed_new' => true ), $row );
+	}
+
+	public static function release_idempotency( $id ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['idempotency'];
+		return false !== $wpdb->delete( $table, array( 'id' => absint( $id ), 'status' => 'processing' ) );
 	}
 
 	public static function complete_idempotency( $id, $response_code, $response ) {

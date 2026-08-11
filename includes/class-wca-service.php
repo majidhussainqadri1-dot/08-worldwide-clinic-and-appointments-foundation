@@ -362,10 +362,6 @@ final class WCA_Service {
 		}
 		$idempotency_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
 		if ( ! $idempotency_key ) { return new WP_Error( 'wca_idempotency_required', __( 'An idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$claim = WCA_Repository::claim_idempotency( 'request_appointment', $idempotency_key, $actor_user_id, self::appointment_request_fingerprint( $data ) );
-		if ( is_wp_error( $claim ) ) { return $claim; }
-		if ( 'completed' === ( $claim['status'] ?? '' ) ) { return $claim['response']; }
-
 		$hold = WCA_Repository::get_slot_hold( (string) ( $data['hold_token'] ?? '' ) );
 		$hold_check = WCA_Plan_Guard::validate_bookable_hold( $hold, $patient_user_id );
 		if ( is_wp_error( $hold_check ) ) { return $hold_check; }
@@ -377,6 +373,13 @@ final class WCA_Service {
 		$clinic  = WCA_Repository::get_clinic( $hold['clinic_id'], true );
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_unavailable', __( 'The clinic is not currently available.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 
+		$claim = WCA_Repository::claim_idempotency( 'request_appointment', $idempotency_key, $actor_user_id, self::appointment_request_fingerprint( $data ) );
+		if ( is_wp_error( $claim ) ) { return $claim; }
+		if ( 'completed' === ( $claim['status'] ?? '' ) ) { return $claim['response']; }
+		if ( empty( $claim['claimed_new'] ) ) {
+			return new WP_Error( 'wca_idempotency_in_progress', __( 'This appointment request is already being processed. Retry with the same idempotency key shortly.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'retry_after' => 2 ) );
+		}
+
 		$appointment_id = wp_insert_post(
 			array(
 				'post_type'   => SWC_Helpers::TYPE,
@@ -386,7 +389,7 @@ final class WCA_Service {
 			),
 			true
 		);
-		if ( is_wp_error( $appointment_id ) ) { return $appointment_id; }
+		if ( is_wp_error( $appointment_id ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $appointment_id; }
 		$public_ref = WCA_Repository::uuid();
 		$meta = array(
 			'public_ref'             => $public_ref,
@@ -412,7 +415,7 @@ final class WCA_Service {
 		);
 		foreach ( $meta as $key => $value ) { update_post_meta( $appointment_id, '_swc_' . $key, $value ); }
 		$booked = WCA_Repository::book_slot( $hold['hold_token'], $appointment_id );
-		if ( is_wp_error( $booked ) ) { wp_delete_post( $appointment_id, true ); return $booked; }
+		if ( is_wp_error( $booked ) ) { wp_delete_post( $appointment_id, true ); WCA_Repository::release_idempotency( $claim['id'] ); return $booked; }
 
 		$terms = self::appointment_terms_text();
 		$consent = WCA_Repository::record_consent( array(
@@ -426,7 +429,7 @@ final class WCA_Service {
 			'legal_basis'        => 'consent',
 			'metadata'           => array( 'telehealth' => ! empty( $data['telehealth_consent'] ), 'privacy' => true, 'emergency_acknowledged' => true ),
 		) );
-		if ( is_wp_error( $consent ) ) { WCA_Repository::release_appointment_slot( $appointment_id ); wp_delete_post( $appointment_id, true ); return $consent; }
+		if ( is_wp_error( $consent ) ) { WCA_Repository::release_appointment_slot( $appointment_id ); wp_delete_post( $appointment_id, true ); WCA_Repository::release_idempotency( $claim['id'] ); return $consent; }
 
 		$trace = WCA_Observability::trace_id();
 		$payload = array(

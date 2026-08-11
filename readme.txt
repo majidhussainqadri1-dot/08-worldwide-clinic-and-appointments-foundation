@@ -3,14 +3,14 @@ Contributors: majidhussainqadri1-dot
 Tags: clinic, appointments, doctors, scheduling, privacy, accessibility
 Requires at least: 6.6
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.2.1
 License: GPLv2 or later
 
 Canonical File 08 clinic and appointment runtime for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Version 1.0.1 implements the File 08 Complete Master Plan and the four fresh plan-governed correction rounds: clinic identity and institutional activation, branches, services and fees, availability, DST-safe server-authoritative slots, atomic appointment-bound holds, idempotent requests, confirmed/declined/reschedule/check-in/completion/cancellation/no-show lifecycle, actor and guardian authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility and localization.
+Version 1.2.1 implements the File 08 Complete Master Plan, Future24 amendment, and the 80-round corrective review: clinic identity and institutional activation, branches, services and fees, availability, DST-safe server-authoritative slots, atomic appointment-bound holds, idempotent requests, confirmed/declined/reschedule/check-in/completion/cancellation/no-show lifecycle, actor and guardian authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility and localization.
 
 Platform commission is always 0%. Donations are optional and never affect visibility or service access.
 

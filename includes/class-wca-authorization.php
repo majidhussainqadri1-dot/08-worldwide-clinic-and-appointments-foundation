@@ -201,11 +201,14 @@ final class WCA_Authorization {
 		$scopes = isset( $entry['scopes'] ) && is_array( $entry['scopes'] ) ? array_map( 'sanitize_key', $entry['scopes'] ) : array();
 		$direct = ! empty( $entry[ $scope ] ) || in_array( $scope, $scopes, true );
 		if ( 'appointments' === $scope ) {
-			$direct = $direct || ! empty( $entry['appointment_ops'] ) || ! empty( $entry['schedule'] ) || ! empty( $entry['clinical_followup'] ) || ! empty( $entry['clinical'] ) || in_array( 'appointment_ops', $scopes, true ) || in_array( 'schedule', $scopes, true ) || in_array( 'clinical_followup', $scopes, true );
+			// Appointment visibility/operations require an explicit appointment grant.
+			// Schedule-only or clinical-followup grants must never broaden into appointment access.
+			$direct = $direct || ! empty( $entry['appointment_ops'] ) || in_array( 'appointment_ops', $scopes, true );
 		} elseif ( 'clinical_followup' === $scope ) {
 			$direct = $direct || ! empty( $entry['clinical'] ) || in_array( 'clinical', $scopes, true );
 		} elseif ( 'clinic_manage' === $scope ) {
-			$direct = $direct || ! empty( $entry['manage'] ) || ! empty( $entry['schedule'] ) || ! empty( $entry['appointments'] ) || in_array( 'manage', $scopes, true );
+			// Management is explicit; schedule/appointments grants are narrower and cannot escalate.
+			$direct = $direct || ! empty( $entry['manage'] ) || in_array( 'manage', $scopes, true );
 		}
 		return (bool) apply_filters( 'wca_clinic_delegation_allows_scope', $direct, $entry, $scope );
 	}
