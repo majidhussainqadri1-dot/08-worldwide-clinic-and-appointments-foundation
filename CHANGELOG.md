@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.6 — 2026-08-11
+
+- Completed a sixth fresh sequential 10-round review-and-correct cycle against exact v1.2.5 repository state.
+- Moved current doctor eligibility into the canonical doctor-to-clinic serving relationship root.
+- Added stable outbox message identity and abandoned-processing lease recovery/dead-letter progression.
+- Removed remaining fixed-window truncation from waitlist offers, questionnaire templates, prerequisite rules and follow-up listing.
+- Corrected monthly recurrence month-end drift by preserving the originating day-of-month and clamping only when the target month is shorter.
+- Advanced runtime identity to 1.2.6 without schema inflation: core 3.2.0, continuity 1.1.0, Future24 1.0.0.
+- Added a permanent sixth-ten-review regression gate. Repository/package/CI, staging, live and operational evidence remain separate states.
+
 ## 1.2.5 — 2026-08-11
 
 - Completed a fifth fresh sequential 10-round review-and-correct cycle against exact v1.2.4 repository state.

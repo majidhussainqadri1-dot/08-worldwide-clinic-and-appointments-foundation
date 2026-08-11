@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.5**
+- Runtime candidate: **1.2.6**
 - Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -36,6 +36,8 @@ The **third fresh 10-round corrective audit** moves the same invariants to canon
 The **fourth fresh 10-round corrective audit** closes additional canonical-root gaps: branch identity now survives slot hold/booking/reschedule, slot discovery is clinic-isolated, Future24 group sessions have idempotent leave/cancel semantics and current-state rechecks, signed calendar links validate persisted UTC strictly, payment intents use migration-safe nullable provider references plus canonical idempotency, service-root appointment requests enforce explicit consent and full replay fingerprints, activation requires step-up/current owner eligibility/publishable inventory, and doctor suspension reconciliation is not truncated at 500 appointments.
 
 The **fifth fresh 10-round corrective audit** closes a further set of canonical-root and scale/concurrency gaps: Future24 service references now resolve through the public-ref repository path; doctor-to-clinic serving authority is actor-independent and rechecked at public slot/hold booking edges; arrival and virtual-room semantic de-duplication is serialized across distinct replay keys; guardian-family and disruption affected sets are fully paged; Future24 UTC/date parsing fails closed at the canonical root; nested calendar/DTO depth no longer fails open; and slot buffer/travel/continuous-consultation policy scans are no longer silently capped at 100 appointments.
+
+The **sixth fresh 10-round corrective audit** hardens the remaining relationship, outbox-liveness, scale and recurrence edges: doctor-to-clinic serving truth now includes current doctor eligibility at its canonical root; outbox delivery exposes a stable message identity and abandoned processing leases can be recovered without silent permanent stalls; waitlist offers, questionnaire templates, prerequisite rules and follow-up lists no longer stop at arbitrary first-page ceilings; and monthly series retain their intended day-of-month across short months.
 
 ## Canonical routes
 

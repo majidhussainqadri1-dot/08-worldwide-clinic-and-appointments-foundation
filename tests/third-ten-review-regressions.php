@@ -70,16 +70,16 @@ t310has('doctor clinic integration filter',$auth,'wca_doctor_may_serve_clinic');
 t310has('doctor scheduling delegation',$auth,'delegated_clinic_ids( $doctor_user_id, \'schedule\' )');
 
 // T3-R9: release identity advances without schema inflation.
-t310has('plugin header 1.2.5',$bootstrap,'Version: 1.2.5');
-t310has('runtime constant 1.2.5',$bootstrap,"WCA_VERSION', '1.2.5");
-t310has('contract runtime 1.2.5',$contracts,"RUNTIME_VERSION                 = '1.2.5'");
+t310has('plugin header 1.2.6',$bootstrap,'Version: 1.2.6');
+t310has('runtime constant 1.2.6',$bootstrap,"WCA_VERSION', '1.2.6");
+t310has('contract runtime 1.2.6',$contracts,"RUNTIME_VERSION                 = '1.2.6'");
 t310has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
 t310has('continuity schema unchanged',$continuity,"const SCHEMA_VERSION = '1.1.0'");
 t310has('future schema unchanged',$future,"const SCHEMA_VERSION   = '1.0.0'");
-t310has('readme stable 1.2.5',$readme,'Stable tag: 1.2.5');
-t310has('repository readme 1.2.5',$repo_readme,'Runtime candidate: **1.2.5**');
-t310has('status 1.2.5',$status,'Runtime candidate: **1.2.5**');
-t310has('changelog 1.2.5',$changelog,'## 1.2.5 — 2026-08-11');
+t310has('readme stable 1.2.6',$readme,'Stable tag: 1.2.6');
+t310has('repository readme 1.2.6',$repo_readme,'Runtime candidate: **1.2.6**');
+t310has('status 1.2.6',$status,'Runtime candidate: **1.2.6**');
+t310has('changelog 1.2.6',$changelog,'## 1.2.6 — 2026-08-11');
 
 // Cross-cycle safety/ownership invariants.
 $runtime=implode("\n",array($bootstrap,$repo,$second,$service,$rest,$contracts));

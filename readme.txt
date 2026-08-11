@@ -3,18 +3,20 @@ Contributors: majidhussainqadri1-dot
 Tags: clinic, appointments, doctors, scheduling, privacy, accessibility
 Requires at least: 6.6
 Requires PHP: 7.4
-Stable tag: 1.2.5
+Stable tag: 1.2.6
 License: GPLv2 or later
 
 Canonical File 08 clinic and appointment runtime for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Version 1.2.5 implements the File 08 Complete Master Plan, Future24 amendment, the earlier 80-round corrective closure, the first 10-round post-closure review-and-correct cycle, the second and third fresh 10-round corrective audits, and the fourth fresh sequential 10-round corrective audit. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
+Version 1.2.6 implements the File 08 Complete Master Plan, Future24 amendment, the earlier 80-round corrective closure, the first 10-round post-closure review-and-correct cycle, the second and third fresh 10-round corrective audits, and the fourth fresh sequential 10-round corrective audit. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
 
 The fourth fresh corrective audit binds branch identity to canonical slot holds and appointment/reschedule state, isolates public slot discovery by clinic, completes Future24 group leave/cancel semantics with current-state rechecks, strictly validates signed-link calendar timestamps, makes payment-intent uniqueness/idempotency migration-safe, enforces consent at the appointment service root, expands replay fingerprints, hardens clinic activation step-up/current-owner/publishable-inventory checks, and removes the 500-appointment doctor-suspension truncation through bounded paged reconciliation. Earlier authorization, concurrency, privacy, migration, package-parity, and Future24 gates remain in force.
 
 The fifth fresh corrective audit fixes Future24 public service-reference resolution, actor-independent doctor-to-clinic serving authority and held-slot rechecks, cross-key semantic concurrency for arrival/virtual-room requests, complete paged guardian/disruption/policy scans, and strict fail-closed Future24 calendar parsing/depth handling.
+
+The sixth fresh corrective audit moves current doctor eligibility into the canonical clinic-serving relationship root; gives outbox consumers a stable message identity and recovers abandoned processing leases; removes remaining waitlist/questionnaire/prerequisite/follow-up fixed-window truncation; and preserves end-of-month intent for monthly recurrence generation.
 
 Platform commission is always 0%. Donations are optional and never affect visibility or service access. The plugin never replaces emergency care and never enables automated diagnosis or prescribing.
 
@@ -32,6 +34,15 @@ Platform commission is always 0%. Donations are optional and never affect visibi
 Protected routes use authentication, object authorization, nonce/CSRF controls where applicable, explicit idempotency/replay protection, rate limiting, and no-store/noindex controls. Public clinic output is allow-listed and uses opaque references. Appointment, patient, contact, clinical-like, native-identifier and private-note data are excluded from public projections. Export, erasure, retention and legal-hold controls are provided. Uninstall is non-destructive by default.
 
 == Changelog ==
+
+= 1.2.6 =
+* Completed a sixth fresh sequential review-and-correct cycle against exact v1.2.5 repository state.
+* Canonical doctor-to-clinic serving authority now fails closed when current doctor eligibility is revoked.
+* Outbox envelopes now carry stable message IDs and abandoned processing leases are recovered for idempotent retry/dead-letter handling.
+* Removed remaining fixed-window starvation/truncation from waitlist offers, dynamic questionnaire templates, prerequisite policies, and follow-up lists.
+* Monthly recurrence preserves the originating day-of-month and clamps only to the target month's valid last day.
+* Runtime is 1.2.6; core schema remains 3.2.0; continuity schema remains 1.1.0; Future24 schema remains 1.0.0.
+* Repository/CI/package evidence remains distinct from staging/live evidence.
 
 = 1.2.5 =
 * Completed a fifth fresh sequential 10-round corrective audit on the v1.2.4 exact repository state.
