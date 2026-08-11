@@ -1,17 +1,17 @@
-name: Apply File 08 Forty Review Corrections
+name: Apply File 08 Eighty Review Corrections
 
 on:
   push:
     branches:
-      - codex/file08-complete-master-plan-1.0.0
+      - codex/file08-new-governing-plans-completion-2026
     paths:
-      - .codex/forty-v102-trigger
+      - .codex/review80/trigger
 
 permissions:
   contents: write
 
 concurrency:
-  group: file08-forty-v102-apply
+  group: file08-review80-apply
   cancel-in-progress: false
 
 jobs:
@@ -20,22 +20,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Check out exact completion branch
+      - name: Check out exact review branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: codex/file08-complete-master-plan-1.0.0
+          ref: codex/file08-new-governing-plans-completion-2026
           fetch-depth: 0
 
-      - name: Reconstruct and apply overlay
+      - name: Reconstruct and apply exact corrective patch
         shell: bash
         run: |
           set -euo pipefail
-          cat .codex/forty-v102/part-* > /tmp/file08-forty-v102.b64
-          test "$(wc -c < /tmp/file08-forty-v102.b64)" -eq 129396
-          base64 -d /tmp/file08-forty-v102.b64 > /tmp/file08-forty-v102.tar.gz
-          echo "0ab00935349f2deee02390a28dadde3a9a18e1e9f5ad02808e101eff6cea6944  /tmp/file08-forty-v102.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/file08-forty-v102.tar.gz -C .
-          rm -rf .codex
+          cat .codex/review80/final-* > /tmp/file08-review80.b64
+          base64 -d /tmp/file08-review80.b64 > /tmp/file08-review80.patch.gz
+          gzip -dc /tmp/file08-review80.patch.gz > /tmp/file08-review80.patch
+          echo "eb9d5c340aefe59b7d71b40f58747e0029bdf0ed6afb2b2cd457fafd09e17356  /tmp/file08-review80.patch" | sha256sum -c -
+          git apply --check /tmp/file08-review80.patch
+          git apply /tmp/file08-review80.patch
+          rm -rf .codex/review80
           rm -f .github/workflows/apply-file08-forty-v102.yml
 
       - name: Set up PHP
@@ -45,22 +46,25 @@ jobs:
           extensions: zip
           coverage: none
 
-      - name: Verify corrected source
+      - name: Verify corrected source before commit
         shell: bash
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
           node --check assets/js/clinic.js
-          php tests/run-all.php
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          grep -q "Version: 1.2.1" worldwide-clinic.php
+          grep -q "WCA_VERSION', '1.2.1'" worldwide-clinic.php
+          grep -q "Stable tag: 1.2.1" readme.txt
           git diff --check
-          test ! -e WCA-CANDIDATE-MANIFEST.json
 
-      - name: Commit and push
+      - name: Commit and push exact corrected source
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "fix(file-08): complete forty sequential review and correction rounds"
-          git push origin HEAD:codex/file08-complete-master-plan-1.0.0
+          git commit -m "fix(file08): materialize 80-round corrective source review"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
