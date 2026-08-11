@@ -982,10 +982,13 @@ final class WCA_Future24 {
 		$clinic_id = absint( isset( $data['clinic_id'] ) ? $data['clinic_id'] : 0 );
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
-		$before = min( 240, absint( isset( $data['buffer_before'] ) ? $data['buffer_before'] : 0 ) );
-		$after = min( 240, absint( isset( $data['buffer_after'] ) ? $data['buffer_after'] : 0 ) );
-		$travel = min( 480, absint( isset( $data['travel_gap_minutes'] ) ? $data['travel_gap_minutes'] : 0 ) );
-		$continuous = min( 30, absint( isset( $data['max_continuous_consultations'] ) ? $data['max_continuous_consultations'] : 0 ) );
+		$before = filter_var( isset( $data['buffer_before'] ) ? $data['buffer_before'] : 0, FILTER_VALIDATE_INT );
+		$after = filter_var( isset( $data['buffer_after'] ) ? $data['buffer_after'] : 0, FILTER_VALIDATE_INT );
+		$travel = filter_var( isset( $data['travel_gap_minutes'] ) ? $data['travel_gap_minutes'] : 0, FILTER_VALIDATE_INT );
+		$continuous = filter_var( isset( $data['max_continuous_consultations'] ) ? $data['max_continuous_consultations'] : 0, FILTER_VALIDATE_INT );
+		if ( false === $before || $before < 0 || $before > 240 || false === $after || $after < 0 || $after > 240 || false === $travel || $travel < 0 || $travel > 480 || false === $continuous || $continuous < 0 || $continuous > 30 ) {
+			return new WP_Error( 'wca_buffer_policy_range', __( 'Buffer, travel-gap, and continuous-consultation values are outside the supported range.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		/*
 		 * Future24 policy is immutable/additive. We deliberately do not bulk-write
 		 * the canonical availability-rule table here; slot projection and hold
