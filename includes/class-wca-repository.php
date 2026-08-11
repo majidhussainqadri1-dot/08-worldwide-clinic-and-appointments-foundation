@@ -699,12 +699,15 @@ final class WCA_Repository {
 		$table  = WCA_Schema::tables()['outbox'];
 		$limit  = min( 100, max( 1, absint( $limit ) ) );
 		$worker = sanitize_text_field( $worker ?: 'worker-' . substr( md5( wp_salt( 'nonce' ) . microtime( true ) ), 0, 12 ) );
-		$ids = (array) $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s) ORDER BY id ASC LIMIT %d", self::now(), gmdate( 'Y-m-d H:i:s', time() - 300 ), $limit ) );
+		$now = self::now();
+		$stale_before = gmdate( 'Y-m-d H:i:s', time() - 300 );
+		$ids = (array) $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s) ORDER BY id ASC LIMIT %d", $now, $stale_before, $limit ) );
 		$claimed = array();
 		foreach ( $ids as $id ) {
-			$ok = $wpdb->update( $table, array( 'status' => 'processing', 'locked_at' => self::now(), 'locked_by' => $worker, 'updated_at' => self::now() ), array( 'id' => absint( $id ) ) );
-			if ( $ok ) {
-				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d LIMIT 1", absint( $id ) ), ARRAY_A );
+			$claimed_at = self::now();
+			$ok = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='processing',locked_at=%s,locked_by=%s,updated_at=%s WHERE id=%d AND status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s)", $claimed_at, $worker, $claimed_at, absint( $id ), $claimed_at, $stale_before ) );
+			if ( 1 === (int) $ok ) {
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d AND status='processing' AND locked_by=%s LIMIT 1", absint( $id ), $worker ), ARRAY_A );
 				if ( $row ) { $row['payload'] = self::decode( $row['payload_json'] ); unset( $row['payload_json'] ); $claimed[] = $row; }
 			}
 		}
