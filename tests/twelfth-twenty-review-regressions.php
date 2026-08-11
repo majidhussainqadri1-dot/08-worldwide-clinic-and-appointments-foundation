@@ -12,5 +12,6 @@ t12_has('R6 waitlist offer transaction','includes/class-wca-future24.php','wca_w
 t12_has('R7 group leave transaction','includes/class-wca-future24.php','wca_group_leave_transaction');
 t12_has('R8 group cancel transaction','includes/class-wca-future24.php','wca_group_cancel_transaction');
 t12_has('R9 participant add transaction','includes/class-wca-future24.php','wca_support_add_transaction');
+t12_has('R10 participant revoke transaction','includes/class-wca-future24.php','wca_support_revoke_transaction');
 if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
 echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";

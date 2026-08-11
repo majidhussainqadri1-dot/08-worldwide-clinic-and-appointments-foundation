@@ -15,5 +15,6 @@
 | T12-R07 | DEFECT CORRECTED | Leaving a group session could commit membership state without governance audit evidence. |
 | T12-R08 | DEFECT CORRECTED | Group-session cancellation used unchecked manual transaction start/commit calls. |
 | T12-R09 | DEFECT CORRECTED | Support-participant add used unchecked manual transaction start/commit calls. |
+| T12-R10 | DEFECT CORRECTED | Support-participant revoke used unchecked manual transaction start/commit calls. |
 
-Rounds T12-R10–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R11–T12-R20 remain unreviewed in this sequential cycle at this commit.
