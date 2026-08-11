@@ -203,10 +203,10 @@ final class SWC_Admin {
 					if ( $status_changed ) {
 						return new WP_Error( 'swc_combined', __( 'Propose reassignment separately from a status change.', 'worldwide-clinic-appointments' ) );
 					}
-					update_post_meta( $id, '_swc_proposed_doctor_id', $doctor );
-					update_post_meta( $id, '_swc_reassignment_reason', $note );
-					update_post_meta( $id, '_swc_reassignment_expires_at', gmdate( 'Y-m-d H:i:s', strtotime( '+7 days' ) ) );
-					SWC_Helpers::bump_version( $id );
+					$proposal_write = SWC_Helpers::apply_meta_mutations( $id, array( '_swc_proposed_doctor_id' => $doctor, '_swc_reassignment_reason' => $note, '_swc_reassignment_expires_at' => gmdate( 'Y-m-d H:i:s', strtotime( '+7 days' ) ) ), array(), 'swc_admin_reassignment' );
+					if ( is_wp_error( $proposal_write ) ) { return $proposal_write; }
+					$version = SWC_Helpers::bump_version_strict( $id );
+					if ( is_wp_error( $version ) ) { return $version; }
 					if ( ! SWC_Helpers::audit( $id, 'reassignment-proposed', array( 'old_doctor_id' => $current_doctor, 'new_doctor_id' => $doctor, 'reason' => $note ) ) ) {
 						return new WP_Error( 'swc_audit', __( 'The reassignment proposal could not be audited.', 'worldwide-clinic-appointments' ) );
 					}
@@ -242,21 +242,20 @@ final class SWC_Admin {
 					if ( $expiry <= time() ) {
 						return new WP_Error( 'swc_expiry', __( 'The proposed time is too soon for patient confirmation.', 'worldwide-clinic-appointments' ) );
 					}
-					update_post_meta( $id, '_swc_proposed_at_utc', $new );
-					update_post_meta( $id, '_swc_proposed_timezone', $zone );
-					update_post_meta( $id, '_swc_proposed_expires_at', gmdate( 'Y-m-d H:i:s', $expiry ) );
+					$proposal_write = SWC_Helpers::apply_meta_mutations( $id, array( '_swc_proposed_at_utc' => $new, '_swc_proposed_timezone' => $zone, '_swc_proposed_expires_at' => gmdate( 'Y-m-d H:i:s', $expiry ) ), array(), 'swc_admin_reschedule' );
+					if ( is_wp_error( $proposal_write ) ) { return $proposal_write; }
 					$details['proposed_at_utc'] = $new;
 				}
 
+				$updates = array(); $deletes = array();
 				if ( $status_changed ) {
-					update_post_meta( $id, '_swc_status', $next );
-					if ( 'reschedule_pending' !== $next ) {
-						delete_post_meta( $id, '_swc_proposed_at_utc' );
-						delete_post_meta( $id, '_swc_proposed_timezone' );
-						delete_post_meta( $id, '_swc_proposed_expires_at' );
-					}
+					$updates['_swc_status'] = $next;
+					if ( 'reschedule_pending' !== $next ) { $deletes = array( '_swc_proposed_at_utc', '_swc_proposed_timezone', '_swc_proposed_expires_at' ); }
 				}
-				SWC_Helpers::bump_version( $id );
+				$state_write = SWC_Helpers::apply_meta_mutations( $id, $updates, $deletes, 'swc_admin_update' );
+				if ( is_wp_error( $state_write ) ) { return $state_write; }
+				$version = SWC_Helpers::bump_version_strict( $id );
+				if ( is_wp_error( $version ) ) { return $version; }
 				$event = $status_changed ? 'admin-status-updated' : 'admin-note-recorded';
 				if ( ! SWC_Helpers::audit( $id, $event, array( 'old_status' => $current, 'new_status' => $next, 'old_doctor_id' => $current_doctor, 'new_doctor_id' => $current_doctor, 'reason' => $note, 'details' => $details ) ) ) {
 					return new WP_Error( 'swc_audit', __( 'The administrator update could not be audited.', 'worldwide-clinic-appointments' ) );
@@ -334,7 +333,8 @@ final class SWC_Admin {
 		SWC_Activator::migrate_existing_records();
 		update_option( 'swc_db_version', SWC_Activator::DB_VERSION, false );
 		global $wpdb;
-		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}swc_rate_limits WHERE expires_at < %s", current_time( 'mysql', true ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$cleaned = $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}swc_rate_limits WHERE expires_at < %s", current_time( 'mysql', true ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $cleaned ) { wp_die( esc_html__( 'Repair could not complete the expired rate-limit cleanup safely.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) ); }
 		wp_safe_redirect( add_query_arg( array( 'page' => 'clinic-system-check', 'repaired' => '1' ), admin_url( 'admin.php' ) ) );
 		exit;
 	}
@@ -346,7 +346,8 @@ final class SWC_Admin {
 		if ( 'PURGE FILE 08' !== $confirmation ) {
 			wp_die( esc_html__( 'The confirmation phrase did not match. No data was deleted.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
 		}
-		SWC_Activator::purge_all_data();
+		$purged = SWC_Activator::purge_all_data();
+		if ( is_wp_error( $purged ) ) { wp_die( esc_html( $purged->get_error_message() ), '', array( 'response' => 500 ) ); }
 		wp_safe_redirect( add_query_arg( array( 'page' => 'plugins.php', 'swc_purged' => '1' ), admin_url() ) );
 		exit;
 	}

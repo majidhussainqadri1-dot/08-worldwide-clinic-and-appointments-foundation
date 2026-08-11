@@ -456,7 +456,9 @@ final class WCA_Continuity {
 
 	public static function maintenance() {
 		self::process_due_followups();
-		self::apply_retention();
+		$retention = self::apply_retention();
+		if ( is_wp_error( $retention ) ) { WCA_Observability::log( 'error', 'continuity_retention_failed', array( 'error_code' => $retention->get_error_code() ) ); }
+		return $retention;
 	}
 
 	public static function process_due_followups() {
@@ -513,20 +515,29 @@ final class WCA_Continuity {
 		do {
 			$intakes = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$intake_table} WHERE updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d", $intake_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			foreach ( $intakes as $row ) {
-				$cursor = max( $cursor, absint( $row['id'] ) );
-				if ( self::legal_hold( 'intake', $row ) ) { continue; }
+				$row_id = absint( $row['id'] );
+				if ( self::legal_hold( 'intake', $row ) ) { $cursor = max( $cursor, $row_id ); continue; }
 				$status = SWC_Helpers::status( absint( $row['appointment_id'] ) );
-				if ( WCA_Contracts::is_terminal( $status ) ) { $wpdb->delete( $intake_table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ); }
+				if ( WCA_Contracts::is_terminal( $status ) ) {
+					$deleted = $wpdb->delete( $intake_table, array( 'id' => $row_id ), array( '%d' ) );
+					if ( false === $deleted ) { return new WP_Error( 'wca_intake_retention_delete', __( 'Expired pre-visit data could not be removed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				}
+				$cursor = max( $cursor, $row_id );
 			}
 		} while ( count( $intakes ) === $batch );
 		$cursor = 0;
 		do {
 			$followups = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id,status FROM {$follow_table} WHERE updated_at<%s AND status IN ('completed','cancelled') AND id>%d ORDER BY id ASC LIMIT %d", $follow_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			foreach ( $followups as $row ) {
-				$cursor = max( $cursor, absint( $row['id'] ) );
-				if ( ! self::legal_hold( 'followup', $row ) ) { $wpdb->delete( $follow_table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ); }
+				$row_id = absint( $row['id'] );
+				if ( ! self::legal_hold( 'followup', $row ) ) {
+					$deleted = $wpdb->delete( $follow_table, array( 'id' => $row_id ), array( '%d' ) );
+					if ( false === $deleted ) { return new WP_Error( 'wca_followup_retention_delete', __( 'Expired follow-up data could not be removed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				}
+				$cursor = max( $cursor, $row_id );
 			}
 		} while ( count( $followups ) === $batch );
+		return true;
 	}
 
 	public static function register_exporter( $exporters ) {
@@ -551,19 +562,27 @@ final class WCA_Continuity {
 		$data = array();
 		$intake_table = self::tables()['intake'];
 		$follow_table = self::tables()['followups'];
-		$intakes = (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$intake_table} WHERE patient_user_id=%d ORDER BY id ASC LIMIT %d OFFSET %d", $user_id, $limit, $offset ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$intakes_raw = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$intake_table} WHERE patient_user_id=%d ORDER BY id ASC LIMIT %d OFFSET %d", $user_id, $limit, $offset ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $intakes_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_continuity_export_intake_query', __( 'Continuity intake data could not be read safely for export.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		$intakes = (array) $intakes_raw;
 		foreach ( $intakes as $row ) {
 			$payload = self::open( $row );
-			if ( is_wp_error( $payload ) ) { continue; }
+			if ( is_wp_error( $payload ) ) { return new WP_Error( 'wca_continuity_export_intake_decrypt', __( 'Continuity intake data could not be decrypted safely for export.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			$data[] = array( 'group_id' => 'wca-continuity-intake', 'group_label' => __( 'Clinic pre-visit information', 'worldwide-clinic-appointments' ), 'item_id' => 'intake-' . $row['public_ref'], 'data' => self::export_fields( $payload, array( 'Appointment reference' => self::appointment_ref( absint( $row['appointment_id'] ) ), 'Status' => $row['status'], 'Updated' => $row['updated_at'] ) ) );
 		}
-		$followups = (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$follow_table} WHERE patient_user_id=%d ORDER BY id ASC LIMIT %d OFFSET %d", $user_id, $limit, $offset ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$followups_raw = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$follow_table} WHERE patient_user_id=%d ORDER BY id ASC LIMIT %d OFFSET %d", $user_id, $limit, $offset ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $followups_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_continuity_export_followup_query', __( 'Continuity follow-up data could not be read safely for export.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		$followups = (array) $followups_raw;
 		foreach ( $followups as $row ) {
 			$payload = self::open( $row );
-			if ( is_wp_error( $payload ) ) { continue; }
+			if ( is_wp_error( $payload ) ) { return new WP_Error( 'wca_continuity_export_followup_decrypt', __( 'Continuity follow-up data could not be decrypted safely for export.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			$data[] = array( 'group_id' => 'wca-continuity-followup', 'group_label' => __( 'Clinic follow-up plans', 'worldwide-clinic-appointments' ), 'item_id' => 'followup-' . $row['public_ref'], 'data' => self::export_fields( $payload, array( 'Appointment reference' => self::appointment_ref( absint( $row['appointment_id'] ) ), 'Due' => $row['due_at'], 'Status' => $row['status'] ) ) );
 		}
-		$count_more = absint( $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$intake_table} WHERE patient_user_id=%d", $user_id ) ) ) + absint( $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$follow_table} WHERE patient_user_id=%d", $user_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$intake_count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$intake_table} WHERE patient_user_id=%d", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $intake_count && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_continuity_export_intake_count', __( 'Continuity intake export could not determine completion safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		$follow_count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$follow_table} WHERE patient_user_id=%d", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $follow_count && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_continuity_export_followup_count', __( 'Continuity follow-up export could not determine completion safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		$count_more = absint( $intake_count ) + absint( $follow_count );
 		return array( 'data' => $data, 'done' => ( $offset + $limit ) >= $count_more );
 	}
 
@@ -590,16 +609,32 @@ final class WCA_Continuity {
 			$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT %d", $user_id, $cursor, 100 ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$last = $cursor;
 			foreach ( $rows as $row ) {
-				$last = max( $last, absint( $row['id'] ) );
-				if ( self::legal_hold( 'followups' === $type ? 'followup' : 'intake', $row ) ) { $retained = true; continue; }
-				if ( false !== $wpdb->delete( $table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ) ) { $removed = true; }
+				$row_id = absint( $row['id'] );
+				if ( self::legal_hold( 'followups' === $type ? 'followup' : 'intake', $row ) ) { $retained = true; $last = max( $last, $row_id ); continue; }
+				$deleted = $wpdb->delete( $table, array( 'id' => $row_id ), array( '%d' ) );
+				if ( false === $deleted ) {
+					$messages[] = __( 'Continuity privacy erasure encountered a storage failure and will retry without skipping the affected record.', 'worldwide-clinic-appointments' );
+					$done = false;
+					break;
+				}
+				if ( 0 === (int) $deleted ) {
+					$still_exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE id=%d AND {$field}=%d", $row_id, $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( $still_exists ) { $messages[] = __( 'Continuity privacy erasure could not remove an affected record and will retry.', 'worldwide-clinic-appointments' ); $done = false; break; }
+				}
+				$last = max( $last, $row_id );
+				$removed = true;
 			}
 			if ( $last > $cursor ) { set_transient( $cursor_key, $last, HOUR_IN_SECONDS ); }
 			$more = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT 1", $user_id, $last ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
 		}
 		$intake_table = self::tables()['intake'];
-		$wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d' ) );
+		$guardian_update = $wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d' ) );
+		if ( false === $guardian_update ) { $messages[] = __( 'Guardian continuity references could not be anonymized safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+		elseif ( 0 === (int) $guardian_update ) {
+			$guardian_remaining = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$intake_table} WHERE guardian_user_id=%d LIMIT 1", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+		}
 		if ( $retained ) { $messages[] = __( 'Some clinic continuity records are retained under an active legal, safety or professional record hold.', 'worldwide-clinic-appointments' ); }
 		return array( 'items_removed' => $removed, 'items_retained' => $retained, 'messages' => $messages, 'done' => $done );
 	}

@@ -95,7 +95,8 @@ final class SWC_Appointments {
 			'record_version'       => 1,
 		);
 		foreach ( $meta as $key => $value ) {
-			update_post_meta( $id, '_swc_' . $key, $value );
+			$written = SWC_Helpers::update_meta_strict( $id, '_swc_' . $key, $value, 'swc_legacy_request_meta' );
+			if ( is_wp_error( $written ) ) { wp_delete_post( $id, true ); wp_die( esc_html__( 'The request could not be persisted safely. Nothing was submitted.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) ); }
 		}
 		update_user_meta( $user_id, '_swc_patient_timezone', $zone );
 
@@ -159,12 +160,10 @@ final class SWC_Appointments {
 				if ( ! SWC_Helpers::slot_is_available( $doctor, $proposed, $duration, $id ) ) {
 					return new WP_Error( 'swc_conflict', __( 'The proposed time is no longer available.', 'worldwide-clinic-appointments' ) );
 				}
-				update_post_meta( $id, '_swc_preferred_at_utc', $proposed );
-				update_post_meta( $id, '_swc_status', 'confirmed' );
-				delete_post_meta( $id, '_swc_proposed_at_utc' );
-				delete_post_meta( $id, '_swc_proposed_timezone' );
-				delete_post_meta( $id, '_swc_proposed_expires_at' );
-				SWC_Helpers::bump_version( $id );
+				$persisted = SWC_Helpers::apply_meta_mutations( $id, array( '_swc_preferred_at_utc' => $proposed, '_swc_status' => 'confirmed' ), array( '_swc_proposed_at_utc', '_swc_proposed_timezone', '_swc_proposed_expires_at' ), 'swc_reschedule_accept' );
+				if ( is_wp_error( $persisted ) ) { return $persisted; }
+				$version = SWC_Helpers::bump_version_strict( $id );
+				if ( is_wp_error( $version ) ) { return $version; }
 				if ( ! SWC_Helpers::audit( $id, 'reschedule-accepted', array( 'old_status' => $current, 'new_status' => 'confirmed', 'reason' => __( 'Confirmed by patient', 'worldwide-clinic-appointments' ) ) ) ) {
 					return new WP_Error( 'swc_audit', __( 'The update could not be audited.', 'worldwide-clinic-appointments' ) );
 				}
@@ -217,13 +216,13 @@ final class SWC_Appointments {
 					if ( ! SWC_Helpers::slot_is_available( $new_doctor, $utc, $duration, $id ) ) {
 						return new WP_Error( 'swc_slot', __( 'The current time is not available with the proposed doctor.', 'worldwide-clinic-appointments' ) );
 					}
-					update_post_meta( $id, '_swc_doctor_id', $new_doctor );
-					update_post_meta( $id, '_swc_appointment_duration', $duration );
+					$assignment_write = SWC_Helpers::apply_meta_mutations( $id, array( '_swc_doctor_id' => $new_doctor, '_swc_appointment_duration' => $duration ), array(), 'swc_reassignment_accept' );
+					if ( is_wp_error( $assignment_write ) ) { return $assignment_write; }
 				}
-				delete_post_meta( $id, '_swc_proposed_doctor_id' );
-				delete_post_meta( $id, '_swc_reassignment_reason' );
-				delete_post_meta( $id, '_swc_reassignment_expires_at' );
-				SWC_Helpers::bump_version( $id );
+				$proposal_clear = SWC_Helpers::apply_meta_mutations( $id, array(), array( '_swc_proposed_doctor_id', '_swc_reassignment_reason', '_swc_reassignment_expires_at' ), 'swc_reassignment_clear' );
+				if ( is_wp_error( $proposal_clear ) ) { return $proposal_clear; }
+				$version = SWC_Helpers::bump_version_strict( $id );
+				if ( is_wp_error( $version ) ) { return $version; }
 				$event = $accept ? 'reassignment-accepted' : 'reassignment-declined';
 				if ( ! SWC_Helpers::audit(
 					$id,
@@ -303,23 +302,21 @@ final class SWC_Appointments {
 					if ( $expiry <= time() ) {
 						return new WP_Error( 'swc_expiry', __( 'The proposed time is too soon for patient confirmation.', 'worldwide-clinic-appointments' ) );
 					}
-					update_post_meta( $id, '_swc_proposed_at_utc', $new );
-					update_post_meta( $id, '_swc_proposed_timezone', $zone );
-					update_post_meta( $id, '_swc_proposed_expires_at', gmdate( 'Y-m-d H:i:s', $expiry ) );
+					$proposal_write = SWC_Helpers::apply_meta_mutations( $id, array( '_swc_proposed_at_utc' => $new, '_swc_proposed_timezone' => $zone, '_swc_proposed_expires_at' => gmdate( 'Y-m-d H:i:s', $expiry ) ), array(), 'swc_doctor_reschedule' );
+					if ( is_wp_error( $proposal_write ) ) { return $proposal_write; }
 					$details['proposed_at_utc'] = $new;
 				}
 
-				update_post_meta( $id, '_swc_doctor_private_note', $private_note );
-				update_post_meta( $id, '_swc_patient_message', $patient_message );
+				$updates = array( '_swc_doctor_private_note' => $private_note, '_swc_patient_message' => $patient_message );
+				$deletes = array();
 				if ( $status_changed ) {
-					update_post_meta( $id, '_swc_status', $next );
-					if ( 'reschedule_pending' !== $next ) {
-						delete_post_meta( $id, '_swc_proposed_at_utc' );
-						delete_post_meta( $id, '_swc_proposed_timezone' );
-						delete_post_meta( $id, '_swc_proposed_expires_at' );
-					}
+					$updates['_swc_status'] = $next;
+					if ( 'reschedule_pending' !== $next ) { $deletes = array( '_swc_proposed_at_utc', '_swc_proposed_timezone', '_swc_proposed_expires_at' ); }
 				}
-				SWC_Helpers::bump_version( $id );
+				$state_write = SWC_Helpers::apply_meta_mutations( $id, $updates, $deletes, 'swc_doctor_update' );
+				if ( is_wp_error( $state_write ) ) { return $state_write; }
+				$version = SWC_Helpers::bump_version_strict( $id );
+				if ( is_wp_error( $version ) ) { return $version; }
 				$event = $status_changed ? 'doctor-status-updated' : 'doctor-notes-updated';
 				if ( ! SWC_Helpers::audit(
 					$id,
@@ -400,11 +397,10 @@ final class SWC_Appointments {
 				if ( ! SWC_Helpers::can_transition( $actor, $current, $next ) ) {
 					return new WP_Error( 'swc_transition', __( 'That status transition is not permitted.', 'worldwide-clinic-appointments' ) );
 				}
-				update_post_meta( $id, '_swc_status', $next );
-				delete_post_meta( $id, '_swc_proposed_at_utc' );
-				delete_post_meta( $id, '_swc_proposed_timezone' );
-				delete_post_meta( $id, '_swc_proposed_expires_at' );
-				SWC_Helpers::bump_version( $id );
+				$state_write = SWC_Helpers::apply_meta_mutations( $id, array( '_swc_status' => $next ), array( '_swc_proposed_at_utc', '_swc_proposed_timezone', '_swc_proposed_expires_at' ), 'swc_locked_transition' );
+				if ( is_wp_error( $state_write ) ) { return $state_write; }
+				$version = SWC_Helpers::bump_version_strict( $id );
+				if ( is_wp_error( $version ) ) { return $version; }
 				if ( ! SWC_Helpers::audit( $id, $event, array( 'old_status' => $current, 'new_status' => $next, 'reason' => $reason ) ) ) {
 					return new WP_Error( 'swc_audit', __( 'The update could not be audited.', 'worldwide-clinic-appointments' ) );
 				}

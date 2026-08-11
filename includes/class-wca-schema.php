@@ -450,10 +450,16 @@ final class WCA_Schema {
 	public static function purge_canonical_data() {
 		global $wpdb;
 		foreach ( array_reverse( self::tables() ) as $table ) {
-			$wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $table ) . '`' ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( false === $wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $table ) . '`' ) ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				return new WP_Error( 'wca_purge_table_failed', __( 'A canonical File 08 table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ) ) );
+			}
 		}
 		foreach ( array( self::OPTION_DB_VERSION, self::OPTION_SCHEMA_SNAPSHOT, self::OPTION_MIGRATION_STATE, 'wca_page_map', 'wca_runtime_version', 'wca_health_snapshot', 'wca_circuit_breakers' ) as $option ) {
-			delete_option( $option );
+			$deleted = delete_option( $option );
+			if ( false === $deleted && false !== get_option( $option, false ) ) {
+				return new WP_Error( 'wca_purge_option_failed', __( 'A canonical File 08 option could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'option' => sanitize_key( $option ) ) );
+			}
 		}
+		return true;
 	}
 }

@@ -35,8 +35,12 @@ final class WCA_Admin {
 
 	public static function run_maintenance() {
 		self::authorize( 'wca_run_maintenance' );
-		WCA_Outbox::maintenance();
-		wp_safe_redirect( add_query_arg( 'wca_maintenance', 'done', admin_url( 'edit.php?post_type=' . SWC_Helpers::TYPE . '&page=wca-operations' ) ) );
+		$result = WCA_Outbox::maintenance();
+		$state = is_wp_error( $result ) ? 'failed' : 'done';
+		if ( is_wp_error( $result ) ) {
+			WCA_Observability::log( 'error', 'manual_maintenance_failed', array( 'error_code' => $result->get_error_code() ) );
+		}
+		wp_safe_redirect( add_query_arg( 'wca_maintenance', $state, admin_url( 'edit.php?post_type=' . SWC_Helpers::TYPE . '&page=wca-operations' ) ) );
 		exit;
 	}
 

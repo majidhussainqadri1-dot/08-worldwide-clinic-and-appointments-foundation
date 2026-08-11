@@ -419,6 +419,51 @@ final class SWC_Helpers {
 		return $version;
 	}
 
+	/** Fail closed when an authoritative appointment meta write does not persist. */
+	public static function update_meta_strict( $id, $key, $value, $error_code = 'swc_meta_write_failed' ) {
+		$id = absint( $id );
+		$key = (string) $key;
+		$updated = update_post_meta( $id, $key, $value );
+		if ( false !== $updated ) { return true; }
+		$current = get_post_meta( $id, $key, true );
+		$same = ( is_scalar( $current ) || null === $current ) && ( is_scalar( $value ) || null === $value )
+			? (string) $current === (string) $value
+			: maybe_serialize( $current ) === maybe_serialize( $value );
+		if ( $same ) { return true; }
+		return new WP_Error( sanitize_key( $error_code ), __( 'The appointment state could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+	}
+
+	/** Fail closed when a requested appointment meta deletion leaves the key behind. */
+	public static function delete_meta_strict( $id, $key, $error_code = 'swc_meta_delete_failed' ) {
+		$id = absint( $id );
+		$key = (string) $key;
+		if ( ! metadata_exists( 'post', $id, $key ) ) { return true; }
+		$deleted = delete_post_meta( $id, $key );
+		if ( false !== $deleted && ! metadata_exists( 'post', $id, $key ) ) { return true; }
+		if ( ! metadata_exists( 'post', $id, $key ) ) { return true; }
+		return new WP_Error( sanitize_key( $error_code ), __( 'The obsolete appointment state could not be removed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+	}
+
+	/** Apply a bounded set of authoritative post-meta changes with fail-closed readback semantics. */
+	public static function apply_meta_mutations( $id, $updates = array(), $deletes = array(), $error_code = 'swc_meta_mutation_failed' ) {
+		foreach ( (array) $updates as $key => $value ) {
+			$written = self::update_meta_strict( $id, (string) $key, $value, $error_code . '_write' );
+			if ( is_wp_error( $written ) ) { return $written; }
+		}
+		foreach ( (array) $deletes as $key ) {
+			$deleted = self::delete_meta_strict( $id, (string) $key, $error_code . '_delete' );
+			if ( is_wp_error( $deleted ) ) { return $deleted; }
+		}
+		return true;
+	}
+
+	/** Increment the authoritative record version only when the new value is durable. */
+	public static function bump_version_strict( $id ) {
+		$version = self::record_version( $id ) + 1;
+		$written = self::update_meta_strict( absint( $id ), '_swc_record_version', $version, 'swc_version_write_failed' );
+		return is_wp_error( $written ) ? $written : $version;
+	}
+
 	/**
 	 * Database-backed lock using WordPress' unique option name constraint.
 	 *

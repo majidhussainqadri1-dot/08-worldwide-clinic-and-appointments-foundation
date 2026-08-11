@@ -562,7 +562,10 @@ final class WCA_Service {
 				'created_via'            => 'wca_command',
 				'idempotency_key_hash'   => hash( 'sha256', $idempotency_key ),
 			);
-			foreach ( $meta as $key => $value ) { update_post_meta( $appointment_id, '_swc_' . $key, $value ); }
+			foreach ( $meta as $key => $value ) {
+				$meta_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_' . $key, $value, 'wca_appointment_meta_write' );
+				if ( is_wp_error( $meta_write ) ) { return $meta_write; }
+			}
 			$booked = WCA_Repository::book_slot( $hold['hold_token'], $appointment_id );
 			if ( is_wp_error( $booked ) ) { return $booked; }
 			$consent = WCA_Repository::record_consent( array(
@@ -644,12 +647,17 @@ final class WCA_Service {
 				$hold = WCA_Repository::get_slot_hold( $hold_token );
 				$hold_check = WCA_Plan_Guard::validate_reschedule_hold( $hold, $appointment_id, $actor_user_id );
 				if ( is_wp_error( $hold_check ) ) { return $hold_check; }
-				update_post_meta( $appointment_id, '_swc_proposed_at_utc', $hold['start_utc'] );
-				update_post_meta( $appointment_id, '_swc_proposed_end_utc', $hold['end_utc'] );
-				update_post_meta( $appointment_id, '_swc_proposed_branch_id', absint( $hold['branch_id'] ?? 0 ) );
-				update_post_meta( $appointment_id, '_swc_proposed_hold_token', $hold_token );
-				update_post_meta( $appointment_id, '_swc_proposed_by_user_id', $actor_user_id );
-				update_post_meta( $appointment_id, '_swc_proposed_expires_at', $hold['expires_at'] );
+				foreach ( array(
+					'proposed_at_utc' => $hold['start_utc'],
+					'proposed_end_utc' => $hold['end_utc'],
+					'proposed_branch_id' => absint( $hold['branch_id'] ?? 0 ),
+					'proposed_hold_token' => $hold_token,
+					'proposed_by_user_id' => $actor_user_id,
+					'proposed_expires_at' => $hold['expires_at'],
+				) as $proposal_key => $proposal_value ) {
+					$proposal_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_' . $proposal_key, $proposal_value, 'wca_reschedule_proposal_write' );
+					if ( is_wp_error( $proposal_write ) ) { return $proposal_write; }
+				}
 			}
 			if ( 'confirmed' === $next && 'reschedule_pending' === $current ) {
 				$token = (string) SWC_Helpers::meta( $appointment_id, 'proposed_hold_token' );
@@ -657,26 +665,43 @@ final class WCA_Service {
 				if ( ! $hold || 'held' !== $hold['status'] || strtotime( $hold['expires_at'] . ' UTC' ) <= time() ) { return new WP_Error( 'wca_reschedule_expired', __( 'The proposed time has expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 				$booked = WCA_Repository::book_slot( $token, $appointment_id );
 				if ( is_wp_error( $booked ) ) { return $booked; }
-				WCA_Repository::release_appointment_slot( $appointment_id, 'released', $token );
-				update_post_meta( $appointment_id, '_swc_preferred_at_utc', $hold['start_utc'] );
-				update_post_meta( $appointment_id, '_swc_appointment_end_utc', $hold['end_utc'] );
-				update_post_meta( $appointment_id, '_swc_branch_id', absint( $hold['branch_id'] ?? 0 ) );
-				foreach ( array( 'proposed_at_utc','proposed_end_utc','proposed_branch_id','proposed_hold_token','proposed_by_user_id','proposed_expires_at' ) as $key ) { delete_post_meta( $appointment_id, '_swc_' . $key ); }
+				$released_old_slot = WCA_Repository::release_appointment_slot( $appointment_id, 'released', $token );
+				if ( false === $released_old_slot ) { return new WP_Error( 'wca_reschedule_old_slot_release', __( 'The previous appointment slot could not be released safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				foreach ( array( 'preferred_at_utc' => $hold['start_utc'], 'appointment_end_utc' => $hold['end_utc'], 'branch_id' => absint( $hold['branch_id'] ?? 0 ) ) as $accepted_key => $accepted_value ) {
+					$accepted_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_' . $accepted_key, $accepted_value, 'wca_reschedule_accept_write' );
+					if ( is_wp_error( $accepted_write ) ) { return $accepted_write; }
+				}
+				foreach ( array( 'proposed_at_utc','proposed_end_utc','proposed_branch_id','proposed_hold_token','proposed_by_user_id','proposed_expires_at' ) as $key ) {
+					$proposal_delete = SWC_Helpers::delete_meta_strict( $appointment_id, '_swc_' . $key, 'wca_reschedule_proposal_delete' );
+					if ( is_wp_error( $proposal_delete ) ) { return $proposal_delete; }
+				}
 			}
 			if ( 'checked_in' === $next ) {
 				$actual_mode = sanitize_key( $data['actual_mode'] ?? SWC_Helpers::meta( $appointment_id, 'consultation_type' ) );
 				if ( ! in_array( $actual_mode, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) { return new WP_Error( 'wca_actual_mode_invalid', __( 'A valid consultation mode is required for check-in.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-				update_post_meta( $appointment_id, '_swc_checked_in_at_utc', WCA_Repository::now() );
-				update_post_meta( $appointment_id, '_swc_actual_mode', $actual_mode );
+				$checkin_time = WCA_Repository::now();
+				$checkin_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_checked_in_at_utc', $checkin_time, 'wca_checkin_write' );
+				if ( is_wp_error( $checkin_write ) ) { return $checkin_write; }
+				$mode_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_actual_mode', $actual_mode, 'wca_checkin_mode_write' );
+				if ( is_wp_error( $mode_write ) ) { return $mode_write; }
 			}
 			if ( 'completed' === $next ) {
 				if ( ! SWC_Helpers::meta( $appointment_id, 'checked_in_at_utc' ) ) { return new WP_Error( 'wca_checkin_required', __( 'The appointment must be checked in before completion.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-				update_post_meta( $appointment_id, '_swc_completed_at_utc', WCA_Repository::now() );
+				$completion_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_completed_at_utc', WCA_Repository::now(), 'wca_completion_write' );
+				if ( is_wp_error( $completion_write ) ) { return $completion_write; }
 			}
-			if ( in_array( $next, array( 'cancelled','declined','no_show' ), true ) ) { WCA_Repository::release_appointment_slot( $appointment_id ); }
-			update_post_meta( $appointment_id, '_swc_status', $next );
-			if ( isset( $data['reason_code'] ) ) { update_post_meta( $appointment_id, '_swc_transition_reason_code', sanitize_key( $data['reason_code'] ) ); }
-			SWC_Helpers::bump_version( $appointment_id );
+			if ( in_array( $next, array( 'cancelled','declined','no_show' ), true ) ) {
+				$released_slot = WCA_Repository::release_appointment_slot( $appointment_id );
+				if ( false === $released_slot ) { return new WP_Error( 'wca_terminal_slot_release', __( 'The appointment slot could not be released safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			}
+			$status_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_status', $next, 'wca_transition_status_write' );
+			if ( is_wp_error( $status_write ) ) { return $status_write; }
+			if ( isset( $data['reason_code'] ) ) {
+				$reason_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_transition_reason_code', sanitize_key( $data['reason_code'] ), 'wca_transition_reason_write' );
+				if ( is_wp_error( $reason_write ) ) { return $reason_write; }
+			}
+			$version_write = SWC_Helpers::bump_version_strict( $appointment_id );
+			if ( is_wp_error( $version_write ) ) { return $version_write; }
 			$trace = WCA_Observability::trace_id();
 			$public_ref = (string) SWC_Helpers::meta( $appointment_id, 'public_ref', 'appointment-' . $appointment_id );
 			$event_type = self::event_for_transition( $next );
@@ -928,11 +953,8 @@ final class WCA_Service {
 				$status = SWC_Helpers::status( $id );
 				if ( ! WCA_Contracts::is_terminal( $status ) ) {
 					$reconciled = WCA_Repository::transaction( function () use ( $id, $reason ) {
-						update_post_meta( $id, '_swc_doctor_authority_hold', '1' );
-						update_post_meta( $id, '_swc_doctor_authority_hold_reason', sanitize_text_field( $reason ) );
-						if ( '1' !== (string) get_post_meta( $id, '_swc_doctor_authority_hold', true ) ) {
-							return new WP_Error( 'wca_doctor_hold_persist', __( 'Doctor authority hold could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
-						}
+						$hold_write = SWC_Helpers::apply_meta_mutations( $id, array( '_swc_doctor_authority_hold' => '1', '_swc_doctor_authority_hold_reason' => sanitize_text_field( $reason ) ), array(), 'wca_doctor_hold_persist' );
+						if ( is_wp_error( $hold_write ) ) { return $hold_write; }
 						$queued = WCA_Repository::enqueue(
 							'File19.NotificationRequested.v1',
 							(string) SWC_Helpers::meta( $id, 'public_ref' ),

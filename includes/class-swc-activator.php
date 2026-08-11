@@ -421,15 +421,16 @@ final class SWC_Activator {
 			)
 		);
 		foreach ( $ids as $id ) {
-			wp_delete_post( $id, true );
+			if ( false === wp_delete_post( $id, true ) ) { return new WP_Error( 'swc_purge_post_delete', __( 'A File 08 appointment could not be deleted during the guarded purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		}
-		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_audit_log" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_rate_limits" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_audit_log" ) ) { return new WP_Error( 'swc_purge_audit_table', __( 'The File 08 audit table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_rate_limits" ) ) { return new WP_Error( 'swc_purge_rate_table', __( 'The File 08 rate-limit table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$like = $wpdb->esc_like( '_swc_' ) . '%';
-		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s", $like ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s", $like ) ) ) { return new WP_Error( 'swc_purge_usermeta', __( 'File 08 user metadata could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		foreach ( array( 'swc_page_map', 'swc_version', 'swc_db_version', 'swc_clinic_phone', 'swc_clinic_whatsapp', 'swc_emergency_notice', 'swc_activation_snapshot', 'swc_last_audit_error', 'swc_last_delivery_error' ) as $option ) {
 			delete_option( $option );
 		}
 		self::remove_capabilities();
+		return true;
 	}
 }

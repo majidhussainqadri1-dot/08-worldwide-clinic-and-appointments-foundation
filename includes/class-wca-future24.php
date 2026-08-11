@@ -341,6 +341,19 @@ final class WCA_Future24 {
 		if ( is_string( $lock ) && '' !== $lock ) { $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) ); }
 	}
 
+	/** Preserve caller intent at persistence roots; never silently clamp capacity. */
+	private static function strict_capacity( $value, $maximum ) {
+		if ( null === $value || '' === $value ) { return 0; }
+		if ( is_bool( $value ) || ! preg_match( '/^\d+$/', trim( (string) $value ) ) ) {
+			return new WP_Error( 'wca_future24_capacity_invalid', __( 'Capacity must be a non-negative integer.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$capacity = (int) $value;
+		if ( $capacity > absint( $maximum ) ) {
+			return new WP_Error( 'wca_future24_capacity_range', __( 'Capacity is outside the supported range.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		return $capacity;
+	}
+
 	/** Generic operational record writer. Never stores clinical narrative. */
 	private static function put_record( $feature_id, $data, $actor_user_id = 0 ) {
 		global $wpdb;
@@ -357,6 +370,8 @@ final class WCA_Future24 {
 		if ( ! is_string( $json ) || strlen( $json ) > self::MAX_PAYLOAD ) {
 			return new WP_Error( 'wca_future24_payload', __( 'Operational payload is too large.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) );
 		}
+		$capacity = self::strict_capacity( $data['capacity'] ?? 0, 10000 );
+		if ( is_wp_error( $capacity ) ) { return $capacity; }
 		$now = WCA_Repository::now();
 		$row = array(
 			'public_ref' => WCA_Repository::uuid(),
@@ -369,23 +384,22 @@ final class WCA_Future24 {
 			'status' => sanitize_key( isset( $data['status'] ) ? $data['status'] : 'active' ),
 			'starts_at' => self::utc( isset( $data['starts_at'] ) ? $data['starts_at'] : '' ),
 			'ends_at' => self::utc( isset( $data['ends_at'] ) ? $data['ends_at'] : '' ),
-			'capacity' => min( 10000, absint( isset( $data['capacity'] ) ? $data['capacity'] : 0 ) ),
+			'capacity' => $capacity,
 			'version' => 1,
 			'payload_json' => $json,
 			'expires_at' => self::utc( isset( $data['expires_at'] ) ? $data['expires_at'] : '' ),
 			'created_at' => $now,
 			'updated_at' => $now,
 		);
-		if ( false === $wpdb->insert( self::tables()['records'], $row ) ) {
-			return new WP_Error( 'wca_future24_store', __( 'The scheduling record could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
-		}
-		$record_id = (int) $wpdb->insert_id;
-		$audit = self::audit( $feature_id, 'record_created', $row['public_ref'], array( 'status' => $row['status'] ), $row['actor_user_id'], false );
-		if ( is_wp_error( $audit ) ) {
-			$wpdb->delete( self::tables()['records'], array( 'id' => $record_id ) );
-			return $audit;
-		}
-		return self::public_record( array_merge( $row, array( 'id' => $record_id ) ) );
+		return WCA_Repository::transaction( function () use ( $wpdb, $feature_id, $row ) {
+			if ( false === $wpdb->insert( self::tables()['records'], $row ) ) {
+				return new WP_Error( 'wca_future24_store', __( 'The scheduling record could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
+			$record_id = (int) $wpdb->insert_id;
+			$audit = self::audit( $feature_id, 'record_created', $row['public_ref'], array( 'status' => $row['status'] ), $row['actor_user_id'], false );
+			if ( is_wp_error( $audit ) ) { return $audit; }
+			return self::public_record( array_merge( $row, array( 'id' => $record_id ) ) );
+		}, 'wca_future24_record_transaction' );
 	}
 
 	private static function put_system_record( $feature_id, $data ) {
@@ -394,6 +408,8 @@ final class WCA_Future24 {
 		$table = self::tables()['records'];
 		$payload = self::sanitize_operational_payload( isset( $data['payload'] ) ? $data['payload'] : array(), true );
 		if ( is_wp_error( $payload ) ) { return $payload; }
+		$capacity = self::strict_capacity( $data['capacity'] ?? 0, 1000 );
+		if ( is_wp_error( $capacity ) ) { return $capacity; }
 		$now = WCA_Repository::now();
 		$row = array(
 			'public_ref' => WCA_Repository::uuid(),
@@ -406,21 +422,20 @@ final class WCA_Future24 {
 			'status' => sanitize_key( isset( $data['status'] ) ? $data['status'] : 'active' ),
 			'starts_at' => self::utc( isset( $data['starts_at'] ) ? $data['starts_at'] : '' ) ?: null,
 			'ends_at' => self::utc( isset( $data['ends_at'] ) ? $data['ends_at'] : '' ) ?: null,
-			'capacity' => min( 1000, absint( isset( $data['capacity'] ) ? $data['capacity'] : 0 ) ),
+			'capacity' => $capacity,
 			'version' => 1,
 			'payload_json' => wp_json_encode( $payload, JSON_UNESCAPED_SLASHES ),
 			'expires_at' => self::utc( isset( $data['expires_at'] ) ? $data['expires_at'] : '' ) ?: null,
 			'created_at' => $now,
 			'updated_at' => $now,
 		);
-		if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_future24_system_insert', __( 'The Future24 system record could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-		$record_id = (int) $wpdb->insert_id;
-		$audit = self::audit( $feature_id, 'system_record_created', $row['public_ref'], array( 'status' => $row['status'], 'system_actor' => true ), 0, false );
-		if ( is_wp_error( $audit ) ) {
-			$wpdb->delete( $table, array( 'id' => $record_id ) );
-			return $audit;
-		}
-		return self::public_record( array_merge( array( 'id' => $record_id ), $row ) );
+		return WCA_Repository::transaction( function () use ( $wpdb, $table, $feature_id, $row ) {
+			if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_future24_system_insert', __( 'The Future24 system record could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$record_id = (int) $wpdb->insert_id;
+			$audit = self::audit( $feature_id, 'system_record_created', $row['public_ref'], array( 'status' => $row['status'], 'system_actor' => true ), 0, false );
+			if ( is_wp_error( $audit ) ) { return $audit; }
+			return self::public_record( array_merge( array( 'id' => $record_id ), $row ) );
+		}, 'wca_future24_system_record_transaction' );
 	}
 
 	public static function observe_outbox_event( $envelope ) {
@@ -1730,7 +1745,13 @@ final class WCA_Future24 {
 
 	public static function maintenance() {
 		global $wpdb; $table=self::tables()['records']; $now=WCA_Repository::now();
-		$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='expired',updated_at=%s,version=version+1 WHERE expires_at IS NOT NULL AND expires_at<%s AND status IN ('waiting','open','reserved','group_open','group_member','arrived','participant_active','room_requested','busy','disruption_active')", $now, $now ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$expired = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='expired',updated_at=%s,version=version+1 WHERE expires_at IS NOT NULL AND expires_at<%s AND status IN ('waiting','open','reserved','group_open','group_member','arrived','participant_active','room_requested','busy','disruption_active')", $now, $now ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $expired ) {
+			WCA_Observability::metric( 'future24_maintenance_failure_total', 1, array( 'operation' => 'expire' ) );
+			WCA_Observability::log( 'error', 'future24_expiry_failed', array( 'db_error' => sanitize_text_field( (string) $wpdb->last_error ) ) );
+			return new WP_Error( 'wca_future24_maintenance_expire', __( 'Future24 expiry maintenance could not be completed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
+		return true;
 	}
 
 	/* REST wrappers */

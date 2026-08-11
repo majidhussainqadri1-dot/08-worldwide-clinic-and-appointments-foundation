@@ -114,48 +114,60 @@ final class SWC_Privacy {
 		$ids      = $this->related_ids( $user->ID, 1 );
 		$removed  = false;
 		$retained = false;
+		$messages = array();
+		$failed   = false;
 		foreach ( $ids as $appointment_id ) {
-			$is_patient = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ) === $user->ID;
-			$is_doctor  = absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) === $user->ID;
-			if ( $is_patient ) {
-				foreach ( array( 'country', 'city', 'phone', 'whatsapp', 'reason', 'concern_duration', 'patient_message', 'consent_at', 'consent_version', 'patient_timezone', 'preferred_at_utc', 'proposed_at_utc', 'proposed_timezone', 'proposed_expires_at', 'reassignment_reason', 'reassignment_expires_at' ) as $key ) {
-					delete_post_meta( $appointment_id, '_swc_' . $key );
+			$result = WCA_Repository::transaction( function () use ( $appointment_id, $user, $wpdb ) {
+				$is_patient = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ) === $user->ID;
+				$is_doctor  = absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) === $user->ID;
+				$changed = false;
+				$retain = false;
+				if ( $is_patient ) {
+					foreach ( array( 'country', 'city', 'phone', 'whatsapp', 'reason', 'concern_duration', 'patient_message', 'consent_at', 'consent_version', 'patient_timezone', 'preferred_at_utc', 'proposed_at_utc', 'proposed_timezone', 'proposed_expires_at', 'reassignment_reason', 'reassignment_expires_at' ) as $key ) {
+						$deleted = SWC_Helpers::delete_meta_strict( $appointment_id, '_swc_' . $key, 'swc_privacy_meta_delete' );
+						if ( is_wp_error( $deleted ) ) { return $deleted; }
+					}
+					$patient_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_patient_user_id', 0, 'swc_privacy_patient_anonymize' );
+					if ( is_wp_error( $patient_write ) ) { return $patient_write; }
+					$post_update = wp_update_post( array( 'ID' => $appointment_id, 'post_author' => 0, 'post_title' => sprintf( 'Anonymized Appointment #%d', $appointment_id ) ), true );
+					if ( is_wp_error( $post_update ) || ! $post_update || 0 !== absint( get_post_field( 'post_author', $appointment_id ) ) ) { return new WP_Error( 'swc_privacy_post_anonymize', __( 'The appointment post could not be anonymized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+					if ( SWC_Helpers::can_transition( 'patient', SWC_Helpers::status( $appointment_id ), 'cancelled' ) ) {
+						$status_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_status', 'cancelled', 'swc_privacy_status_anonymize' );
+						if ( is_wp_error( $status_write ) ) { return $status_write; }
+					}
+					$erased_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_erased', '1', 'swc_privacy_erased_marker' );
+					if ( is_wp_error( $erased_write ) ) { return $erased_write; }
+					$changed = true; $retain = true;
 				}
-				update_post_meta( $appointment_id, '_swc_patient_user_id', 0 );
-				wp_update_post( array( 'ID' => $appointment_id, 'post_author' => 0, 'post_title' => sprintf( 'Anonymized Appointment #%d', $appointment_id ) ) );
-				if ( SWC_Helpers::can_transition( 'patient', SWC_Helpers::status( $appointment_id ), 'cancelled' ) ) {
-					update_post_meta( $appointment_id, '_swc_status', 'cancelled' );
+				if ( $is_doctor ) {
+					$doctor_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_doctor_id', 0, 'swc_privacy_doctor_anonymize' );
+					if ( is_wp_error( $doctor_write ) ) { return $doctor_write; }
+					foreach ( array( 'doctor_private_note', 'patient_message' ) as $key ) { $deleted = SWC_Helpers::delete_meta_strict( $appointment_id, '_swc_' . $key, 'swc_privacy_private_meta_delete' ); if ( is_wp_error( $deleted ) ) { return $deleted; } }
+					$changed = true; $retain = true;
 				}
-				update_post_meta( $appointment_id, '_swc_erased', '1' );
-				$removed  = true;
-				$retained = true;
+				if ( absint( SWC_Helpers::meta( $appointment_id, 'proposed_doctor_id' ) ) === $user->ID ) {
+					foreach ( array( 'proposed_doctor_id', 'reassignment_reason', 'reassignment_expires_at' ) as $key ) { $deleted = SWC_Helpers::delete_meta_strict( $appointment_id, '_swc_' . $key, 'swc_privacy_reassignment_delete' ); if ( is_wp_error( $deleted ) ) { return $deleted; } }
+					$changed = true;
+				}
+				$audit_update = $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->prefix}swc_audit_log SET actor_id=0, note='', reason='', details_json='{}' WHERE appointment_id=%d AND actor_id=%d", $appointment_id, $user->ID ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				if ( false === $audit_update ) { return new WP_Error( 'swc_privacy_audit_anonymize', __( 'Appointment audit identity could not be anonymized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				return array( 'changed' => $changed, 'retained' => $retain );
+			}, 'swc_privacy_erase_transaction' );
+			if ( is_wp_error( $result ) ) {
+				clean_post_cache( $appointment_id );
+				$messages[] = __( 'Legacy appointment privacy erasure encountered a storage failure and will retry.', 'worldwide-clinic-appointments' );
+				$failed = true;
+				break;
 			}
-			if ( $is_doctor ) {
-				update_post_meta( $appointment_id, '_swc_doctor_id', 0 );
-				delete_post_meta( $appointment_id, '_swc_doctor_private_note' );
-				delete_post_meta( $appointment_id, '_swc_patient_message' );
-				$removed  = true;
-				$retained = true;
-			}
-			if ( absint( SWC_Helpers::meta( $appointment_id, 'proposed_doctor_id' ) ) === $user->ID ) {
-				delete_post_meta( $appointment_id, '_swc_proposed_doctor_id' );
-				delete_post_meta( $appointment_id, '_swc_reassignment_reason' );
-				delete_post_meta( $appointment_id, '_swc_reassignment_expires_at' );
-				$removed = true;
-			}
-			$wpdb->query(
-				$wpdb->prepare(
-					"UPDATE {$wpdb->prefix}swc_audit_log SET actor_id=0, note='', reason='', details_json='{}' WHERE appointment_id=%d AND actor_id=%d",
-					$appointment_id,
-					$user->ID
-				)
-			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$removed = $removed || ! empty( $result['changed'] );
+			$retained = $retained || ! empty( $result['retained'] );
 		}
-		$done = 0 === $this->related_count( $user->ID );
+		$done = ! $failed && 0 === $this->related_count( $user->ID );
+		if ( $retained ) { $messages[] = __( 'A minimal anonymized appointment and status record was retained for integrity, security, and accountability. Direct identifiers, contact details, private notes, consent details, scheduling times, and user-linked audit content were removed.', 'worldwide-clinic-appointments' ); }
 		return array(
 			'items_removed'  => $removed,
 			'items_retained' => $retained,
-			'messages'       => $retained ? array( __( 'A minimal anonymized appointment and status record was retained for integrity, security, and accountability. Direct identifiers, contact details, private notes, consent details, scheduling times, and user-linked audit content were removed.', 'worldwide-clinic-appointments' ) ) : array(),
+			'messages'       => array_unique( $messages ),
 			'done'           => $done,
 		);
 	}

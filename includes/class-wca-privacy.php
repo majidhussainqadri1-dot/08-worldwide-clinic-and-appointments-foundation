@@ -83,7 +83,7 @@ final class WCA_Privacy {
 		$table = self::future24_table();
 		if ( $table ) {
 			$offset = ( $page - 1 ) * 50;
-			$future_rows = (array) $wpdb->get_results(
+			$future_rows_raw = $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT id,public_ref,feature_id,status,appointment_id,clinic_id,parent_ref,starts_at,ends_at,expires_at,created_at,updated_at,payload_json
 					 FROM {$table}
@@ -95,6 +95,10 @@ final class WCA_Privacy {
 				),
 				ARRAY_A
 			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $future_rows_raw && '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_privacy_export_future24_query', __( 'Future24 privacy data could not be read safely for export.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
+			$future_rows = (array) $future_rows_raw;
 			foreach ( $future_rows as $row ) {
 				$fields = array();
 				foreach ( array( 'public_ref','feature_id','status','parent_ref','starts_at','ends_at','expires_at','created_at','updated_at' ) as $key ) {
@@ -128,17 +132,30 @@ final class WCA_Privacy {
 		$ids = self::appointment_ids_after( $user_id, $cursor, self::ERASE_BATCH );
 		$last_id = $cursor;
 		foreach ( $ids as $id ) {
-			$last_id = max( $last_id, $id );
 			if ( self::legal_hold( $id ) ) {
 				$retained = true;
+				$last_id = max( $last_id, $id );
 				continue;
 			}
-			foreach ( array( 'reason','patient_message','phone','whatsapp','country','city','doctor_private_note','transition_reason_code' ) as $key ) { delete_post_meta( $id, '_swc_' . $key ); }
-			update_post_meta( $id, '_swc_privacy_erased_at', WCA_Repository::now() );
-			if ( absint( SWC_Helpers::meta( $id, 'patient_user_id', 0 ) ) === $user_id ) { update_post_meta( $id, '_swc_patient_user_id', 0 ); }
-			if ( absint( SWC_Helpers::meta( $id, 'guardian_user_id', 0 ) ) === $user_id ) { update_post_meta( $id, '_swc_guardian_user_id', 0 ); }
-			if ( absint( SWC_Helpers::meta( $id, 'doctor_id', 0 ) ) === $user_id ) { update_post_meta( $id, '_swc_doctor_id', 0 ); }
-			if ( absint( get_post_field( 'post_author', $id ) ) === $user_id ) { wp_update_post( array( 'ID' => $id, 'post_author' => 0 ) ); }
+			$erase_error = null;
+			foreach ( array( 'reason','patient_message','phone','whatsapp','country','city','doctor_private_note','transition_reason_code' ) as $key ) {
+				$deleted = SWC_Helpers::delete_meta_strict( $id, '_swc_' . $key, 'wca_privacy_meta_delete' );
+				if ( is_wp_error( $deleted ) ) { $erase_error = $deleted; break; }
+			}
+			if ( ! $erase_error ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_privacy_erased_at', WCA_Repository::now(), 'wca_privacy_erased_marker' ); }
+			if ( ! $erase_error && absint( SWC_Helpers::meta( $id, 'patient_user_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_patient_user_id', 0, 'wca_privacy_patient_anonymize' ); }
+			if ( ! $erase_error && absint( SWC_Helpers::meta( $id, 'guardian_user_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_guardian_user_id', 0, 'wca_privacy_guardian_anonymize' ); }
+			if ( ! $erase_error && absint( SWC_Helpers::meta( $id, 'doctor_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_doctor_id', 0, 'wca_privacy_doctor_anonymize' ); }
+			if ( ! $erase_error && absint( get_post_field( 'post_author', $id ) ) === $user_id ) {
+				$post_update = wp_update_post( array( 'ID' => $id, 'post_author' => 0 ), true );
+				if ( is_wp_error( $post_update ) || ! $post_update || 0 !== absint( get_post_field( 'post_author', $id ) ) ) { $erase_error = new WP_Error( 'wca_privacy_author_anonymize', __( 'Appointment author identity could not be anonymized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			}
+			if ( is_wp_error( $erase_error ) ) {
+				$messages[] = __( 'Appointment privacy erasure encountered a storage failure and will retry without skipping the affected record.', 'worldwide-clinic-appointments' );
+				$done = false;
+				break;
+			}
+			$last_id = max( $last_id, $id );
 			$removed = true;
 		}
 		if ( $last_id > $cursor ) { set_transient( $cursor_key, $last_id, self::CURSOR_TTL ); }
@@ -158,8 +175,8 @@ final class WCA_Privacy {
 			$last = $cursor;
 			$subject_uuid = strtolower( sanitize_text_field( (string) get_user_meta( $user_id, '_smc_subject_uuid', true ) ) );
 			foreach ( $rows as $row ) {
-				$last = max( $last, absint( $row['id'] ) );
-				if ( self::future24_legal_hold( $row ) ) { $retained = true; continue; }
+				$row_id = absint( $row['id'] );
+				if ( self::future24_legal_hold( $row ) ) { $retained = true; $last = max( $last, $row_id ); continue; }
 				$payload = json_decode( (string) $row['payload_json'], true );
 				$payload = is_array( $payload ) ? self::scrub_future24_payload( $payload, $subject_uuid ) : array();
 				$updated = $wpdb->update(
@@ -174,7 +191,26 @@ final class WCA_Privacy {
 					array( '%d','%d','%s','%s' ),
 					array( '%d' )
 				);
-				if ( false !== $updated ) { $removed = true; }
+				if ( false === $updated ) {
+					$messages[] = __( 'Future24 privacy erasure encountered a storage failure and will retry without skipping the affected record.', 'worldwide-clinic-appointments' );
+					$done = false;
+					break;
+				}
+				if ( 0 === (int) $updated ) {
+					$current = $wpdb->get_row( $wpdb->prepare( "SELECT actor_user_id,subject_user_id FROM {$table} WHERE id=%d", $row_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( null === $current && '' !== (string) $wpdb->last_error ) {
+						$messages[] = __( 'Future24 privacy erasure could not verify a concurrent update safely.', 'worldwide-clinic-appointments' );
+						$done = false;
+						break;
+					}
+					if ( $current && ( absint( $current['actor_user_id'] ) === $user_id || absint( $current['subject_user_id'] ) === $user_id ) ) {
+						$messages[] = __( 'Future24 privacy erasure did not remove the requested user linkage and will retry.', 'worldwide-clinic-appointments' );
+						$done = false;
+						break;
+					}
+				}
+				$last = max( $last, $row_id );
+				$removed = true;
 			}
 			if ( $last > $cursor ) { set_transient( $cursor_key, $last, self::CURSOR_TTL ); }
 			$more = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE (actor_user_id=%d OR subject_user_id=%d) AND id>%d ORDER BY id ASC LIMIT 1", $user_id, $user_id, $last ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -244,9 +280,17 @@ final class WCA_Privacy {
 		global $wpdb;
 		$policy = wp_parse_args( (array) get_option( self::RETENTION_OPTION, array() ), array( 'outbox_delivered_days' => 30, 'idempotency_days' => 7, 'metrics_days' => 395, 'future24_operational_days' => 395 ) );
 		$tables = WCA_Schema::tables();
-		$wpdb->query( $wpdb->prepare( "DELETE FROM {$tables['outbox']} WHERE status='delivered' AND delivered_at < %s", gmdate( 'Y-m-d H:i:s', time() - absint( $policy['outbox_delivered_days'] ) * DAY_IN_SECONDS ) ) );
-		$wpdb->query( $wpdb->prepare( "DELETE FROM {$tables['idempotency']} WHERE expires_at < %s", WCA_Repository::now() ) );
-		$wpdb->query( $wpdb->prepare( "DELETE FROM {$tables['metrics']} WHERE metric_bucket < %s", gmdate( 'Y-m-d H:i:s', time() - absint( $policy['metrics_days'] ) * DAY_IN_SECONDS ) ) );
+		$base_deletes = array(
+			'outbox' => $wpdb->prepare( "DELETE FROM {$tables['outbox']} WHERE status='delivered' AND delivered_at < %s", gmdate( 'Y-m-d H:i:s', time() - absint( $policy['outbox_delivered_days'] ) * DAY_IN_SECONDS ) ),
+			'idempotency' => $wpdb->prepare( "DELETE FROM {$tables['idempotency']} WHERE expires_at < %s", WCA_Repository::now() ),
+			'metrics' => $wpdb->prepare( "DELETE FROM {$tables['metrics']} WHERE metric_bucket < %s", gmdate( 'Y-m-d H:i:s', time() - absint( $policy['metrics_days'] ) * DAY_IN_SECONDS ) ),
+		);
+		foreach ( $base_deletes as $scope => $statement ) {
+			if ( false === $wpdb->query( $statement ) ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				WCA_Observability::log( 'error', 'retention_delete_failed', array( 'scope' => $scope ) );
+				return new WP_Error( 'wca_retention_' . sanitize_key( $scope ), __( 'Retention maintenance could not complete safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
+		}
 
 		$table = self::future24_table();
 		if ( $table ) {
@@ -259,11 +303,17 @@ final class WCA_Privacy {
 					ARRAY_A
 				); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 				foreach ( $rows as $row ) {
-					$cursor = max( $cursor, absint( $row['id'] ) );
-					if ( self::future24_legal_hold( $row ) ) { continue; }
-					$wpdb->delete( $table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) );
+					$row_id = absint( $row['id'] );
+					if ( self::future24_legal_hold( $row ) ) { $cursor = max( $cursor, $row_id ); continue; }
+					$deleted = $wpdb->delete( $table, array( 'id' => $row_id ), array( '%d' ) );
+					if ( false === $deleted ) {
+						WCA_Observability::log( 'error', 'future24_retention_delete_failed', array( 'record_id' => $row_id ) );
+						return new WP_Error( 'wca_retention_future24', __( 'Future24 retention cleanup could not complete safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+					}
+					$cursor = max( $cursor, $row_id );
 				}
 			} while ( count( $rows ) === $batch );
 		}
+		return true;
 	}
 }

@@ -156,10 +156,23 @@ final class WCA_Outbox {
 	}
 
 	public static function maintenance() {
-		WCA_Repository::expire_slot_holds();
-		WCA_Privacy::apply_retention();
+		$errors = array();
+		$expired = WCA_Repository::expire_slot_holds();
+		if ( false === $expired ) {
+			$errors[] = 'slot_hold_expiry';
+			WCA_Observability::log( 'error', 'slot_hold_expiry_failed', array() );
+		}
+		$retention = WCA_Privacy::apply_retention();
+		if ( is_wp_error( $retention ) ) {
+			$errors[] = $retention->get_error_code();
+		}
 		self::process( self::BATCH_SIZE );
 		WCA_Observability::health();
+		if ( $errors ) {
+			WCA_Observability::metric( 'maintenance_failure_total', 1, array( 'scope' => 'outbox' ) );
+			return new WP_Error( 'wca_maintenance_incomplete', __( 'One or more maintenance operations could not be completed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'operations' => $errors ) );
+		}
+		return true;
 	}
 
 	private static function metric_topic( $topic ) {

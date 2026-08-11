@@ -233,16 +233,25 @@ final class WCA_Continuity_Guards {
 
 			$last_id = $cursor;
 			foreach ( $rows as $row ) {
-				$last_id = max( $last_id, absint( $row['id'] ) );
+				$row_id = absint( $row['id'] );
 				$held = (bool) apply_filters( 'wca_continuity_legal_hold', false, $config['hold'], $row );
 				if ( $held ) {
 					$retained = true;
+					$last_id = max( $last_id, $row_id );
 					continue;
 				}
-				$deleted = $wpdb->delete( $table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) );
-				if ( false !== $deleted && $deleted > 0 ) {
-					$removed = true;
+				$deleted = $wpdb->delete( $table, array( 'id' => $row_id ), array( '%d' ) );
+				if ( false === $deleted ) {
+					$messages[] = __( 'Continuity privacy erasure encountered a storage failure and will retry without skipping the affected record.', 'worldwide-clinic-appointments' );
+					$done = false;
+					break;
 				}
+				if ( 0 === (int) $deleted ) {
+					$still_exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE id=%d AND {$field}=%d", $row_id, $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( $still_exists ) { $messages[] = __( 'Continuity privacy erasure could not remove an affected record and will retry.', 'worldwide-clinic-appointments' ); $done = false; break; }
+				}
+				$last_id = max( $last_id, $row_id );
+				$removed = true;
 			}
 			if ( $last_id > $cursor ) {
 				set_transient( $cursor_key, $last_id, self::CURSOR_TTL );
@@ -263,7 +272,12 @@ final class WCA_Continuity_Guards {
 
 		if ( 1 === $page ) {
 			$intake_table = WCA_Continuity::tables()['intake'];
-			$wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d' ) );
+			$guardian_update = $wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d' ) );
+			if ( false === $guardian_update ) { $messages[] = __( 'Guardian continuity references could not be anonymized safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+			elseif ( 0 === (int) $guardian_update ) {
+				$guardian_remaining = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$intake_table} WHERE guardian_user_id=%d LIMIT 1", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				if ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+			}
 		}
 		if ( $retained ) {
 			$messages[] = __( 'Some clinic continuity records are retained under an active legal, safety, or professional-record hold.', 'worldwide-clinic-appointments' );

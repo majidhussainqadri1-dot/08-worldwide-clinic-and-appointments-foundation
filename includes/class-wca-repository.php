@@ -660,7 +660,10 @@ final class WCA_Repository {
 		$table = WCA_Schema::tables()['review_eligibility'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s AND reviewer_user_id=%d LIMIT 1", sanitize_text_field( $public_ref ), absint( $reviewer_user_id ) ), ARRAY_A );
 		if ( ! $row || 'eligible' !== $row['status'] || strtotime( (string) $row['expires_at'] . ' UTC' ) <= time() ) {
-			if ( $row && 'eligible' === $row['status'] ) { $wpdb->update( $table, array( 'status' => 'revoked', 'revoked_at' => self::now(), 'revocation_reason' => 'expired' ), array( 'id' => absint( $row['id'] ), 'status' => 'eligible' ) ); }
+			if ( $row && 'eligible' === $row['status'] ) {
+				$revoked = $wpdb->update( $table, array( 'status' => 'revoked', 'revoked_at' => self::now(), 'revocation_reason' => 'expired' ), array( 'id' => absint( $row['id'] ), 'status' => 'eligible' ) );
+				if ( false === $revoked ) { return new WP_Error( 'wca_review_expiry_persist', __( 'Expired review eligibility could not be revoked safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			}
 			return new WP_Error( 'wca_review_not_eligible', __( 'Review eligibility is unavailable or expired.', 'worldwide-clinic-appointments' ) );
 		}
 		$ok = $wpdb->update( $table, array( 'status' => 'used', 'used_at' => self::now() ), array( 'id' => absint( $row['id'] ), 'status' => 'eligible' ) );
@@ -730,6 +733,9 @@ final class WCA_Repository {
 		$provider = sanitize_key( $data['provider'] ?? 'manual' );
 		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND provider=%s AND request_key=%s LIMIT 1", $appointment_id, $provider, $request_key ), ARRAY_A );
 		if ( $existing ) { return $existing; }
+		$amount_raw = $data['amount_minor'] ?? 0;
+		if ( is_bool( $amount_raw ) || ! preg_match( '/^\d+$/', trim( (string) $amount_raw ) ) ) { return new WP_Error( 'wca_payment_amount_invalid', __( 'Payment amount must be a non-negative integer in minor currency units.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$amount_minor = (int) $amount_raw;
 		$row = array(
 			'public_ref'                 => self::uuid(),
 			'appointment_id'             => $appointment_id,
@@ -737,7 +743,7 @@ final class WCA_Repository {
 			'provider_ref'               => '' !== $provider_ref ? $provider_ref : null,
 			'request_key'                => $request_key,
 			'currency'                   => strtoupper( sanitize_text_field( $data['currency'] ?? 'PKR' ) ),
-			'amount_minor'               => max( 0, absint( $data['amount_minor'] ?? 0 ) ),
+			'amount_minor'               => $amount_minor,
 			'platform_commission_minor'  => 0,
 			'status'                     => sanitize_key( $data['status'] ?? 'pending' ),
 			'version'                    => 1,
@@ -745,7 +751,7 @@ final class WCA_Repository {
 			'created_at'                 => self::now(),
 			'updated_at'                 => self::now(),
 		);
-		if ( ! $row['appointment_id'] || 3 !== strlen( $row['currency'] ) ) { return new WP_Error( 'wca_payment_required', __( 'Valid appointment and currency are required.', 'worldwide-clinic-appointments' ) ); }
+		if ( ! $row['appointment_id'] || ! preg_match( '/^[A-Z]{3}$/', $row['currency'] ) ) { return new WP_Error( 'wca_payment_required', __( 'Valid appointment and ISO-style three-letter currency are required.', 'worldwide-clinic-appointments' ) ); }
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND provider=%s AND request_key=%s LIMIT 1", $appointment_id, $provider, $request_key ), ARRAY_A );
 			if ( $existing ) { return $existing; }
