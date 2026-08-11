@@ -23,7 +23,7 @@ Platform commission is always 0%. Donations are optional and never affect visibi
 == Installation ==
 
 1. Verify the exact required companion packages are installed and accepted for staging: Files 00, 03, 07, 09, 17, 19, 20, 24, 25, and 26.
-2. Download the exact CI-generated File 08 v1.2.4 candidate whose manifest commit, artifact digest, and detached SHA-256 match the approved repository HEAD.
+2. Download the exact CI-generated File 08 v1.2.6 candidate whose manifest commit, artifact digest, and detached SHA-256 match the approved repository HEAD.
 3. Install that exact candidate on the canonical Hostinger staging site only.
 4. Complete STAGING-ACCEPTANCE.md, including fresh install/upgrade/migration, DB/schema/migration-state evidence, rollback/restore, real-role journeys, concurrency/replay/provider-failure cases, privacy/cache/accessibility checks, and Founder acceptance.
 5. Do not deploy live until staging acceptance is complete and a controlled production deployment is explicitly authorized.
