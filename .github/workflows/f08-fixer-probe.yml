@@ -1,12 +1,58 @@
-name: F08 Fixer Probe
+name: F08 Third Review R3 Fix
 
 on:
   push:
     branches: [codex/file08-new-governing-plans-completion-2026]
     paths: [.github/workflows/f08-fixer-probe.yml]
 
+permissions:
+  contents: write
+
 jobs:
-  probe:
+  fix:
     runs-on: ubuntu-24.04
     steps:
-      - run: echo probe-ok
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - name: Enforce payer authority in canonical service
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('includes/class-wca-service.php')
+          s=p.read_text()
+          start=s.index('public static function create_payment_intent(')
+          needle="\t\t$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );\n"
+          pos=s.index(needle,start)+len(needle)
+          insert=(
+          "\t\t$patient_user_id  = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );\n"
+          "\t\t$guardian_user_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );\n"
+          "\t\tif ( $actor_user_id !== $patient_user_id && ( ! $guardian_user_id || $actor_user_id !== $guardian_user_id ) ) {\n"
+          "\t\t\treturn new WP_Error( 'wca_payment_payer_required', __( 'Only the patient or currently authorized guardian may create a payment intent.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );\n"
+          "\t\t}\n"
+          "\t\tif ( $guardian_user_id && $actor_user_id === $guardian_user_id ) {\n"
+          "\t\t\t$guardian = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_user_id, $guardian_user_id, $actor_user_id ) : new WP_Error( 'wca_guardian_verification_unavailable', __( 'Guardian authority could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );\n"
+          "\t\t\tif ( is_wp_error( $guardian ) ) { return $guardian; }\n"
+          "\t\t}\n"
+          )
+          if 'wca_payment_payer_required' in s[start:s.index('public static function appointment_ics(',start)]:
+              raise SystemExit('R3 fix already present; refusing duplicate patch')
+          p.write_text(s[:pos]+insert+s[pos:])
+          PY
+          php -l includes/class-wca-service.php
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('includes/class-wca-service.php').read_text()
+          b=s[s.index('public static function create_payment_intent('):s.index('public static function appointment_ics(')]
+          assert 'wca_payment_payer_required' in b
+          assert 'validate_patient_guardian' in b
+          assert 'patient_user_id' in b and 'guardian_user_id' in b
+          PY
+          git config user.name "Sabri File 08 QA"
+          git config user.email "actions@users.noreply.github.com"
+          git add includes/class-wca-service.php
+          git diff --cached --quiet && exit 1 || true
+          git commit -m "File 08 third review R3: enforce payment payer authority at service root"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
