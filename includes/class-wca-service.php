@@ -769,15 +769,22 @@ final class WCA_Service {
 
 	public static function handle_doctor_suspended( $doctor_user_id, $reason = '' ) {
 		$doctor_user_id = absint( $doctor_user_id );
-		$appointments = get_posts( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => 'private', 'posts_per_page' => 500, 'fields' => 'ids', 'meta_query' => array( array( 'key' => '_swc_doctor_id', 'value' => $doctor_user_id ) ) ) );
-		foreach ( $appointments as $id ) {
-			$status = SWC_Helpers::status( $id );
-			if ( ! WCA_Contracts::is_terminal( $status ) ) {
-				update_post_meta( $id, '_swc_doctor_authority_hold', '1' );
-				update_post_meta( $id, '_swc_doctor_authority_hold_reason', sanitize_text_field( $reason ) );
-				WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) SWC_Helpers::meta( $id, 'public_ref' ), array( 'event' => 'doctor_authority_hold', 'recipients' => array( absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) ) ) ), WCA_Observability::trace_id() );
+		$page = 1;
+		$seen = 0;
+		do {
+			$appointments = get_posts( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => 'private', 'posts_per_page' => 200, 'paged' => $page, 'orderby' => 'ID', 'order' => 'ASC', 'fields' => 'ids', 'no_found_rows' => true, 'meta_query' => array( array( 'key' => '_swc_doctor_id', 'value' => $doctor_user_id ) ) ) );
+			foreach ( $appointments as $id ) {
+				$status = SWC_Helpers::status( $id );
+				if ( ! WCA_Contracts::is_terminal( $status ) ) {
+					update_post_meta( $id, '_swc_doctor_authority_hold', '1' );
+					update_post_meta( $id, '_swc_doctor_authority_hold_reason', sanitize_text_field( $reason ) );
+					WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) SWC_Helpers::meta( $id, 'public_ref' ), array( 'event' => 'doctor_authority_hold', 'recipients' => array( absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) ) ) ), WCA_Observability::trace_id() );
+				}
+				$seen++;
 			}
-		}
+			$page++;
+		} while ( 200 === count( $appointments ) && $page <= 500 );
+		WCA_Observability::metric( 'doctor_suspension_appointments_scanned', $seen, array( 'doctor_scope' => 'suspended' ) );
 	}
 
 	public static function handle_payment_status_changed( $payment_ref, $status ) {

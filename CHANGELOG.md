@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.4 — 2026-08-11
+
+- Completed a fourth fresh sequential 10-round review-and-correct cycle against exact v1.2.3 source state.
+- Persisted canonical branch identity through slot holds, appointment creation and reschedule confirmation; isolated slot queries by clinic.
+- Added Future24 group leave/cancel semantics and current clinic/service/start-time revalidation.
+- Replaced permissive signed-calendar timestamp parsing with strict UTC validation.
+- Corrected payment-intent provider reference uniqueness and added canonical service-root idempotency with migration-safe nullable keys.
+- Enforced privacy/emergency/teleconsult consent at the service root and expanded appointment replay fingerprints to bind meaningful request semantics.
+- Required activation step-up, current clinic-owner eligibility, and active public branch/eligible-service inventory.
+- Replaced the 500-record doctor-suspension ceiling with bounded paged reconciliation.
+- Advanced core schema to 3.2.0 and runtime to 1.2.4; continuity and Future24 schemas remain unchanged.
+- Added a permanent fourth-ten-review regression gate; repository/package/CI, staging, live and operational evidence remain separate states.
+
 ## 1.2.3 — 2026-08-11
 
 - Completed a third fresh sequential 10-round review-and-correct cycle against the corrected v1.2.2 source state.

@@ -8,8 +8,8 @@ function r80true( $l,$c ) { global $failures,$checks; $checks++; if(!$c){ $failu
 $bootstrap=r80src('worldwide-clinic.php'); $contracts=r80src('includes/class-wca-contracts.php'); $auth=r80src('includes/class-wca-authorization.php'); $repo=r80src('includes/class-wca-repository.php'); $service=r80src('includes/class-wca-service.php'); $future=r80src('includes/class-wca-future24.php'); $privacy=r80src('includes/class-wca-privacy.php'); $readme=r80src('readme.txt');
 
 // R78 release identity.
-foreach(array('Version: 1.2.3',"WCA_VERSION', '1.2.3'") as $t){ r80has('bootstrap runtime',$bootstrap,$t); }
-r80has('contract runtime',$contracts,"RUNTIME_VERSION                 = '1.2.3'"); r80has('readme runtime',$readme,'Stable tag: 1.2.3');
+foreach(array('Version: 1.2.4',"WCA_VERSION', '1.2.4'") as $t){ r80has('bootstrap runtime',$bootstrap,$t); }
+r80has('contract runtime',$contracts,"RUNTIME_VERSION                 = '1.2.4'"); r80has('readme runtime',$readme,'Stable tag: 1.2.4');
 
 // R08/R13/R14 current guardian truth and least-privilege delegation.
 foreach(array('guardian_context','can_staff_access_appointment','clinic_manage','delegation_allows_scope') as $t){ r80has('authorization',$auth,$t); }

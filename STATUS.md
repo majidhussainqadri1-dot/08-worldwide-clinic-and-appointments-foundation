@@ -3,8 +3,8 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.3**
-- Core File 08 schema: **3.1.0**
+- Runtime candidate: **1.2.4**
+- Core File 08 schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
 - File plan contract: **SSH-F08-PLAN-2026-v1.0**
@@ -19,7 +19,7 @@ The authoritative repository release identity is the exact final branch HEAD tog
 
 The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving the File 08 ownership boundary. The runtime includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback metadata, accessibility/localization, and the Future24 scheduling/interoperability layer.
 
-## Third fresh 10-round corrective audit
+## Fourth fresh 10-round corrective audit
 
 A third fresh sequential 10-round review-and-correct cycle was opened after the v1.2.2 candidate. Findings are corrected before the next review proceeds. This cycle adds or strengthens:
 
@@ -38,7 +38,7 @@ Supported public/cross-file mutation paths continue to enforce transition expect
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — third-cycle source corrections are present. |
+| Coded | **Corrected candidate** — fourth-cycle source corrections are present. |
 | Fresh post-final-code reviews | **In progress until the final exact-head review/CI reopening is complete.** |
 | Packaged | **Pending exact-final-HEAD CI artifact confirmation.** |
 | Automated-QA Green | **Pending exact-final-HEAD workflow confirmation.** |

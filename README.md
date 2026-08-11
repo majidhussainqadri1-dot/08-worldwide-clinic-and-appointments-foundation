@@ -6,8 +6,8 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.3**
-- Core schema: **3.1.0**
+- Runtime candidate: **1.2.4**
+- Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
 - Text domain: `worldwide-clinic-appointments`
@@ -32,6 +32,8 @@ The first post-closure 10-round review corrected canonical detail routing, legac
 The **second fresh 10-round corrective audit** further hardens administrator transition purpose/step-up checks, requires explicit slot-hold replay keys, namespaces hold replay identity by patient, fails closed on ambiguous stale mutation reservations, strictly validates Future24 date/time inputs, removes native numeric identifiers from Future24 REST DTOs, and serializes outbox dispatch so cron/shutdown workers cannot overlap. Every supported mutation entry point remains guarded by authorization, rate/replay controls, and state/object constraints.
 
 The **third fresh 10-round corrective audit** moves the same invariants to canonical roots where cross-cutting guards were insufficient: stale idempotency is fail-closed in the repository itself, payment and transition preconditions are enforced in the service root, protected mutations are no-store/noindex, ICS output strictly validates persisted UTC timestamps, outbox claims atomically re-check eligibility, and service/availability doctor assignment requires current clinic-serving authority rather than eligibility alone.
+
+The **fourth fresh 10-round corrective audit** closes additional canonical-root gaps: branch identity now survives slot hold/booking/reschedule, slot discovery is clinic-isolated, Future24 group sessions have idempotent leave/cancel semantics and current-state rechecks, signed calendar links validate persisted UTC strictly, payment intents use migration-safe nullable provider references plus canonical idempotency, service-root appointment requests enforce explicit consent and full replay fingerprints, activation requires step-up/current owner eligibility/publishable inventory, and doctor suspension reconciliation is not truncated at 500 appointments.
 
 ## Canonical routes
 
