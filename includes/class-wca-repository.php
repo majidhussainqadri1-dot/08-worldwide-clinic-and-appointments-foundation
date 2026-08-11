@@ -791,19 +791,25 @@ final class WCA_Repository {
 		return $claimed;
 	}
 
-	public static function complete_outbox( $id ) {
+	public static function complete_outbox( $id, $worker = '' ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['outbox'];
-		return false !== $wpdb->update( $table, array( 'status' => 'delivered', 'delivered_at' => self::now(), 'updated_at' => self::now(), 'locked_at' => null, 'locked_by' => '' ), array( 'id' => absint( $id ) ) );
+		$worker = sanitize_text_field( $worker );
+		if ( '' === $worker ) { return false; }
+		$updated = $wpdb->update( $table, array( 'status' => 'delivered', 'delivered_at' => self::now(), 'updated_at' => self::now(), 'locked_at' => null, 'locked_by' => '' ), array( 'id' => absint( $id ), 'status' => 'processing', 'locked_by' => $worker ) );
+		return 1 === (int) $updated;
 	}
 
-	public static function fail_outbox( $id, $error, $attempts ) {
+	public static function fail_outbox( $id, $error, $attempts, $worker = '' ) {
 		global $wpdb;
 		$table   = WCA_Schema::tables()['outbox'];
+		$worker = sanitize_text_field( $worker );
+		if ( '' === $worker ) { return false; }
 		$attempts = absint( $attempts ) + 1;
 		$status  = $attempts >= 8 ? 'dead_letter' : 'retry';
 		$delay   = min( DAY_IN_SECONDS, (int) pow( 2, min( 10, $attempts ) ) * 60 );
-		return false !== $wpdb->update( $table, array( 'status' => $status, 'attempts' => $attempts, 'last_error' => substr( sanitize_text_field( $error ), 0, 500 ), 'next_attempt_at' => gmdate( 'Y-m-d H:i:s', time() + $delay ), 'updated_at' => self::now(), 'locked_at' => null, 'locked_by' => '' ), array( 'id' => absint( $id ) ) );
+		$updated = $wpdb->update( $table, array( 'status' => $status, 'attempts' => $attempts, 'last_error' => substr( sanitize_text_field( $error ), 0, 500 ), 'next_attempt_at' => gmdate( 'Y-m-d H:i:s', time() + $delay ), 'updated_at' => self::now(), 'locked_at' => null, 'locked_by' => '' ), array( 'id' => absint( $id ), 'status' => 'processing', 'locked_by' => $worker ) );
+		return 1 === (int) $updated;
 	}
 
 	/** @return array<string,mixed>|WP_Error */
