@@ -371,8 +371,13 @@ final class WCA_Future24 {
 		if ( false === $wpdb->insert( self::tables()['records'], $row ) ) {
 			return new WP_Error( 'wca_future24_store', __( 'The scheduling record could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 		}
-		self::audit( $feature_id, 'record_created', $row['public_ref'], array( 'status' => $row['status'] ), $row['actor_user_id'], false );
-		return self::public_record( array_merge( $row, array( 'id' => $wpdb->insert_id ) ) );
+		$record_id = (int) $wpdb->insert_id;
+		$audit = self::audit( $feature_id, 'record_created', $row['public_ref'], array( 'status' => $row['status'] ), $row['actor_user_id'], false );
+		if ( is_wp_error( $audit ) ) {
+			$wpdb->delete( self::tables()['records'], array( 'id' => $record_id ) );
+			return $audit;
+		}
+		return self::public_record( array_merge( $row, array( 'id' => $record_id ) ) );
 	}
 
 	private static function put_system_record( $feature_id, $data ) {
@@ -401,8 +406,13 @@ final class WCA_Future24 {
 			'updated_at' => $now,
 		);
 		if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_future24_system_insert', __( 'The Future24 system record could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-		self::audit( $feature_id, 'system_record_created', $row['public_ref'], array( 'status' => $row['status'], 'system_actor' => true ), 0, false );
-		return self::public_record( array_merge( array( 'id' => $wpdb->insert_id ), $row ) );
+		$record_id = (int) $wpdb->insert_id;
+		$audit = self::audit( $feature_id, 'system_record_created', $row['public_ref'], array( 'status' => $row['status'], 'system_actor' => true ), 0, false );
+		if ( is_wp_error( $audit ) ) {
+			$wpdb->delete( $table, array( 'id' => $record_id ) );
+			return $audit;
+		}
+		return self::public_record( array_merge( array( 'id' => $record_id ), $row ) );
 	}
 
 	public static function observe_outbox_event( $envelope ) {
@@ -598,9 +608,10 @@ final class WCA_Future24 {
 			'automated_clinical_decision' => false,
 			'context' => self::sanitize_operational_payload( $context ),
 		);
-		if ( class_exists( 'WCA_Repository' ) ) {
-			WCA_Repository::append_event( 'Future24GovernanceRecorded.v1', 'future24', sanitize_text_field( $object_ref ), $payload, $actor_user_id, WCA_Observability::trace_id() );
+		if ( ! class_exists( 'WCA_Repository' ) ) {
+			return new WP_Error( 'wca_future24_audit_unavailable', __( 'Future24 governance audit storage is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
+		return WCA_Repository::append_event( 'Future24GovernanceRecorded.v1', 'future24', sanitize_text_field( $object_ref ), $payload, $actor_user_id, WCA_Observability::trace_id() );
 	}
 
 	/* FUT-01 */
