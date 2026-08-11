@@ -20,5 +20,6 @@ t12_has('R14 idempotency release CAS','includes/class-wca-repository.php','retur
 t12_has('R15 cursor persistence fail closed','includes/class-wca-rest.php','wca_cursor_store_failed');
 t12_has('R16 recurrence range validation','includes/class-wca-future24.php','wca_series_count_range');
 t12_has('R17 buffer range validation','includes/class-wca-future24.php','wca_buffer_policy_range');
+t12_has('R18 capacity range validation','includes/class-wca-future24.php','wca_resource_capacity_range');
 if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
 echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";

@@ -23,5 +23,6 @@
 | T12-R15 | DEFECT CORRECTED | Public clinic pagination advertised a cursor even when cursor-state persistence failed. |
 | T12-R16 | DEFECT CORRECTED | Recurrence count/interval/custom-day inputs were silently clamped instead of rejected. |
 | T12-R17 | DEFECT CORRECTED | Future24 buffer/travel/continuous-consultation policy values were silently clamped. |
+| T12-R18 | DEFECT CORRECTED | Resource/group capacities were silently normalized, changing caller intent. |
 
-Rounds T12-R18–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R19–T12-R20 remain unreviewed in this sequential cycle at this commit.

@@ -782,7 +782,9 @@ final class WCA_Future24 {
 		$branch = self::branch_for_clinic( $clinic_id, isset( $data['branch_ref'] ) ? $data['branch_ref'] : '' );
 		if ( is_wp_error( $branch ) ) { return $branch; }
 		$branch_ref = $branch ? strtolower( (string) $branch['public_ref'] ) : '';
-		return self::put_record( 'F08-FUT-04', array( 'clinic_id' => $clinic_id, 'status' => 'resource_active', 'capacity' => max( 1, absint( $data['capacity'] ?? 1 ) ), 'payload' => array( 'resource_type' => $type, 'label' => sanitize_text_field( $data['label'] ?? '' ), 'branch_ref' => $branch_ref ) ), $actor );
+		$capacity = filter_var( isset( $data['capacity'] ) ? $data['capacity'] : 1, FILTER_VALIDATE_INT );
+		if ( false === $capacity || $capacity < 1 || $capacity > 10000 ) { return new WP_Error( 'wca_resource_capacity_range', __( 'Scheduling resource capacity must be an integer from 1 through 10000.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		return self::put_record( 'F08-FUT-04', array( 'clinic_id' => $clinic_id, 'status' => 'resource_active', 'capacity' => $capacity, 'payload' => array( 'resource_type' => $type, 'label' => sanitize_text_field( $data['label'] ?? '' ), 'branch_ref' => $branch_ref ) ), $actor );
 	}
 
 	public static function reserve_resource( $resource_ref, $data, $actor = 0 ) {
@@ -843,7 +845,8 @@ final class WCA_Future24 {
 		$service = self::service_for_clinic( $clinic_id, isset( $data['service_ref'] ) ? $data['service_ref'] : '' );
 		if ( is_wp_error( $service ) ) { return $service; }
 		$service_ref = $service ? strtolower( (string) $service['public_ref'] ) : '';
-		$capacity = min( 100, max( 2, absint( isset( $data['capacity'] ) ? $data['capacity'] : 2 ) ) );
+		$capacity = filter_var( isset( $data['capacity'] ) ? $data['capacity'] : 2, FILTER_VALIDATE_INT );
+		if ( false === $capacity || $capacity < 2 || $capacity > 100 ) { return new WP_Error( 'wca_group_capacity_range', __( 'Group-session capacity must be an integer from 2 through 100.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		return self::put_record( 'F08-FUT-05', array(
 			'clinic_id' => $clinic_id,
 			'status' => 'group_open',
