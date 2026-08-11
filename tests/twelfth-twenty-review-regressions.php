@@ -23,5 +23,7 @@ t12_has('R17 buffer range validation','includes/class-wca-future24.php','wca_buf
 t12_has('R18 capacity range validation','includes/class-wca-future24.php','wca_resource_capacity_range');
 t12_has('R19 service numeric ranges','includes/class-wca-service.php','wca_service_duration_range');
 t12_has('R19 repository availability numeric ranges','includes/class-wca-repository.php','wca_repository_availability_numeric_range');
+t12_has('R20 disruption transaction','includes/class-wca-future24.php','wca_disruption_transaction');
+t12_has('R20 disruption enqueue fail closed','includes/class-wca-future24.php','if(is_wp_error($queued)){return $queued;}');
 if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
 echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";

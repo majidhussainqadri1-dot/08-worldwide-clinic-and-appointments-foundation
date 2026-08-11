@@ -1458,24 +1458,28 @@ final class WCA_Future24 {
 			$affected[]=$appointment_id;
 		}
 		$affected=array_values(array_unique($affected));
-		$record=self::put_record('F08-FUT-17',array(
-			'clinic_id'=>$clinic_id,'status'=>'disruption_active','starts_at'=>$effective_start,'ends_at'=>$end,
-			'expires_at'=>gmdate('Y-m-d H:i:s',$end_ts+DAY_IN_SECONDS),
-			'payload'=>array('reason_code'=>sanitize_key($data['reason_code'] ?? 'operational_delay'),'rebooking_mode'=>'offer_only','auto_cancel'=>false,'affected_count'=>count($affected),'affected_states'=>array('requested','confirmed','reschedule_pending'),'past_appointments_excluded'=>true),
-		),$actor);
-		if(is_wp_error($record)){return $record;}
-		foreach($affected as $appointment_id){
-			$recipients=array_values(array_unique(array_filter(array(
-				absint(SWC_Helpers::meta($appointment_id,'patient_user_id',get_post_field('post_author',$appointment_id))),
-				absint(SWC_Helpers::meta($appointment_id,'guardian_user_id',0)),
-				absint(SWC_Helpers::meta($appointment_id,'doctor_id',0)),
-			))));
-			WCA_Repository::enqueue('File19.NotificationRequested.v1',self::appointment_ref($appointment_id),array(
-				'event'=>'clinic_disruption','appointment_ref'=>self::appointment_ref($appointment_id),'clinic_ref'=>(string)$clinic['public_ref'],
-				'disruption_ref'=>$record['public_ref'],'recipients'=>$recipients,'delivery_owner'=>'File19','auto_cancel'=>false,
-			),WCA_Observability::trace_id());
-		}
-		$record['affected_count']=count($affected); return $record;
+		return WCA_Repository::transaction( function () use ( $clinic_id, $effective_start, $end, $end_ts, $affected, $actor, $clinic, $data ) {
+			$record=self::put_record('F08-FUT-17',array(
+				'clinic_id'=>$clinic_id,'status'=>'disruption_active','starts_at'=>$effective_start,'ends_at'=>$end,
+				'expires_at'=>gmdate('Y-m-d H:i:s',$end_ts+DAY_IN_SECONDS),
+				'payload'=>array('reason_code'=>sanitize_key($data['reason_code'] ?? 'operational_delay'),'rebooking_mode'=>'offer_only','auto_cancel'=>false,'affected_count'=>count($affected),'affected_states'=>array('requested','confirmed','reschedule_pending'),'past_appointments_excluded'=>true),
+			),$actor);
+			if(is_wp_error($record)){return $record;}
+			$trace=WCA_Observability::trace_id();
+			foreach($affected as $appointment_id){
+				$recipients=array_values(array_unique(array_filter(array(
+					absint(SWC_Helpers::meta($appointment_id,'patient_user_id',get_post_field('post_author',$appointment_id))),
+					absint(SWC_Helpers::meta($appointment_id,'guardian_user_id',0)),
+					absint(SWC_Helpers::meta($appointment_id,'doctor_id',0)),
+				))));
+				$queued=WCA_Repository::enqueue('File19.NotificationRequested.v1',self::appointment_ref($appointment_id),array(
+					'event'=>'clinic_disruption','appointment_ref'=>self::appointment_ref($appointment_id),'clinic_ref'=>(string)$clinic['public_ref'],
+					'disruption_ref'=>$record['public_ref'],'recipients'=>$recipients,'delivery_owner'=>'File19','auto_cancel'=>false,
+				),$trace);
+				if(is_wp_error($queued)){return $queued;}
+			}
+			$record['affected_count']=count($affected); return $record;
+		}, 'wca_disruption_transaction' );
 	}
 
 	/* FUT-18 */
