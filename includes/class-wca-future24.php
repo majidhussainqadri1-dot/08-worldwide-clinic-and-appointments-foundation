@@ -1055,7 +1055,7 @@ final class WCA_Future24 {
 		$days = min( 90, max( 7, absint( $days ) ) );
 		$from = gmdate( 'Y-m-d 00:00:00' );
 		$to = gmdate( 'Y-m-d 23:59:59', time() + ( $days - 1 ) * DAY_IN_SECONDS );
-		$ids = self::clinic_appointments_between( $clinic_id, $from, $to, 2000 );
+		$ids = self::clinic_appointments_between_all( $clinic_id, $from, $to );
 		$rules_table = WCA_Schema::tables()['availability'];
 		$rules = (array) $wpdb->get_results( $wpdb->prepare( "SELECT rrule_json,capacity,status FROM {$rules_table} WHERE clinic_id=%d AND status='active' ORDER BY id ASC", absint( $clinic_id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$map = array();
