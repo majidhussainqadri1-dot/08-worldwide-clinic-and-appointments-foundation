@@ -121,6 +121,13 @@ final class WCA_Plan_Guard {
 		if ( ! $matched ) {
 			return new WP_Error( 'wca_slot_not_available', __( 'The selected slot is not in the current server availability projection.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
+		$client_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $client_key ) ) {
+			return new WP_Error( 'wca_idempotency_required', __( 'A valid idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		/* The repository's key is globally unique, but client keys are not. Namespace
+		 * the replay identity by the authorized patient without exposing the raw key. */
+		$data['idempotency_key'] = 'p' . absint( $patient_user_id ) . ':' . hash( 'sha256', $client_key );
 		return array_merge(
 			$data,
 			array(
