@@ -473,29 +473,28 @@ final class WCA_Continuity {
 				$id = absint( $candidate['id'] );
 				$cursor = max( $cursor, $id );
 				if ( ! $id ) { continue; }
-				$wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d AND status='scheduled' AND reminder_sent_at IS NULL FOR UPDATE", $id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				if ( ! $row ) { $wpdb->query( 'COMMIT' ); continue; } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$trace = WCA_Observability::trace_id();
-				$queued = WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) $row['public_ref'], array(
-					'recipients'      => array( absint( $row['patient_user_id'] ) ),
-					'event'           => 'followup_due',
-					'appointment_ref' => self::appointment_ref( absint( $row['appointment_id'] ) ),
-					'followup_ref'    => (string) $row['public_ref'],
-					'contract'        => self::CONTRACT_VERSION,
-				), $trace );
-				if ( is_wp_error( $queued ) ) {
-					$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-					WCA_Observability::log( 'error', 'followup_reminder_enqueue_failed', array( 'followup_ref' => (string) $row['public_ref'], 'trace_id' => $trace ) );
+				$outcome = WCA_Repository::transaction( function () use ( $table, $id, $now ) {
+					global $wpdb;
+					$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d AND status='scheduled' AND reminder_sent_at IS NULL FOR UPDATE", $id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( ! $row ) { return false; }
+					$trace = WCA_Observability::trace_id();
+					$queued = WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) $row['public_ref'], array(
+						'recipients'      => array( absint( $row['patient_user_id'] ) ),
+						'event'           => 'followup_due',
+						'appointment_ref' => self::appointment_ref( absint( $row['appointment_id'] ) ),
+						'followup_ref'    => (string) $row['public_ref'],
+						'contract'        => self::CONTRACT_VERSION,
+					), $trace );
+					if ( is_wp_error( $queued ) ) { return $queued; }
+					$changed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET reminder_sent_at=%s,updated_at=%s,version=version+1 WHERE id=%d AND status='scheduled' AND reminder_sent_at IS NULL AND version=%d", $now, $now, $id, absint( $row['version'] ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( 1 !== (int) $changed ) { return new WP_Error( 'wca_followup_reminder_conflict', __( 'Follow-up reminder state changed before it could be queued safely.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+					return array( 'sent' => true, 'followup_ref' => (string) $row['public_ref'], 'trace_id' => $trace );
+				}, 'wca_followup_reminder_transaction' );
+				if ( is_wp_error( $outcome ) ) {
+					WCA_Observability::log( 'error', 'followup_reminder_transaction_failed', array( 'followup_id' => $id, 'error_code' => $outcome->get_error_code() ) );
 					continue;
 				}
-				$changed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET reminder_sent_at=%s,updated_at=%s,version=version+1 WHERE id=%d AND status='scheduled' AND reminder_sent_at IS NULL AND version=%d", $now, $now, $id, absint( $row['version'] ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				if ( 1 !== (int) $changed ) {
-					$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-					continue;
-				}
-				$wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				$sent++;
+				if ( is_array( $outcome ) && ! empty( $outcome['sent'] ) ) { $sent++; }
 			}
 		} while ( count( $rows ) === $batch );
 		return $sent;

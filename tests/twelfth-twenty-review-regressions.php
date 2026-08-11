@@ -7,5 +7,6 @@ t12_has('R1 intake transaction','includes/class-wca-continuity-secure.php','wca_
 t12_has('R2 consent revoke transaction','includes/class-wca-continuity-secure.php','wca_consent_revoke_transaction');
 t12_has('R3 followup create transaction','includes/class-wca-continuity-secure.php','wca_followup_create_transaction');
 t12_has('R4 followup complete transaction','includes/class-wca-continuity-secure.php','wca_followup_complete_transaction');
+t12_has('R5 reminder transaction','includes/class-wca-continuity-secure.php','wca_followup_reminder_transaction');
 if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
 echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";
