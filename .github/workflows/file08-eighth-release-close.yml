@@ -1,0 +1,219 @@
+name: File 08 Eighth Review Release Closure
+
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - '.github/workflows/file08-eighth-release-close.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release-close:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact review branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+
+      - name: Apply v1.2.8 release, docs and permanent regression gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def p(path): return Path(path)
+          def replace(path, old, new, count=-1):
+              q=p(path); s=q.read_text()
+              if old not in s: raise SystemExit(f'missing expected pattern in {path}: {old[:80]}')
+              q.write_text(s.replace(old,new,count))
+
+          replace('worldwide-clinic.php','Version: 1.2.7','Version: 1.2.8',1)
+          replace('worldwide-clinic.php',"define( 'WCA_VERSION', '1.2.7' );","define( 'WCA_VERSION', '1.2.8' );",1)
+          replace('includes/class-wca-contracts.php',"const RUNTIME_VERSION                 = '1.2.7';","const RUNTIME_VERSION                 = '1.2.8';",1)
+
+          # Current runtime assertions that intentionally track the latest candidate.
+          current_needles = {
+              'Version: 1.2.7':'Version: 1.2.8',
+              "define( 'WCA_VERSION', '1.2.7' )":"define( 'WCA_VERSION', '1.2.8' )",
+              "RUNTIME_VERSION                 = '1.2.7'":"RUNTIME_VERSION                 = '1.2.8'",
+              'Stable tag: 1.2.7':'Stable tag: 1.2.8',
+              'Runtime candidate: **1.2.7**':'Runtime candidate: **1.2.8**',
+              "'1.2.7' === WCA_Contracts::RUNTIME_VERSION":"'1.2.8' === WCA_Contracts::RUNTIME_VERSION",
+              'runtime contract is 1.2.7':'runtime contract is 1.2.8',
+              'plugin version is 1.2.7':'plugin version is 1.2.8',
+              'plugin 1.2.7':'plugin 1.2.8',
+              'runtime 1.2.7':'runtime 1.2.8',
+              'readme stable 1.2.7':'readme stable 1.2.8',
+              'repository readme 1.2.7':'repository readme 1.2.8',
+              'status 1.2.7':'status 1.2.8',
+          }
+          for q in Path('tests').glob('*.php'):
+              s=q.read_text()
+              for old,new in current_needles.items(): s=s.replace(old,new)
+              q.write_text(s)
+
+          # README current identity and eighth-cycle source closure.
+          q=p('README.md'); s=q.read_text()
+          s=s.replace('Runtime candidate: **1.2.7**','Runtime candidate: **1.2.8**',1)
+          anchor='The **seventh fresh 10-round corrective audit** closes privacy-lifecycle starvation, silent input truncation, evidence truncation, and high-volume analytics undercounting: continuity erasure and retention now traverse complete keyset-bounded sets without legal-hold starvation; Future24 retention does the same; scheduling windows, prerequisite policies, follow-up resources and episode chains reject oversized requests instead of silently discarding tail data; prerequisite evidence is evaluated completely; and heatmap/no-show aggregates no longer stop at 2,000 appointments.\n'
+          eighth='\nThe **eighth fresh 10-round corrective audit** closes additional high-volume, concurrency and exact-slot correctness gaps: doctor-suspension and verification reconciliation scans no longer have artificial total ceilings; due follow-up reminders traverse the complete due set transactionally; canonical Future24 operational writes reject oversized payloads rather than silently truncating them; first-time practitioner opaque references are serialized; slot discovery avoids multi-rule/timezone starvation; hold revalidation projects the exact rule/slot while preserving true idempotent replay; and waitlist, flexible-window and support-participant semantic duplicates are serialized, with support-participant File17 projection committed atomically.\n'
+          if eighth.strip() not in s:
+              if anchor not in s: raise SystemExit('README seventh-cycle anchor missing')
+              s=s.replace(anchor,anchor+eighth,1)
+          q.write_text(s)
+
+          # STATUS: current identity, eighth-cycle description, exact schema truth.
+          q=p('STATUS.md'); s=q.read_text()
+          s=s.replace('Runtime candidate: **1.2.7**','Runtime candidate: **1.2.8**',1)
+          start=s.find('## Seventh fresh 10-round corrective audit')
+          end=s.find('## Evidence-state classification')
+          if start < 0 or end < 0 or end <= start: raise SystemExit('STATUS audit section anchors missing')
+          section='''## Eighth fresh 10-round corrective audit\n\nAn eighth fresh sequential review-and-correct cycle was run against the corrected v1.2.7 repository state. Every proved defect was corrected and the complete source QA suite passed before the next review proceeded. The cycle closes:\n\n- complete doctor-suspension and verification-reconciliation traversal without artificial total-page ceilings;\n- complete, transactionally claimed due follow-up reminders without first-page loss, false-sent state, or overlapping-worker duplication;\n- explicit failure for oversized canonical Future24 operational payloads instead of silent key/item truncation;\n- serialized first-time practitioner opaque-reference creation;\n- slot discovery that avoids timezone-boundary and early-rule starvation, followed by global chronological ordering;\n- exact rule/slot hold reprojection with canonical service duration while preserving true namespaced idempotent replay;\n- semantic de-duplication for waitlist and flexible-window creation across distinct replay keys;\n- atomic, de-duplicated support/interpreter participant creation with File17 outbox projection in the same transaction;\n- release/test/document identity for runtime candidate 1.2.8 while retaining core schema 3.2.0, continuity schema 1.1.0, and Future24 schema 1.0.0.\n\nSupported public/cross-file mutation paths remain authorization-, idempotency-, rate-, scope-, consent-, and state-guarded. Repository evidence still does not prove Hostinger staging or live state.\n\n'''
+          s=s[:start]+section+s[end:]
+          s=s.replace('seventh-cycle source corrections are present','eighth-cycle source corrections are present')
+          s=s.replace('No older v1.2.1/v1.2.2/v1.2.3/v1.2.4/v1.2.5/v1.2.6 artifact or older CI run may be used as evidence for the v1.2.7 candidate.', 'No older v1.2.1/v1.2.2/v1.2.3/v1.2.4/v1.2.5/v1.2.6/v1.2.7 artifact or older CI run may be used as evidence for the v1.2.8 candidate.')
+          q.write_text(s)
+
+          # WordPress readme: current identity + eighth summary + retained historical changelog.
+          q=p('readme.txt'); s=q.read_text()
+          s=s.replace('Stable tag: 1.2.7','Stable tag: 1.2.8',1)
+          s=s.replace('Version 1.2.7 implements','Version 1.2.8 implements',1)
+          s=s.replace('File 08 v1.2.7 candidate whose manifest','File 08 v1.2.8 candidate whose manifest',1)
+          seven='The seventh fresh corrective audit fixes privacy erasure/retention starvation, rejects oversized scheduling windows, prerequisite policies, follow-up resources and episode chains instead of silently truncating them, evaluates complete prerequisite evidence, and removes the 2,000-appointment ceiling from heatmap and no-show aggregate calculations.\n'
+          eight='\nThe eighth fresh corrective audit removes residual total-page ceilings from doctor-suspension and verification reconciliation, makes due follow-up reminders complete and transactionally claimed, rejects oversized canonical Future24 operational payloads, serializes first-time practitioner opaque-reference creation, prevents multi-rule/timezone slot starvation, revalidates exact held slots while preserving true replay, serializes waitlist/flexible-window semantic creation, and makes support/interpreter participant creation both de-duplicated and atomic with its File17 projection.\n'
+          if eight.strip() not in s:
+              if seven not in s: raise SystemExit('readme seventh summary anchor missing')
+              s=s.replace(seven,seven+eight,1)
+          marker='== Changelog ==\n\n'
+          entry='''= 1.2.8 =\n* Completed an eighth fresh sequential 10-round corrective audit on the exact v1.2.7 repository state.\n* Removed residual total-page ceilings from doctor-suspension and verification-reconciliation safety processing.\n* Made due follow-up reminders complete, transactionally claimed, and failure-aware.\n* Canonical Future24 operational writes reject oversized payloads rather than silently truncating them.\n* Serialized practitioner opaque-reference creation and waitlist/flexible-window/support-participant semantic creation.\n* Corrected multi-rule/timezone slot starvation and exact held-slot replay/reprojection semantics.\n* Support/interpreter participant creation is atomic with its File17 projection.\n* Runtime is 1.2.8; core schema remains 3.2.0; continuity schema remains 1.1.0; Future24 schema remains 1.0.0.\n* Repository/CI/package evidence remains distinct from staging/live evidence.\n\n'''
+          if '= 1.2.8 =' not in s:
+              if marker not in s: raise SystemExit('readme changelog marker missing')
+              s=s.replace(marker,marker+entry,1)
+          q.write_text(s)
+
+          # Standalone changelog: retain v1.2.7 history, prepend v1.2.8.
+          q=p('CHANGELOG.md'); s=q.read_text()
+          entry='''## 1.2.8 — 2026-08-11\n\n- Completed an eighth fresh sequential 10-round review-and-correct cycle against exact v1.2.7 repository state.\n- Removed artificial total-page ceilings from doctor-suspension safety processing and verification reconciliation.\n- Made due secure-continuity follow-up reminders complete, transactionally claimed, failure-aware and safe against overlapping workers.\n- Replaced silent canonical Future24 operational payload truncation with explicit oversized-payload errors.\n- Serialized first-time practitioner opaque-reference creation.\n- Corrected multi-rule/timezone slot starvation and exact held-slot reprojection while preserving same-patient/idempotency replay.\n- Serialized semantic creation for waitlists and flexible scheduling windows across distinct replay keys.\n- Made support/interpreter participant creation de-duplicated and atomic with the File17 projection outbox event.\n- Advanced runtime identity to 1.2.8 without schema inflation: core 3.2.0, continuity 1.1.0, Future24 1.0.0.\n- Added a permanent eighth-ten-review regression gate. Repository/package/CI, staging, live and operational evidence remain separate states.\n\n'''
+          if '## 1.2.8 — 2026-08-11' not in s:
+              s=s.replace('# Changelog\n\n','# Changelog\n\n'+entry,1)
+          q.write_text(s)
+
+          # Staging checklist had stale core schema 3.1.0 despite repository core 3.2.0.
+          replace('STAGING-ACCEPTANCE.md','File 08 core schema `3.1.0`','File 08 core schema `3.2.0`',1)
+
+          # Permanent eighth-cycle source regression gate.
+          gate=r'''<?php
+          /** File 08 eighth fresh ten-round corrective regression gate. */
+          $root = dirname( __DIR__ );
+          $failures = array();
+          $checks = 0;
+          function t810src( $path ) { global $root,$failures; $file=$root.'/'.$path; if(!is_file($file)){ $failures[]='Missing '.$path; return ''; } $data=file_get_contents($file); return is_string($data)?$data:''; }
+          function t810has( $label,$source,$needle ) { global $failures,$checks; $checks++; if(false===strpos($source,$needle)){ $failures[]=$label.' missing: '.$needle; } }
+          function t810lacks( $label,$source,$needle ) { global $failures,$checks; $checks++; if(false!==strpos($source,$needle)){ $failures[]=$label.' forbidden: '.$needle; } }
+          $bootstrap=t810src('worldwide-clinic.php');
+          $contracts=t810src('includes/class-wca-contracts.php');
+          $service=t810src('includes/class-wca-service.php');
+          $guard=t810src('includes/class-wca-plan-guard.php');
+          $continuity=t810src('includes/class-wca-continuity-secure.php');
+          $future=t810src('includes/class-wca-future24.php');
+          $reconcile=t810src('includes/class-wca-verification-reconciliation.php');
+          $staging=t810src('STAGING-ACCEPTANCE.md');
+          t810lacks('doctor suspension has no artificial 500-page ceiling',$service,'&& $page <= 500');
+          t810has('doctor suspension bounded terminal page',$service,'while ( count( $appointments ) === $batch )');
+          t810lacks('verification reconciliation has no artificial 100-page ceiling',$reconcile,'&& $page <= 100');
+          t810has('continuity due reminder keyset cursor',$continuity,'AND id>%d');
+          t810has('continuity due reminder transaction',$continuity,"START TRANSACTION");
+          t810has('continuity due reminder row lock',$continuity,'FOR UPDATE');
+          t810has('continuity due reminder rollback',$continuity,"ROLLBACK");
+          t810has('continuity due reminder CAS',$continuity,'row_version=row_version+1');
+          t810has('canonical payload key overflow',$future,'wca_future24_payload_keys');
+          t810has('canonical payload item overflow',$future,'wca_future24_payload_items');
+          t810has('strict operational payload write',$future,"sanitize_operational_payload( isset( $data['payload'] ) && is_array( $data['payload'] ) ? $data['payload'] : array(), true )");
+          t810has('practitioner ref advisory lock',$guard,'SELECT GET_LOCK(%s, 3)');
+          t810has('practitioner ref lock release',$guard,'SELECT RELEASE_LOCK(%s)');
+          t810has('slot display date lower bound',$service,'display_date_from');
+          t810has('slot display date upper bound',$service,'display_date_to');
+          t810has('exact held slot projector',$service,'project_rule_slot');
+          t810has('hold uses exact rule projector',$guard,'WCA_Service::project_rule_slot');
+          t810has('hold replay repository key',$guard,'$repository_key');
+          t810has('waitlist semantic lock',$future,"semantic_lock( 'waitlist'");
+          t810has('window semantic lock',$future,"semantic_lock( 'windows'");
+          t810has('support participant semantic lock',$future,"semantic_lock('support-participant'");
+          t810has('support participant transaction',$future,"START TRANSACTION");
+          t810has('support participant File17 atomic projection',$future,'File17.AppointmentParticipantChanged.v1');
+          t810has('support participant commit',$future,"COMMIT");
+          t810has('plugin 1.2.8',$bootstrap,'Version: 1.2.8');
+          t810has('runtime 1.2.8',$contracts,"RUNTIME_VERSION                 = '1.2.8'");
+          t810has('core schema 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
+          t810has('staging schema parity',$staging,'File 08 core schema `3.2.0`');
+          t810has('zero commission',$contracts,"'commission_percent' => 0");
+          t810has('no automated diagnosis',$contracts,"'automated_diagnosis' => false");
+          t810has('no automated prescribing',$contracts,"'automated_prescribing' => false");
+          $runtime=implode("\n",array($bootstrap,$contracts,$service,$guard,$continuity,$future,$reconcile));
+          foreach(array('eval(','base64_decode(','shell_exec(','unserialize(') as $token){ t810lacks('forbidden runtime primitive',$runtime,$token); }
+          if($failures){ fwrite(STDERR,"File 08 eighth-ten-review regression gate failed:\n- ".implode("\n- ",$failures)."\n"); exit(1); }
+          echo 'File 08 eighth fresh ten-round regression assertions passed: ' . $checks . '/' . $checks . ".\n";
+          '''
+          # Dedent exactly 10 leading spaces introduced by this workflow heredoc.
+          gate='\n'.join(line[10:] if line.startswith('          ') else line for line in gate.splitlines())+'\n'
+          p('tests/eighth-ten-review-regressions.php').write_text(gate)
+
+          q=p('tests/run-all.php'); s=q.read_text()
+          if "'eighth-ten-review-regressions.php'" not in s:
+              s=s.replace("'seventh-ten-review-regressions.php' );","'seventh-ten-review-regressions.php', 'eighth-ten-review-regressions.php' );",1)
+          q.write_text(s)
+
+          # Guard against stale current-release identity in the principal current assertions.
+          stale=[]
+          for q in list(Path('tests').glob('*.php'))+[p('worldwide-clinic.php'),p('includes/class-wca-contracts.php'),p('README.md'),p('STATUS.md')]:
+              txt=q.read_text()
+              for needle in ('Version: 1.2.7', "RUNTIME_VERSION                 = '1.2.7'", 'Stable tag: 1.2.7', 'Runtime candidate: **1.2.7**'):
+                  if needle in txt: stale.append(f'{q}:{needle}')
+          if stale: raise SystemExit('stale current identity remains: '+', '.join(stale))
+          PY
+
+      - name: Full corrected-state QA before release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+
+      - name: Remove transient eighth-review machinery and commit exact release source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/file08-eighth-ten-review.yml \
+            .github/workflows/file08-eighth-ten-review-v2.yml \
+            .github/workflows/file08-eighth-ten-review-v3.yml \
+            .github/workflows/file08-eighth-ten-review-v4.yml \
+            .github/workflows/file08-eighth-ten-review-v5.yml \
+            .github/workflows/file08-eighth-release-close.yml \
+            tools/eighth-review-patcher.gz.b64
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'File 08 v1.2.8: close eighth ten-round corrective release'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
