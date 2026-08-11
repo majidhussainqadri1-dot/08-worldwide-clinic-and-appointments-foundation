@@ -66,10 +66,10 @@ final class WCA_Outbox {
 				if ( is_wp_error( $result ) ) {
 					throw new RuntimeException( $result->get_error_message() );
 				}
-				WCA_Repository::complete_outbox( absint( $item['id'] ) );
+				WCA_Repository::complete_outbox( absint( $item['id'] ), $worker );
 				WCA_Observability::metric( 'outbox_delivered_total', 1, array( 'topic' => self::metric_topic( $item['topic'] ) ) );
 			} catch ( Throwable $error ) {
-				WCA_Repository::fail_outbox( absint( $item['id'] ), $error->getMessage(), $attempts );
+				WCA_Repository::fail_outbox( absint( $item['id'] ), $error->getMessage(), $attempts, $worker );
 				WCA_Observability::log( 'error', 'outbox_delivery_failed', array(
 					'topic'       => self::metric_topic( $item['topic'] ),
 					'aggregate'   => (string) $item['aggregate_ref'],
