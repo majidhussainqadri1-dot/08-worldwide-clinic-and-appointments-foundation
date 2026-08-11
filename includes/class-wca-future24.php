@@ -318,6 +318,21 @@ final class WCA_Future24 {
 			: true;
 	}
 
+	/** Acquire a short MySQL advisory lock for semantic de-duplication across different replay keys. */
+	private static function semantic_lock( $scope, $identity ) {
+		global $wpdb;
+		$lock = 'wca-f24-' . sanitize_key( $scope ) . '-' . substr( hash( 'sha256', (string) $identity ), 0, 32 );
+		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) {
+			return new WP_Error( 'wca_future24_busy', __( 'This scheduling operation is already being updated. Try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+		return $lock;
+	}
+
+	private static function release_semantic_lock( $lock ) {
+		global $wpdb;
+		if ( is_string( $lock ) && '' !== $lock ) { $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) ); }
+	}
+
 	/** Generic operational record writer. Never stores clinical narrative. */
 	private static function put_record( $feature_id, $data, $actor_user_id = 0 ) {
 		global $wpdb;
@@ -1232,18 +1247,24 @@ final class WCA_Future24 {
 		if ( $now < strtotime( $start . ' UTC' ) - 4 * HOUR_IN_SECONDS || $now > strtotime( $end . ' UTC' ) + 6 * HOUR_IN_SECONDS ) {
 			return new WP_Error( 'wca_arrival_window', __( 'Arrival may only be announced near the scheduled appointment time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
-		$table = self::tables()['records'];
-		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND subject_user_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $actor_id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( $existing ) { return self::public_record( $existing ); }
-		return self::put_record( 'F08-FUT-15', array(
-			'clinic_id' => absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) ),
-			'appointment_id' => $id,
-			'subject_user_id' => $actor_id,
-			'status' => 'arrived',
-			'starts_at' => WCA_Repository::now(),
-			'expires_at' => gmdate( 'Y-m-d H:i:s', strtotime( $end . ' UTC' ) + 6 * HOUR_IN_SECONDS ),
-			'payload' => array( 'queue_token' => substr( hash( 'sha256', strtolower( $appointment_ref ) . '|' . wp_salt( 'nonce' ) ), 0, 12 ), 'clinical_checkin' => false, 'operational_signal_only' => true ),
-		), $actor_id );
+		$lock = self::semantic_lock( 'arrival', $id . '|' . $actor_id );
+		if ( is_wp_error( $lock ) ) { return $lock; }
+		try {
+			$table = self::tables()['records'];
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND subject_user_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $actor_id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $existing ) { return self::public_record( $existing ); }
+			return self::put_record( 'F08-FUT-15', array(
+				'clinic_id' => absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) ),
+				'appointment_id' => $id,
+				'subject_user_id' => $actor_id,
+				'status' => 'arrived',
+				'starts_at' => WCA_Repository::now(),
+				'expires_at' => gmdate( 'Y-m-d H:i:s', strtotime( $end . ' UTC' ) + 6 * HOUR_IN_SECONDS ),
+				'payload' => array( 'queue_token' => substr( hash( 'sha256', strtolower( $appointment_ref ) . '|' . wp_salt( 'nonce' ) ), 0, 12 ), 'clinical_checkin' => false, 'operational_signal_only' => true ),
+			), $actor_id );
+		} finally {
+			self::release_semantic_lock( $lock );
+		}
 	}
 
 	/* FUT-16 */
