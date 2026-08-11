@@ -164,7 +164,6 @@ final class WCA_Continuity {
 		$sealed = self::seal( $sanitized );
 		if ( is_wp_error( $sealed ) ) { return $sealed; }
 		$table   = self::tables()['intake'];
-		$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d LIMIT 1", $appointment_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$now = WCA_Repository::now();
 		$expected_version = absint( isset( $payload['expected_version'] ) ? $payload['expected_version'] : 0 );
 		$row = array(
@@ -181,24 +180,31 @@ final class WCA_Continuity {
 			'updated_at'        => $now,
 		);
 		if ( $submit ) { $row['submitted_at'] = $now; }
-		if ( $current ) {
-			if ( $expected_version && $expected_version !== absint( $current['version'] ) ) {
-				return new WP_Error( 'wca_intake_stale', __( 'Pre-visit intake changed. Refresh before saving.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		$mutation = WCA_Repository::transaction( function () use ( $table, $row, $appointment_id, $expected_version, $submit, $actor_user_id ) {
+			global $wpdb;
+			$row = $row;
+			$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d LIMIT 1 FOR UPDATE", $appointment_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $current ) {
+				if ( $expected_version && $expected_version !== absint( $current['version'] ) ) {
+					return new WP_Error( 'wca_intake_stale', __( 'Pre-visit intake changed. Refresh before saving.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+				}
+				$row['version'] = absint( $current['version'] ) + 1;
+				$changed = $wpdb->update( $table, $row, array( 'id' => absint( $current['id'] ), 'version' => absint( $current['version'] ) ) );
+				if ( 1 !== (int) $changed ) { return new WP_Error( 'wca_intake_update', __( 'Pre-visit intake could not be updated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+				$public_ref = (string) $current['public_ref'];
+			} else {
+				$row['public_ref']     = WCA_Repository::uuid();
+				$row['appointment_id'] = $appointment_id;
+				$row['version']        = 1;
+				$row['created_at']     = WCA_Repository::now();
+				if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_intake_insert', __( 'Pre-visit intake could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				$public_ref = (string) $row['public_ref'];
 			}
-			$row['version'] = absint( $current['version'] ) + 1;
-			$changed = $wpdb->update( $table, $row, array( 'id' => absint( $current['id'] ), 'version' => absint( $current['version'] ) ) );
-			if ( false === $changed || 0 === $changed ) { return new WP_Error( 'wca_intake_update', __( 'Pre-visit intake could not be updated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-			$public_ref = (string) $current['public_ref'];
-		} else {
-			$row['public_ref']     = WCA_Repository::uuid();
-			$row['appointment_id'] = $appointment_id;
-			$row['version']        = 1;
-			$row['created_at']     = $now;
-			if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_intake_insert', __( 'Pre-visit intake could not be stored.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-			$public_ref = (string) $row['public_ref'];
-		}
-		$trace = WCA_Observability::trace_id();
-		WCA_Repository::append_event( $submit ? 'PreVisitIntakeSubmitted.v1' : 'PreVisitIntakeSaved.v1', 'previsit_intake', $public_ref, array( 'intake_ref' => $public_ref, 'appointment_ref' => self::appointment_ref( $appointment_id ), 'status' => $submit ? 'submitted' : 'draft' ), $actor_user_id, $trace );
+			$trace = WCA_Observability::trace_id();
+			$event = WCA_Repository::append_event( $submit ? 'PreVisitIntakeSubmitted.v1' : 'PreVisitIntakeSaved.v1', 'previsit_intake', $public_ref, array( 'intake_ref' => $public_ref, 'appointment_ref' => self::appointment_ref( $appointment_id ), 'status' => $submit ? 'submitted' : 'draft' ), $actor_user_id, $trace );
+			return is_wp_error( $event ) ? $event : $public_ref;
+		}, 'wca_intake_mutation_transaction' );
+		if ( is_wp_error( $mutation ) ) { return $mutation; }
 		return self::get_intake( $appointment_ref, $actor_user_id );
 	}
 
