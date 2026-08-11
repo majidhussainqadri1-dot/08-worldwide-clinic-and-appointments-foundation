@@ -131,6 +131,7 @@ final class WCA_Contracts {
 	public static function event_schemas() {
 		return array(
 			'ClinicActivated.v1' => array( 'required' => array( 'event_id', 'occurred_at', 'clinic_ref', 'owner_subject_uuid', 'trace_id' ), 'class' => 'restricted' ),
+			'ClinicBranchChanged.v1' => array( 'required' => array( 'event_id', 'occurred_at', 'clinic_ref', 'branch_ref', 'change', 'trace_id' ), 'class' => 'restricted' ),
 			'ClinicAvailabilityChanged.v1' => array( 'required' => array( 'event_id', 'occurred_at', 'clinic_ref', 'doctor_subject_uuid', 'version', 'trace_id' ), 'class' => 'restricted' ),
 			'AppointmentRequested.v1' => array( 'required' => array( 'event_id', 'occurred_at', 'appointment_ref', 'patient_subject_uuid', 'doctor_subject_uuid', 'trace_id' ), 'class' => 'sensitive' ),
 			'AppointmentConfirmed.v1' => array( 'required' => array( 'event_id', 'occurred_at', 'appointment_ref', 'scheduled_at_utc', 'trace_id' ), 'class' => 'sensitive' ),
