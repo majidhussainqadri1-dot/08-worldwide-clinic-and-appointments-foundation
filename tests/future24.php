@@ -57,7 +57,7 @@ f24_has( 'maintenance expiry', $future, "'arrived','participant_active','room_re
 f24_has( 'resource auth', $future, 'self::require_appointment( $appointment_ref, $actor )' );
 f24_has( 'virtual consent', $future, "consent['scopes']['teleconsult']" );
 f24_has( 'prerequisite matching', $future, 'if(isset($evidence[$r])){continue;}' );
-f24_has( 'prerequisite blocking/provisional split', $future, "if('block'===$behavior){$missing_blocking[]=$r;}else{$missing_provisional[]=$r;}" );
+f24_has( 'prerequisite blocking/provisional split', $future, 'if(\'block\'===$behavior){$missing_blocking[]=$r;}else{$missing_provisional[]=$r;}' );
 f24_lacks( 'readiness', $future, "'guardian_recheck_runtime' => true" );
 f24_lacks( 'queue stale-count regression', $future, 'status=\'arrived\' AND created_at<%s", $clinic_id, $current[\'created_at\'] )' );
 foreach ( array('enforce_slot_hold_policy_pre_dispatch','wca_future24_slot_policy','observe_outbox_event','AppointmentCancelled.v1','offer_waitlist_for_cancelled_appointment','offer_pending','confirmation_required','waitlist_offer_available','questionnaire_for_appointment','wca.dynamic-previsit-questionnaire','performed_for_each_returned_appointment','File17.AppointmentParticipantChanged.v1') as $token ) { f24_has( 'second review hardening', $future, $token ); }
