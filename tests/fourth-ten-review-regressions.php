@@ -87,13 +87,13 @@ t410has('suspension scan metric',$service,'doctor_suspension_appointments_scanne
 t410lacks('no hard 500 truncation',$service,"'posts_per_page' => 500");
 
 // Release identity / schema law.
-t410has('plugin 1.2.4',$bootstrap,'Version: 1.2.4');
-t410has('runtime 1.2.4',$contracts,"RUNTIME_VERSION                 = '1.2.4'");
+t410has('plugin 1.2.5',$bootstrap,'Version: 1.2.5');
+t410has('runtime 1.2.5',$contracts,"RUNTIME_VERSION                 = '1.2.5'");
 t410has('core schema 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
-t410has('readme 1.2.4',$readme,'Stable tag: 1.2.4');
-t410has('repo readme 1.2.4',$repo_readme,'Runtime candidate: **1.2.4**');
-t410has('status 1.2.4',$status,'Runtime candidate: **1.2.4**');
-t410has('changelog 1.2.4',$changelog,'## 1.2.4 — 2026-08-11');
+t410has('readme 1.2.5',$readme,'Stable tag: 1.2.5');
+t410has('repo readme 1.2.5',$repo_readme,'Runtime candidate: **1.2.5**');
+t410has('status 1.2.5',$status,'Runtime candidate: **1.2.5**');
+t410has('changelog 1.2.5',$changelog,'## 1.2.5 — 2026-08-11');
 
 $runtime=implode("\n",array($bootstrap,$contracts,$schema,$repo,$guard,$service,$rest,$calendar,$future));
 foreach(array('eval(','base64_decode(','shell_exec(','unserialize(') as $token){ t410lacks('forbidden runtime primitive',$runtime,$token); }

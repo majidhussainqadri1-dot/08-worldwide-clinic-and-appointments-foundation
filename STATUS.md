@@ -3,7 +3,7 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.4**
+- Runtime candidate: **1.2.5**
 - Core File 08 schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -19,29 +19,26 @@ The authoritative repository release identity is the exact final branch HEAD tog
 
 The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving the File 08 ownership boundary. The runtime includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback metadata, accessibility/localization, and the Future24 scheduling/interoperability layer.
 
-## Fourth fresh 10-round corrective audit
+## Fifth fresh 10-round corrective audit
 
-A fourth fresh sequential 10-round review-and-correct cycle was completed on the corrected v1.2.3 repository state. Every proved defect was corrected before the next round. The cycle adds or strengthens:
+A fifth fresh sequential 10-round review-and-correct cycle was run against the corrected v1.2.4 repository state. Findings were corrected before the next round proceeded. The cycle hardens:
 
-- canonical `branch_id` persistence in slot holds and propagation through booking/rescheduling, with live branch-scope revalidation;
-- clinic-isolated availability-rule lookup and slot discovery, including service-to-clinic scope validation;
-- Future24 group-session leave/cancel semantics with advisory locking, optimistic updates, audit evidence, and live clinic/service/start-time rechecks;
-- strict round-trip UTC validation in signed calendar-link generation, not only the primary calendar export path;
-- migration-safe payment-intent uniqueness using nullable provider references plus request-key idempotency at the canonical service root;
-- explicit privacy/emergency/telehealth consent validation in direct/internal appointment service calls and replay fingerprints that bind the actual request semantics;
-- clinic activation step-up, current owner-doctor eligibility, and publishable branch/service inventory revalidation;
-- bounded paged doctor-suspension reconciliation so appointment authority holds are not silently truncated at 500 records;
-- runtime/document/test alignment at **1.2.4**, core schema **3.2.0**, continuity schema **1.1.0**, and Future24 schema **1.0.0**;
-- a permanent `tests/fourth-ten-review-regressions.php` gate covering the new invariants.
+- Future24 public service-reference resolution at every clinic-scoped capability;
+- actor-independent current doctor-to-clinic serving authority, including public slot search and held-slot booking rechecks;
+- cross-key semantic concurrency for patient arrival and File17 virtual-room requests;
+- complete paged guardian-family and disruption affected-set traversal;
+- strict canonical Future24 UTC/date parsing and fail-closed nested calendar/DTO depth handling;
+- complete paged slot buffer/travel/continuous-consultation policy evaluation;
+- release/test/document identity for runtime candidate 1.2.5 while retaining core schema 3.2.0, continuity schema 1.1.0, and Future24 schema 1.0.0.
 
-Supported public/cross-file mutation paths continue to enforce transition expected-state/version preconditions, patient/current-authorized-guardian payment authority, doctor-to-clinic availability scope, stale replay fail-closed behavior, protected-response cache controls, and canonical ownership boundaries. Direct companion-table ownership remains prohibited.
+Supported public/cross-file mutation paths remain authorization-, idempotency-, rate-, scope-, consent-, and state-guarded. Repository evidence still does not prove Hostinger staging or live state.
 
 ## Evidence-state classification
 
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — fourth-cycle source corrections are present. |
+| Coded | **Corrected candidate** — fifth-cycle source corrections are present. |
 | Fresh post-final-code reviews | **Complete at repository/source-review level.** |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |

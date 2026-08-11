@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.5 — 2026-08-11
+
+- Completed a fifth fresh sequential 10-round review-and-correct cycle against exact v1.2.4 repository state.
+- Corrected Future24 public service-reference lookup and actor-independent doctor-to-clinic serving authority, including slot/hold rechecks.
+- Added semantic MySQL advisory locks for arrival and virtual-room de-duplication across different replay keys.
+- Removed fixed-count truncation from guardian-family, disruption affected-set, and slot-policy evaluation by bounded paging.
+- Replaced permissive Future24 canonical timestamp parsing with strict round-trip parsing; tightened waitlist dates and nested REST calendar/DTO fail-closed depth behavior.
+- Advanced runtime identity to 1.2.5 without schema inflation: core 3.2.0, continuity 1.1.0, Future24 1.0.0.
+- Added a permanent fifth-ten-review regression gate. Repository/package/CI, staging, live and operational evidence remain separate states.
+
 ## 1.2.4 — 2026-08-11
 
 - Completed a fourth fresh sequential 10-round review-and-correct cycle against exact v1.2.3 source state.

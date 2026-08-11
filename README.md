@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.4**
+- Runtime candidate: **1.2.5**
 - Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -34,6 +34,8 @@ The **second fresh 10-round corrective audit** further hardens administrator tra
 The **third fresh 10-round corrective audit** moves the same invariants to canonical roots where cross-cutting guards were insufficient: stale idempotency is fail-closed in the repository itself, payment and transition preconditions are enforced in the service root, protected mutations are no-store/noindex, ICS output strictly validates persisted UTC timestamps, outbox claims atomically re-check eligibility, and service/availability doctor assignment requires current clinic-serving authority rather than eligibility alone.
 
 The **fourth fresh 10-round corrective audit** closes additional canonical-root gaps: branch identity now survives slot hold/booking/reschedule, slot discovery is clinic-isolated, Future24 group sessions have idempotent leave/cancel semantics and current-state rechecks, signed calendar links validate persisted UTC strictly, payment intents use migration-safe nullable provider references plus canonical idempotency, service-root appointment requests enforce explicit consent and full replay fingerprints, activation requires step-up/current owner eligibility/publishable inventory, and doctor suspension reconciliation is not truncated at 500 appointments.
+
+The **fifth fresh 10-round corrective audit** closes a further set of canonical-root and scale/concurrency gaps: Future24 service references now resolve through the public-ref repository path; doctor-to-clinic serving authority is actor-independent and rechecked at public slot/hold booking edges; arrival and virtual-room semantic de-duplication is serialized across distinct replay keys; guardian-family and disruption affected sets are fully paged; Future24 UTC/date parsing fails closed at the canonical root; nested calendar/DTO depth no longer fails open; and slot buffer/travel/continuous-consultation policy scans are no longer silently capped at 100 appointments.
 
 ## Canonical routes
 
