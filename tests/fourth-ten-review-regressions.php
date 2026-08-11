@@ -26,8 +26,8 @@ t410has('hold branch scope',$repo,'wca_slot_branch_scope');
 t410has('hold replay branch',$repo,"absint( \$row['branch_id'] ?? 0 ) === \$branch_id");
 t410has('bookable branch recheck',$guard,'wca_hold_branch_scope');
 t410has('appointment branch from hold',$service,"absint( \$hold['branch_id'] ?? 0 )");
-t410has('reschedule proposed branch',$service,'_swc_proposed_branch_id');
-t410has('reschedule confirmed branch',$service,"update_post_meta( \$appointment_id, '_swc_branch_id'");
+t410has('reschedule proposed branch',$service,"'proposed_branch_id' => absint( \$hold['branch_id'] ?? 0 )");
+t410has('reschedule confirmed branch',$service,"'branch_id' => absint( \$hold['branch_id'] ?? 0 )");
 
 // F4-R2 public slot discovery is clinic-isolated.
 t410has('availability clinic arg',$repo,'list_availability_rules( $doctor_user_id, $service_id = 0, $clinic_id = 0 )');
