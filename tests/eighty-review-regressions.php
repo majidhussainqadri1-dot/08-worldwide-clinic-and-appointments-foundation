@@ -17,7 +17,9 @@ r80has('current guardian state',$future,'current_guardian_state'); r80has('patie
 
 // R10-R33 Future24 scope/state/safety corrections.
 foreach(array('service_for_clinic','branch_for_clinic','create_resource','reserve_resource','create_group_session','join_group_session','save_questionnaire','readiness','save_prerequisites','create_disruption','add_participant','request_virtual_room','smart_find','save_external_busy','create_episode') as $t){ r80has('Future24 corrected path',$future,$t); }
-foreach(array('wca_resource_appointment_scope','wca_group_window','wca_questionnaire_fields','wca_prerequisite_fields','wca_disruption_window','wca_support_subject_ineligible','wca_virtual_room_consent','wca_smart_find_parameter','wca_external_busy_window','wca_episode_scope') as $t){ r80has('Future24 negative path',$future,$t); }
+foreach(array('wca_resource_appointment_scope','wca_group_window','wca_questionnaire_fields','count_only_evidence_is_not_sufficient','wca_disruption_window','wca_support_subject_ineligible','wca_virtual_room_consent','wca_smart_find_parameter','wca_external_busy_window','wca_episode_scope') as $t){ r80has('Future24 negative path',$future,$t); }
+r80has('prerequisite evidence matching',$future,'if(isset($evidence[$r])){continue;}');
+r80has('prerequisite provisional policy',$future,'provisional_missing_does_not_block');
 r80has('group join keeps request body',$future,'rest_group_join( WP_REST_Request $r ){ $d=self::data($r);'); r80has('virtual room does not assume recording',$future,"'recording_assumed'=>false"); r80has('transport event recording false',$future,"'recording_allowed'=>false"); r80has('no patient scoring',$future,"'patient_scoring' => false");
 foreach(array('fhir_projection','smart_find','save_external_busy','create_episode','request_virtual_room') as $t){ r80has('interoperability boundary',$future,$t); }
 r80has('no automated diagnosis',$contracts,"'automated_diagnosis' => false"); r80has('no automated prescribing',$contracts,"'automated_prescribing' => false"); r80has('zero commission',$contracts,"'commission_percent' => 0"); r80has('no donor visibility advantage',$contracts,"'donation_visibility_link' => false");
@@ -32,6 +34,11 @@ r80has('doctor erasure coverage',$privacy,"'_swc_doctor_id'"); r80has('Future24 
 for($i=1;$i<=24;$i++){ r80has('Future24 capability '.$i,$future,sprintf('F08-FUT-%02d',$i)); }
 r80true('Future24 manifest declares exactly 24 IDs',24===preg_match_all("/'F08-FUT-[0-9]{2}'\\s*=>/",$future));
 $runtime=implode("\n",array($auth,$repo,$service,$future,$privacy,$bootstrap)); foreach(array('eval(','base64_decode(','shell_exec(','unserialize(') as $t){ r80lacks('forbidden runtime primitive',$runtime,$t); }
-r80true('review80 staging fragments removed',!is_dir($root.'/.codex/review80')); r80true('one-shot correction workflow removed',!is_file($root.'/.github/workflows/apply-file08-forty-v102.yml'));
+// R79 repository/release hygiene: transient patch staging must never survive final source.
+r80true('review80 staging fragments removed',!is_dir($root.'/.codex/review80'));
+r80true('legacy forty staging fragments removed',!is_dir($root.'/.codex/forty'));
+r80true('legacy forty-v102 staging fragments removed',!is_dir($root.'/.codex/forty-v102'));
+r80true('legacy forty-v102 trigger removed',!is_file($root.'/.codex/forty-v102-trigger'));
+r80true('one-shot correction workflow removed',!is_file($root.'/.github/workflows/apply-file08-forty-v102.yml'));
 if($failures){ fwrite(STDERR,"File 08 eighty-round regression gate failed:\n- ".implode("\n- ",$failures)."\n"); exit(1); }
 echo "File 08 eighty-round corrective regression assertions passed: {$checks}/{$checks}.\n";
