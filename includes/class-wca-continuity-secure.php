@@ -522,21 +522,35 @@ final class WCA_Continuity {
 		$user = get_user_by( 'email', sanitize_email( $email_address ) );
 		if ( ! $user ) { return array( 'items_removed' => false, 'items_retained' => false, 'messages' => array(), 'done' => true ); }
 		$user_id = absint( $user->ID );
+		$page = max( 1, absint( $page ) );
+		$base = 'wca_continuity_erase_' . substr( hash( 'sha256', strtolower( sanitize_email( $email_address ) ) ), 0, 24 );
+		if ( 1 === $page ) {
+			delete_transient( $base . '_intake' );
+			delete_transient( $base . '_followups' );
+		}
 		$removed = false;
 		$retained = false;
 		$messages = array();
+		$done = true;
 		foreach ( array( 'intake' => 'patient_user_id', 'followups' => 'patient_user_id' ) as $type => $field ) {
 			$table = self::tables()[ $type ];
-			$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$table} WHERE {$field}=%d ORDER BY id ASC LIMIT 100", $user_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$cursor_key = $base . '_' . $type;
+			$cursor = absint( get_transient( $cursor_key ) );
+			$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT %d", $user_id, $cursor, 100 ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$last = $cursor;
 			foreach ( $rows as $row ) {
+				$last = max( $last, absint( $row['id'] ) );
 				if ( self::legal_hold( 'followups' === $type ? 'followup' : 'intake', $row ) ) { $retained = true; continue; }
 				if ( false !== $wpdb->delete( $table, array( 'id' => absint( $row['id'] ) ), array( '%d' ) ) ) { $removed = true; }
 			}
+			if ( $last > $cursor ) { set_transient( $cursor_key, $last, HOUR_IN_SECONDS ); }
+			$more = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT 1", $user_id, $last ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
 		}
 		$intake_table = self::tables()['intake'];
 		$wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d' ) );
 		if ( $retained ) { $messages[] = __( 'Some clinic continuity records are retained under an active legal, safety or professional record hold.', 'worldwide-clinic-appointments' ); }
-		return array( 'items_removed' => $removed, 'items_retained' => $retained, 'messages' => $messages, 'done' => true );
+		return array( 'items_removed' => $removed, 'items_retained' => $retained, 'messages' => $messages, 'done' => $done );
 	}
 
 	public static function register_routes() {
