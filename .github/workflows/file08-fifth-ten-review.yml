@@ -41,6 +41,50 @@ jobs:
             echo "===== F08 FIFTH REVIEW ROUND ${round} ====="
             python tools/fifth-ten-review-patcher.py "${round}"
 
+            if [ "${round}" = "2" ]; then
+              python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/third-ten-review-regressions.php')
+          s=p.read_text(encoding='utf-8')
+          old="$service=t310src('includes/class-wca-service.php');\n"
+          if old not in s:
+              raise SystemExit('third-ten service source marker missing')
+          s=s.replace(old,old+"$auth=t310src('includes/class-wca-authorization.php');\n",1)
+          old="t310has('doctor clinic integration filter',$service,'wca_doctor_may_serve_clinic');"
+          new="t310has('doctor clinic integration filter',$auth,'wca_doctor_may_serve_clinic');"
+          if old not in s:
+              raise SystemExit('third-ten integration assertion marker missing')
+          s=s.replace(old,new,1)
+          old="t310has('doctor scheduling delegation',$service,'delegated_clinic_ids( $doctor_id, \\'schedule\\' )');"
+          new="t310has('doctor scheduling delegation',$auth,'delegated_clinic_ids( $doctor_user_id, \\'schedule\\' )');"
+          if old not in s:
+              raise SystemExit('third-ten delegation assertion marker missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+            fi
+
+            if [ "${round}" = "9" ]; then
+              python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/fifth-ten-review-regressions.php')
+          s=p.read_text(encoding='utf-8')
+          replacements={
+          '''t510has('doctor delegated schedule',$auth,"delegated_clinic_ids( $doctor_user_id, 'schedule' )");''': '''t510has('doctor delegated schedule',$auth,'delegated_clinic_ids( $doctor_user_id, \\'schedule\\' )');''',
+          '''t510has('doctor delegated manage',$auth,"delegated_clinic_ids( $doctor_user_id, 'clinic_manage' )");''': '''t510has('doctor delegated manage',$auth,'delegated_clinic_ids( $doctor_user_id, \\'clinic_manage\\' )');''',
+          '''t510lacks('no global-admin assignment bypass',$service,"user_can( $actor_user_id, 'manage_worldwide_clinic' ) || $doctor_id === $actor_user_id");''': '''t510lacks('no global-admin assignment bypass',$service,'user_can( $actor_user_id, \\'manage_worldwide_clinic\\' ) || $doctor_id === $actor_user_id');''',
+          '''t510has('family paged traversal',$future,"'posts_per_page' => $batch, 'paged' => $page");''': '''t510has('family paged traversal',$future,"'posts_per_page' => \\$batch, 'paged' => \\$page");''',
+          '''t510lacks('canonical no permissive strtotime parser',$future,"$ts = strtotime( $value");''': '''t510lacks('canonical no permissive strtotime parser',$future,"\\$ts = strtotime( \\$value");''',
+          '''t510has('slot policy page',$future,"'paged' => $page");''': '''t510has('slot policy page',$future,"'paged' => \\$page");''',
+          }
+          for old,new in replacements.items():
+              if old not in s:
+                  raise SystemExit('fifth-ten literal marker missing: '+old)
+              s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+            fi
+
             find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/f08-lint.txt
             php tests/run-all.php
             node --check assets/js/clinic.js
