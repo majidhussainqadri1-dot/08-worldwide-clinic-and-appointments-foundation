@@ -29,14 +29,14 @@ A tenth fresh sequential review-and-correct cycle was run against exact v1.2.9 r
 
 ## Eleventh fresh 20-round corrective audit
 
-Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported repository defects; R16 aligns runtime/tests/docs and permanent regression evidence to v1.2.12 without schema inflation. R17-R20 are corrected-state closure reviews. Repository evidence remains distinct from staging/live evidence.
+Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported repository defects; R16 aligns runtime/tests/docs and permanent regression evidence to v1.2.11 without schema inflation. R17-R20 are corrected-state closure reviews. Repository evidence remains distinct from staging/live evidence.
 
 ## Evidence-state classification
 
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — ninth-cycle source corrections are present. |
+| Coded | **Corrected candidate** — thirteenth-cycle source corrections are present. |
 | Fresh post-final-code reviews | **Complete at repository/source-review level.** |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
@@ -44,7 +44,7 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
 
-No older v1.2.1/v1.2.2/v1.2.3/v1.2.4/v1.2.5/v1.2.6/v1.2.7/v1.2.8 artifact or older CI run may be used as evidence for the v1.2.9 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
+No older v1.2.1 through v1.2.12 artifact or older CI run may be used as evidence for the v1.2.13 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
 
 ## Mandatory staging / production gates
 
