@@ -479,16 +479,21 @@ final class SWC_Helpers {
 	 * @return mixed|WP_Error
 	 */
 	public static function with_resource_lock( $resource, $callback ) {
+		global $wpdb;
 		$resource = substr( preg_replace( '/[^a-z0-9_-]/', '-', strtolower( (string) $resource ) ), 0, 120 );
 		$key      = 'swc_lock_' . md5( $resource );
 		$token    = wp_generate_uuid4();
 		$now      = time();
 		$value    = wp_json_encode( array( 'token' => $token, 'time' => $now, 'resource' => $resource ) );
 		if ( ! add_option( $key, $value, '', false ) ) {
-			$existing = json_decode( (string) get_option( $key, '' ), true );
-			if ( is_array( $existing ) && ! empty( $existing['time'] ) && $now - absint( $existing['time'] ) > 30 ) {
-				delete_option( $key );
-				add_option( $key, $value, '', false );
+			$existing_raw = (string) get_option( $key, '' );
+			$existing = json_decode( $existing_raw, true );
+			if ( is_array( $existing ) && ! empty( $existing['time'] ) && $now - absint( $existing['time'] ) > 300 ) {
+				$swapped = $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value=%s WHERE option_name=%s AND option_value=%s", $value, $key, $existing_raw ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				wp_cache_delete( $key, 'options' );
+				if ( 1 !== (int) $swapped ) {
+					return new WP_Error( 'swc_locked', __( 'This scheduling resource is being updated. Refresh and try again.', 'worldwide-clinic-appointments' ) );
+				}
 			}
 		}
 		if ( (string) get_option( $key, '' ) !== $value ) {
