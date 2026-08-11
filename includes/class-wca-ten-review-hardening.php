@@ -142,7 +142,6 @@ final class WCA_Ten_Review_Hardening {
 		$status = absint( $response->get_status() );
 		if ( $status >= 200 && $status < 400 ) {
 			WCA_Repository::complete_idempotency( $claim['id'], $status, $response->get_data() );
-			if ( '/wca/v1/branches' === $claim['route'] ) { self::branch_projection_event( $claim['data'], $response->get_data() ); }
 		} else {
 			WCA_Repository::release_idempotency( $claim['id'] );
 		}

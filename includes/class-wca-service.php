@@ -168,6 +168,34 @@ final class WCA_Service {
 	}
 
 	/** @return array<string,mixed>|WP_Error */
+	public static function create_branch( $data, $actor_user_id = 0 ) {
+		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
+		$clinic = WCA_Repository::get_clinic( absint( $data['clinic_id'] ?? 0 ), false );
+		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+		$auth = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
+		if ( is_wp_error( $auth ) ) { return $auth; }
+		$timezone = (string) ( $data['timezone'] ?? '' );
+		if ( ! self::valid_timezone( $timezone ) ) { return new WP_Error( 'wca_branch_timezone', __( 'A valid IANA time zone is required for the branch.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$data['timezone'] = $timezone;
+		return WCA_Repository::transaction( function () use ( $data, $clinic, $actor_user_id ) {
+			$branch = WCA_Repository::create_branch( $data );
+			if ( is_wp_error( $branch ) ) { return $branch; }
+			$trace = WCA_Observability::trace_id();
+			$payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'clinic_ref' => (string) $clinic['public_ref'], 'branch_ref' => (string) $branch['public_ref'], 'change' => 'branch_created', 'trace_id' => $trace );
+			$event = WCA_Repository::append_event( 'ClinicBranchChanged.v1', 'branch', $branch['public_ref'], $payload, $actor_user_id, $trace );
+			if ( is_wp_error( $event ) ) { return $event; }
+			foreach ( array(
+				array( 'ClinicBranchChanged.v1', $branch['public_ref'], $payload ),
+				array( 'File26.SearchProjectionChanged.v1', $clinic['public_ref'], array( 'entity' => 'clinic', 'entity_ref' => (string) $clinic['public_ref'], 'change' => 'branch_created', 'trace_id' => $trace ) ),
+			) as $outbox ) {
+				$queued = WCA_Repository::enqueue( $outbox[0], $outbox[1], $outbox[2], $trace );
+				if ( is_wp_error( $queued ) ) { return $queued; }
+			}
+			return $branch;
+		}, 'wca_branch_create_transaction' );
+	}
+
+	/** @return array<string,mixed>|WP_Error */
 	public static function save_service( $data, $service_id = 0, $expected_version = 0, $actor_user_id = 0 ) {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$clinic = WCA_Repository::get_clinic( absint( $data['clinic_id'] ?? 0 ), false );

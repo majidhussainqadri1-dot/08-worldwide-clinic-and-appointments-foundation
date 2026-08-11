@@ -176,12 +176,7 @@ final class WCA_REST {
 	}
 
 	public static function create_branch( WP_REST_Request $request ) {
-		$data   = self::data( $request );
-		$clinic = WCA_Repository::get_clinic( absint( $data['clinic_id'] ?? 0 ), false );
-		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
-		$auth = WCA_Authorization::can_manage_clinic( $clinic );
-		if ( is_wp_error( $auth ) ) { return $auth; }
-		return self::respond( WCA_Repository::create_branch( $data ), 201 );
+		return self::respond( WCA_Service::create_branch( self::data( $request ) ), 201 );
 	}
 
 	public static function save_service( WP_REST_Request $request ) {
