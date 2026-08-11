@@ -270,13 +270,17 @@ final class WCA_REST {
 	}
 
 	public static function security_headers( $response, $server, $request ) {
-		$route = $request instanceof WP_REST_Request ? $request->get_route() : '';
+		$route  = $request instanceof WP_REST_Request ? $request->get_route() : '';
+		$method = $request instanceof WP_REST_Request ? strtoupper( (string) $request->get_method() ) : '';
 		if ( 0 === strpos( $route, '/' . self::NAMESPACE ) ) {
 			$response->header( 'X-Content-Type-Options', 'nosniff' );
 			$response->header( 'Referrer-Policy', 'strict-origin-when-cross-origin' );
 			$response->header( 'Permissions-Policy', 'camera=(), microphone=(), geolocation=()' );
-			if ( false !== strpos( $route, '/appointments' ) || false !== strpos( $route, '/slot-holds' ) || false !== strpos( $route, '/complaints' ) || false !== strpos( $route, '/health' ) ) {
+			$protected_mutation = ! in_array( $method, array( 'GET', 'HEAD', 'OPTIONS' ), true );
+			$sensitive_read = false !== strpos( $route, '/appointments' ) || false !== strpos( $route, '/slot-holds' ) || false !== strpos( $route, '/complaints' ) || false !== strpos( $route, '/health' );
+			if ( $protected_mutation || $sensitive_read ) {
 				$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
+				$response->header( 'Pragma', 'no-cache' );
 				$response->header( 'X-Robots-Tag', 'noindex, nofollow, noarchive' );
 			}
 		}
