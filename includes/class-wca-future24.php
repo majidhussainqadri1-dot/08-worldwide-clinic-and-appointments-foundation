@@ -343,7 +343,8 @@ final class WCA_Future24 {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$claims = WCA_Authorization::claims( $actor_user_id );
 		if ( is_wp_error( $claims ) ) { return $claims; }
-		$payload = self::sanitize_operational_payload( isset( $data['payload'] ) && is_array( $data['payload'] ) ? $data['payload'] : array() );
+		$payload = self::sanitize_operational_payload( isset( $data['payload'] ) && is_array( $data['payload'] ) ? $data['payload'] : array(), true );
+		if ( is_wp_error( $payload ) ) { return $payload; }
 		$json = wp_json_encode( $payload );
 		if ( ! is_string( $json ) || strlen( $json ) > self::MAX_PAYLOAD ) {
 			return new WP_Error( 'wca_future24_payload', __( 'Operational payload is too large.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) );
@@ -378,7 +379,7 @@ final class WCA_Future24 {
 		global $wpdb;
 		if ( ! isset( self::capabilities()[ $feature_id ] ) ) { return new WP_Error( 'wca_future24_feature', __( 'Unsupported Future24 capability.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$table = self::tables()['records'];
-		$payload = self::sanitize_operational_payload( isset( $data['payload'] ) ? $data['payload'] : array() );
+		$payload = self::sanitize_operational_payload( isset( $data['payload'] ) ? $data['payload'] : array(), true );
 		if ( is_wp_error( $payload ) ) { return $payload; }
 		$now = WCA_Repository::now();
 		$row = array(
@@ -488,18 +489,26 @@ final class WCA_Future24 {
 		return $offered;
 	}
 
-	private static function sanitize_operational_payload( $payload ) {
+	private static function sanitize_operational_payload( $payload, $strict = false ) {
+		$payload = (array) $payload;
+		if ( $strict && count( $payload ) > 80 ) {
+			return new WP_Error( 'wca_future24_payload_keys', __( 'Operational payload contains too many fields.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) );
+		}
 		$out = array();
 		$blocked = '/(diagnos|prescri|symptom|reason|clinical_note|private_note|intake_answer|patient_name|email|phone|whatsapp|address_private|treatment|remedy)/i';
-		foreach ( array_slice( (array) $payload, 0, 80, true ) as $key => $value ) {
+		$source = $strict ? $payload : array_slice( $payload, 0, 80, true );
+		foreach ( $source as $key => $value ) {
 			$key = sanitize_key( $key );
 			if ( ! $key || preg_match( $blocked, $key ) ) { continue; }
 			if ( is_bool( $value ) ) { $out[ $key ] = $value; continue; }
 			if ( is_int( $value ) || is_float( $value ) ) { $out[ $key ] = $value; continue; }
 			if ( is_string( $value ) ) { $out[ $key ] = substr( sanitize_text_field( $value ), 0, 1000 ); continue; }
 			if ( is_array( $value ) ) {
+				if ( $strict && count( $value ) > 50 ) {
+					return new WP_Error( 'wca_future24_payload_items', __( 'An operational payload list contains too many items.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) );
+				}
 				$items = array();
-				foreach ( array_slice( $value, 0, 50 ) as $item ) {
+				foreach ( $strict ? $value : array_slice( $value, 0, 50 ) as $item ) {
 					if ( is_scalar( $item ) ) { $items[] = substr( sanitize_text_field( (string) $item ), 0, 500 ); }
 				}
 				$out[ $key ] = $items;
