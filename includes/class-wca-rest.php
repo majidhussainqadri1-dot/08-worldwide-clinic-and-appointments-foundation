@@ -194,23 +194,33 @@ final class WCA_REST {
 	}
 
 	public static function submit_clinic_review( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'clinic_review', 20, HOUR_IN_SECONDS );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		return self::respond( WCA_Service::submit_clinic_for_review( absint( $request['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
 	}
 
 	public static function activate_clinic( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'clinic_activate', 20, HOUR_IN_SECONDS );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		return self::respond( WCA_Service::activate_clinic( absint( $request['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
 	}
 
 	public static function create_branch( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'branch_mutation', 30, HOUR_IN_SECONDS );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		return self::respond( WCA_Service::create_branch( self::data( $request ) ), 201 );
 	}
 
 	public static function save_service( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'service_mutation', 60, HOUR_IN_SECONDS );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		$data = self::data( $request );
 		return self::respond( WCA_Service::save_service( $data, absint( $data['service_id'] ?? 0 ), absint( $data['expected_version'] ?? 0 ) ), empty( $data['service_id'] ) ? 201 : 200 );
 	}
 
 	public static function save_availability( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'availability_mutation', 60, HOUR_IN_SECONDS );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		$data = self::data( $request );
 		return self::respond( WCA_Service::set_availability( $data, absint( $data['rule_id'] ?? 0 ), absint( $data['expected_version'] ?? 0 ) ), empty( $data['rule_id'] ) ? 201 : 200 );
 	}
@@ -274,6 +284,8 @@ final class WCA_REST {
 	}
 
 	public static function transition( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'appointment_transition', 60, HOUR_IN_SECONDS );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		$data = self::data( $request );
 		$raw_next = sanitize_key( (string) ( $data['next_status'] ?? '' ) );
 		if ( ! WCA_Contracts::is_appointment_status( $raw_next, true ) ) {
@@ -293,6 +305,8 @@ final class WCA_REST {
 	}
 
 	public static function payment_intent( WP_REST_Request $request ) {
+		$rate = self::rate_limit( 'payment_intent', 20, HOUR_IN_SECONDS );
+		if ( is_wp_error( $rate ) ) { return $rate; }
 		return self::respond( self::protected_mutation_projection( WCA_Service::create_payment_intent( absint( $request['id'] ), sanitize_key( $request->get_param( 'provider' ) ?: 'manual' ), get_current_user_id(), trim( (string) $request->get_header( 'Idempotency-Key' ) ) ), 'payment' ), 201 );
 	}
 

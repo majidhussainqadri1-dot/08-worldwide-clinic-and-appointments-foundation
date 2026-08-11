@@ -17,5 +17,6 @@
 | T12-R09 | DEFECT CORRECTED | Support-participant add used unchecked manual transaction start/commit calls. |
 | T12-R10 | DEFECT CORRECTED | Support-participant revoke used unchecked manual transaction start/commit calls. |
 | T12-R11 | DEFECT CORRECTED | Virtual-room request used unchecked manual transaction start/commit calls. |
+| T12-R12 | DEFECT CORRECTED | Several protected mutation callbacks lacked the plan-required request rate limits. |
 
-Rounds T12-R12–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R13–T12-R20 remain unreviewed in this sequential cycle at this commit.
