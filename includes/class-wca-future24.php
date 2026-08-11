@@ -752,6 +752,12 @@ final class WCA_Future24 {
 		if ( ! $session || 'group_open' !== $session['status'] || ( ! empty( $session['expires_at'] ) && strtotime( $session['expires_at'] . ' UTC' ) <= time() ) ) {
 			return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 		}
+		$clinic = WCA_Repository::get_clinic( absint( $session['clinic_id'] ), true );
+		$session_payload = json_decode( (string) $session['payload_json'], true );
+		$service_ref = is_array( $session_payload ) ? sanitize_text_field( $session_payload['service_ref'] ?? '' ) : '';
+		$service = $service_ref ? self::service_for_clinic( absint( $session['clinic_id'] ), $service_ref ) : null;
+		if ( ! $clinic || is_wp_error( $service ) || ! $service ) { return new WP_Error( 'wca_group_scope_stale', __( 'This group appointment is no longer bookable because its clinic or service is not active.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( ! empty( $session['starts_at'] ) && strtotime( $session['starts_at'] . ' UTC' ) <= time() ) { return new WP_Error( 'wca_group_started', __( 'This group appointment has already started and is closed to new joins.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$table = self::tables()['records'];
 		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
 		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
