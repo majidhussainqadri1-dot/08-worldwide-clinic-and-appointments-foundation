@@ -21,17 +21,20 @@ The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F
 
 ## Fourth fresh 10-round corrective audit
 
-A third fresh sequential 10-round review-and-correct cycle was opened after the v1.2.2 candidate. Findings are corrected before the next review proceeds. This cycle adds or strengthens:
+A fourth fresh sequential 10-round review-and-correct cycle was completed on the corrected v1.2.3 repository state. Every proved defect was corrected before the next round. The cycle adds or strengthens:
 
-- purpose-limited `operations` access plus recent step-up before the canonical administrator actor may transition an appointment;
-- explicit slot-hold idempotency keys and patient-namespaced repository replay identity;
-- fail-closed handling for ambiguous stale `processing` idempotency reservations on the governed appointment command and REST mutation boundary;
-- strict Future24 calendar date/timestamp validation;
-- recursive Future24 REST DTO removal of native numeric identifiers;
-- serialized outbox dispatch using a MySQL advisory lock so cron/shutdown workers cannot claim/finalize the same work concurrently;
-- canonical-root stale replay safety, payment/transition authority, protected-response cache controls, strict persisted calendar validation, atomic outbox row claims, doctor-to-clinic service/availability scope, and release/document alignment for runtime candidate 1.2.3 while retaining core schema 3.1.0, continuity schema 1.1.0 and Future24 schema 1.0.0.
+- canonical `branch_id` persistence in slot holds and propagation through booking/rescheduling, with live branch-scope revalidation;
+- clinic-isolated availability-rule lookup and slot discovery, including service-to-clinic scope validation;
+- Future24 group-session leave/cancel semantics with advisory locking, optimistic updates, audit evidence, and live clinic/service/start-time rechecks;
+- strict round-trip UTC validation in signed calendar-link generation, not only the primary calendar export path;
+- migration-safe payment-intent uniqueness using nullable provider references plus request-key idempotency at the canonical service root;
+- explicit privacy/emergency/telehealth consent validation in direct/internal appointment service calls and replay fingerprints that bind the actual request semantics;
+- clinic activation step-up, current owner-doctor eligibility, and publishable branch/service inventory revalidation;
+- bounded paged doctor-suspension reconciliation so appointment authority holds are not silently truncated at 500 records;
+- runtime/document/test alignment at **1.2.4**, core schema **3.2.0**, continuity schema **1.1.0**, and Future24 schema **1.0.0**;
+- a permanent `tests/fourth-ten-review-regressions.php` gate covering the new invariants.
 
-Supported public/cross-file mutation paths continue to enforce transition expected-state/version preconditions, patient/current-authorized-guardian payment authority, and doctor-to-clinic availability scope. Direct companion-table ownership remains prohibited.
+Supported public/cross-file mutation paths continue to enforce transition expected-state/version preconditions, patient/current-authorized-guardian payment authority, doctor-to-clinic availability scope, stale replay fail-closed behavior, protected-response cache controls, and canonical ownership boundaries. Direct companion-table ownership remains prohibited.
 
 ## Evidence-state classification
 
@@ -39,14 +42,14 @@ Supported public/cross-file mutation paths continue to enforce transition expect
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
 | Coded | **Corrected candidate** — fourth-cycle source corrections are present. |
-| Fresh post-final-code reviews | **In progress until the final exact-head review/CI reopening is complete.** |
+| Fresh post-final-code reviews | **Complete at source-review level; exact-final-HEAD CI/package reopening remains the release gate.** |
 | Packaged | **Pending exact-final-HEAD CI artifact confirmation.** |
 | Automated-QA Green | **Pending exact-final-HEAD workflow confirmation.** |
 | Staging-Accepted | **Pending / not claimed.** |
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
 
-Do not promote this candidate to Packaged or Automated-QA Green using any older v1.2.1/v1.2.2 artifact. Rebuild and reverify from the exact final HEAD.
+Do not promote this candidate to Packaged or Automated-QA Green using any older v1.2.1/v1.2.2/v1.2.3 artifact. Rebuild and reverify from the exact final HEAD.
 
 ## Mandatory staging / production gates
 
