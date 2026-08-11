@@ -3,14 +3,14 @@ Contributors: majidhussainqadri1-dot
 Tags: clinic, appointments, doctors, scheduling, privacy, accessibility
 Requires at least: 6.6
 Requires PHP: 7.4
-Stable tag: 1.2.6
+Stable tag: 1.2.7
 License: GPLv2 or later
 
 Canonical File 08 clinic and appointment runtime for the Sabri Social Homeopathy Platform.
 
 == Description ==
 
-Version 1.2.6 implements the File 08 Complete Master Plan, Future24 amendment, the earlier 80-round corrective closure, the first 10-round post-closure review-and-correct cycle, the second and third fresh 10-round corrective audits, and the fourth fresh sequential 10-round corrective audit. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
+Version 1.2.7 implements the File 08 Complete Master Plan, Future24 amendment, the earlier 80-round corrective closure, the first 10-round post-closure review-and-correct cycle, the second and third fresh 10-round corrective audits, and the fourth fresh sequential 10-round corrective audit. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
 
 The fourth fresh corrective audit binds branch identity to canonical slot holds and appointment/reschedule state, isolates public slot discovery by clinic, completes Future24 group leave/cancel semantics with current-state rechecks, strictly validates signed-link calendar timestamps, makes payment-intent uniqueness/idempotency migration-safe, enforces consent at the appointment service root, expands replay fingerprints, hardens clinic activation step-up/current-owner/publishable-inventory checks, and removes the 500-appointment doctor-suspension truncation through bounded paged reconciliation. Earlier authorization, concurrency, privacy, migration, package-parity, and Future24 gates remain in force.
 
@@ -18,12 +18,14 @@ The fifth fresh corrective audit fixes Future24 public service-reference resolut
 
 The sixth fresh corrective audit moves current doctor eligibility into the canonical clinic-serving relationship root; gives outbox consumers a stable message identity and recovers abandoned processing leases; removes remaining waitlist/questionnaire/prerequisite/follow-up fixed-window truncation; and preserves end-of-month intent for monthly recurrence generation.
 
+The seventh fresh corrective audit fixes privacy erasure/retention starvation, rejects oversized scheduling windows, prerequisite policies, follow-up resources and episode chains instead of silently truncating them, evaluates complete prerequisite evidence, and removes the 2,000-appointment ceiling from heatmap and no-show aggregate calculations.
+
 Platform commission is always 0%. Donations are optional and never affect visibility or service access. The plugin never replaces emergency care and never enables automated diagnosis or prescribing.
 
 == Installation ==
 
 1. Verify the exact required companion packages are installed and accepted for staging: Files 00, 03, 07, 09, 17, 19, 20, 24, 25, and 26.
-2. Download the exact CI-generated File 08 v1.2.6 candidate whose manifest commit, artifact digest, and detached SHA-256 match the approved repository HEAD.
+2. Download the exact CI-generated File 08 v1.2.7 candidate whose manifest commit, artifact digest, and detached SHA-256 match the approved repository HEAD.
 3. Install that exact candidate on the canonical Hostinger staging site only.
 4. Complete STAGING-ACCEPTANCE.md, including fresh install/upgrade/migration, DB/schema/migration-state evidence, rollback/restore, real-role journeys, concurrency/replay/provider-failure cases, privacy/cache/accessibility checks, and Founder acceptance.
 5. Do not deploy live until staging acceptance is complete and a controlled production deployment is explicitly authorized.
@@ -34,6 +36,14 @@ Platform commission is always 0%. Donations are optional and never affect visibi
 Protected routes use authentication, object authorization, nonce/CSRF controls where applicable, explicit idempotency/replay protection, rate limiting, and no-store/noindex controls. Public clinic output is allow-listed and uses opaque references. Appointment, patient, contact, clinical-like, native-identifier and private-note data are excluded from public projections. Export, erasure, retention and legal-hold controls are provided. Uninstall is non-destructive by default.
 
 == Changelog ==
+
+= 1.2.7 =
+* Completed a seventh fresh sequential 10-round corrective audit on the exact v1.2.6 repository state.
+* Privacy erasure and retention now traverse complete bounded sets without first-page or legal-hold starvation.
+* Oversized windows, prerequisites, follow-up resources and episode chains fail explicitly instead of silently truncating caller input.
+* Prerequisite evidence and high-volume heatmap/no-show aggregates are no longer silently capped.
+* Runtime is 1.2.7; core schema remains 3.2.0; continuity schema remains 1.1.0; Future24 schema remains 1.0.0.
+* Repository/CI/package evidence remains distinct from staging/live evidence.
 
 = 1.2.6 =
 * Completed a sixth fresh sequential review-and-correct cycle against exact v1.2.5 repository state.

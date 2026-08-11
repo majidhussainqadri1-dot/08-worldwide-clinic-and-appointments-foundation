@@ -4,7 +4,7 @@
  */
 
 define( 'ABSPATH', __DIR__ . '/' );
-define( 'SMC_VERSION', '1.2.6' );
+define( 'SMC_VERSION', '1.2.7' );
 define( 'SMC_CONTRACT_VERSION', '1.1.2' );
 define( 'GDO_VERSION', '1.1.0' );
 
