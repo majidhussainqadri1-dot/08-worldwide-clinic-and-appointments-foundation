@@ -1,0 +1,83 @@
+name: F08 Fifth Fresh Ten-Round Sequential Review
+
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/file08-fifth-ten-review.yml
+
+permissions:
+  contents: write
+
+jobs:
+  review-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+
+      - name: Configure review identity
+        run: |
+          git config user.name "Sabri File 08 QA"
+          git config user.email "actions@users.noreply.github.com"
+          test -f tools/fifth-ten-review-patcher.py
+          grep -q "Version: 1.2.4" worldwide-clinic.php
+
+      - name: Run ten sequential review-fix rounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3 4 5 6 7 8 9 10; do
+            echo "===== F08 FIFTH REVIEW ROUND ${round} ====="
+            python tools/fifth-ten-review-patcher.py "${round}"
+
+            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/f08-lint.txt
+            php tests/run-all.php
+            node --check assets/js/clinic.js
+            node --check assets/js/continuity.js
+            node --check assets/js/future24.js
+            test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+            test -z "$(find . -type l -print -quit)"
+            test ! -e .gitmodules
+            ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+
+            if [ "${round}" = "10" ]; then
+              git rm -f tools/fifth-ten-review-patcher.py .github/workflows/file08-fifth-ten-review.yml
+            fi
+
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "File 08 fifth review R${round}: corrective review closure"
+            else
+              echo "Round ${round}: clean review; no repository mutation required."
+            fi
+          done
+
+      - name: Exact corrected-state source QA before push
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          test ! -e tools/fifth-ten-review-patcher.py
+          test ! -e .github/workflows/file08-fifth-ten-review.yml
+          grep -q "Version: 1.2.5" worldwide-clinic.php
+          grep -q "RUNTIME_VERSION                 = '1.2.5'" includes/class-wca-contracts.php
+          grep -q "SCHEMA_VERSION                  = '3.2.0'" includes/class-wca-contracts.php
+          php tests/fifth-ten-review-regressions.php
+
+      - name: Push all ten corrected rounds
+        run: git push origin HEAD:codex/file08-new-governing-plans-completion-2026
