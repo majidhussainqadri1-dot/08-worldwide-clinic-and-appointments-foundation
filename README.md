@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.1**
+- Runtime candidate: **1.2.2**
 - Core schema: **3.1.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -27,7 +27,9 @@ The runtime does not introduce automated diagnosis/prescribing, emergency-servic
 
 The current source implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24`: institutional clinic activation, branches, services/fees, availability, timezone/DST-safe slot projection, server-authoritative holds, explicit mutation idempotency/replay protection, canonical appointment lifecycle, compensation-safe rescheduling, patient/guardian/doctor/delegated-staff authorization, opaque protected references, emergency diversion, consent, secure continuity, expiring review eligibility, calendar, payment/complaint adapters, privacy lifecycle, audit/outbox/observability, migration/rollback metadata, accessibility/localization, waitlist/series/resource/group scheduling, readiness/prerequisite governance, queue/disruption/support/interpreter contracts, consent-gated File 17 virtual-room requests, privacy-safe interoperability adapters, external busy projections, and episode chains.
 
-The subsequent 10-round post-closure review also corrected canonical detail routing, legacy native-ID browser mutation surfaces, delegated clinic-staff appointment/dashboard visibility, transition state/version preconditions, core mutation rate/replay behavior, payment-payer authority, doctor-to-clinic availability scope, display-timezone boundary slot discovery, hold reprojection across timezone/DST day boundaries, and branch-change audit/File26 projection events.
+The first post-closure 10-round review corrected canonical detail routing, legacy native-ID browser mutation surfaces, delegated clinic-staff appointment/dashboard visibility, transition state/version preconditions, core mutation rate/replay behavior, payment-payer authority, doctor-to-clinic availability scope, display-timezone boundary slot discovery, hold reprojection across timezone/DST day boundaries, and branch-change audit/File26 projection events.
+
+The **second fresh 10-round corrective audit** further hardens administrator transition purpose/step-up checks, requires explicit slot-hold replay keys, namespaces hold replay identity by patient, fails closed on ambiguous stale mutation reservations, strictly validates Future24 date/time inputs, removes native numeric identifiers from Future24 REST DTOs, and serializes outbox dispatch so cron/shutdown workers cannot overlap. Every supported mutation entry point remains guarded by authorization, rate/replay controls, and state/object constraints.
 
 ## Canonical routes
 
