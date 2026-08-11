@@ -594,6 +594,15 @@ final class WCA_Service {
 	/** @return array<string,mixed>|WP_Error */
 	public static function create_payment_intent( $appointment_id, $provider = 'manual', $actor_user_id = 0 ) {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
+		$patient_user_id  = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
+		$guardian_user_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );
+		if ( $actor_user_id !== $patient_user_id && ( ! $guardian_user_id || $actor_user_id !== $guardian_user_id ) ) {
+			return new WP_Error( 'wca_payment_payer_required', __( 'Only the patient or currently authorized guardian may create a payment intent.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+		}
+		if ( $guardian_user_id && $actor_user_id === $guardian_user_id ) {
+			$guardian = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_user_id, $guardian_user_id, $actor_user_id ) : new WP_Error( 'wca_guardian_verification_unavailable', __( 'Guardian authority could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+			if ( is_wp_error( $guardian ) ) { return $guardian; }
+		}
 		$access = WCA_Authorization::can_view_appointment( $appointment_id, $actor_user_id );
 		if ( is_wp_error( $access ) ) { return $access; }
 		$service_id = absint( SWC_Helpers::meta( $appointment_id, 'service_id' ) );
