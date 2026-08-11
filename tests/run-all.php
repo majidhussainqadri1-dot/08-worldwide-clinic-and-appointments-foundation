@@ -1,5 +1,5 @@
 <?php
-$tests = array( 'contracts.php', 'master-plan-contract.php', 'security-static.php', 'four-review-regressions.php', 'central-plan-2026.php', 'new-plan-hardening.php', 'future24.php', 'release-package-contract.php' );
+$tests = array( 'contracts.php', 'master-plan-contract.php', 'security-static.php', 'four-review-regressions.php', 'central-plan-2026.php', 'new-plan-hardening.php', 'future24.php', 'release-package-contract.php', 'eighty-review-regressions.php' );
 foreach ( $tests as $test ) {
 	$command = escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( __DIR__ . '/' . $test );
 	passthru( $command, $code );
