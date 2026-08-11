@@ -679,6 +679,16 @@ final class WCA_Future24 {
 		), $context['actor_user_id'] );
 	}
 
+
+	/** Advance a monthly recurrence while preserving the original day-of-month when possible and clamping only to the target month's last day. */
+	private static function advance_months_anchored( DateTimeImmutable $cursor, $months, $anchor_day ) {
+		$months = max( 1, absint( $months ) );
+		$anchor_day = min( 31, max( 1, absint( $anchor_day ) ) );
+		$target = $cursor->modify( 'first day of this month' )->modify( '+' . $months . ' months' );
+		$day = min( $anchor_day, absint( $target->format( 't' ) ) );
+		return $target->setDate( absint( $target->format( 'Y' ) ), absint( $target->format( 'n' ) ), $day );
+	}
+
 	/* FUT-03 */
 	public static function create_series( $data, $actor = 0 ) {
 		$appointment = self::require_appointment( sanitize_text_field( isset( $data['appointment_ref'] ) ? $data['appointment_ref'] : '' ), $actor );
@@ -695,10 +705,11 @@ final class WCA_Future24 {
 		$occurrences = array();
 		$cursor = new DateTimeImmutable( $origin . ' UTC' );
 		$origin_ts = $cursor->getTimestamp();
+		$anchor_day = absint( $cursor->format( 'j' ) );
 		$custom_days = min( 365, max( 1, absint( isset( $data['custom_days'] ) ? $data['custom_days'] : $interval ) ) );
 		for ( $i = 1; $i <= $count; $i++ ) {
 			if ( 'weekly' === $frequency ) { $cursor = $cursor->modify( '+' . $interval . ' weeks' ); }
-			elseif ( 'monthly' === $frequency ) { $cursor = $cursor->modify( '+' . $interval . ' months' ); }
+			elseif ( 'monthly' === $frequency ) { $cursor = self::advance_months_anchored( $cursor, $interval, $anchor_day ); }
 			else { $cursor = $cursor->modify( '+' . $custom_days . ' days' ); }
 			if ( $cursor->getTimestamp() - $origin_ts > 730 * DAY_IN_SECONDS ) { return new WP_Error( 'wca_series_horizon', __( 'Recurring appointment intents may not extend beyond two years from the originating appointment.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 			$occurrences[] = $cursor->format( 'Y-m-d H:i:s' );
