@@ -909,9 +909,14 @@ final class WCA_Future24 {
 			$member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status IN ('group_member','group_left','group_cancelled') ORDER BY id DESC LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( ! $member ) { return array( 'session_ref' => strtolower( $session_ref ), 'left' => true, 'already_absent' => true ); }
 			if ( in_array( (string) $member['status'], array( 'group_left', 'group_cancelled' ), true ) ) { return self::public_record( $member ); }
-			$ok = $wpdb->update( $table, array( 'status' => 'group_left', 'version' => absint( $member['version'] ) + 1, 'updated_at' => WCA_Repository::now() ), array( 'id' => absint( $member['id'] ), 'status' => 'group_member', 'version' => absint( $member['version'] ) ) );
-			if ( 1 !== (int) $ok ) { return new WP_Error( 'wca_group_leave_conflict', __( 'Group membership changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-			self::audit( 'F08-FUT-05', 'group_member_left', strtolower( (string) $member['public_ref'] ), array( 'session_ref' => strtolower( $session_ref ) ), $context['actor_user_id'], false );
+			$result = WCA_Repository::transaction( function () use ( $table, $member, $session_ref, $context ) {
+				global $wpdb;
+				$ok = $wpdb->update( $table, array( 'status' => 'group_left', 'version' => absint( $member['version'] ) + 1, 'updated_at' => WCA_Repository::now() ), array( 'id' => absint( $member['id'] ), 'status' => 'group_member', 'version' => absint( $member['version'] ) ) );
+				if ( 1 !== (int) $ok ) { return new WP_Error( 'wca_group_leave_conflict', __( 'Group membership changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+				$audit = self::audit( 'F08-FUT-05', 'group_member_left', strtolower( (string) $member['public_ref'] ), array( 'session_ref' => strtolower( $session_ref ) ), $context['actor_user_id'], false );
+				return is_wp_error( $audit ) ? $audit : true;
+			}, 'wca_group_leave_transaction' );
+			if ( is_wp_error( $result ) ) { return $result; }
 			return self::public_record( self::get_record( $member['public_ref'], 'F08-FUT-05' ) );
 		} finally {
 			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
