@@ -7,5 +7,6 @@
 | Round | Result | Finding / correction |
 |---|---|---|
 | T12-R01 | DEFECT CORRECTED | Pre-visit intake state/event persistence was not one fail-closed owner transaction. |
+| T12-R02 | DEFECT CORRECTED | Consent revocation could report success/emit an event on zero affected rows and was not atomic with evidence. |
 
-Rounds T12-R02–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R03–T12-R20 remain unreviewed in this sequential cycle at this commit.

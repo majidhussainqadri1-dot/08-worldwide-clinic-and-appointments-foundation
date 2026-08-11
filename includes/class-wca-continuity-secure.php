@@ -292,10 +292,15 @@ final class WCA_Continuity {
 		$scope = sanitize_key( $scope );
 		if ( ! in_array( $scope, self::context_consent_scopes(), true ) ) { return new WP_Error( 'wca_consent_scope', __( 'Unsupported consent scope.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$table = WCA_Schema::tables()['consents'];
-		$changed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',revoked_at=%s WHERE appointment_id=%d AND scope=%s AND actor_user_id=%d AND status='granted'", WCA_Repository::now(), $appointment_id, $scope, $actor_user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( false === $changed ) { return new WP_Error( 'wca_consent_revoke', __( 'Consent could not be revoked.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-		WCA_Repository::append_event( 'AppointmentConsentRevoked.v1', 'appointment', self::appointment_ref( $appointment_id ), array( 'appointment_ref' => self::appointment_ref( $appointment_id ), 'scope' => $scope ), $actor_user_id, WCA_Observability::trace_id() );
-		return true;
+		$result = WCA_Repository::transaction( function () use ( $table, $appointment_id, $scope, $actor_user_id ) {
+			global $wpdb;
+			$changed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',revoked_at=%s WHERE appointment_id=%d AND scope=%s AND actor_user_id=%d AND status='granted'", WCA_Repository::now(), $appointment_id, $scope, $actor_user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( false === $changed ) { return new WP_Error( 'wca_consent_revoke', __( 'Consent could not be revoked.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			if ( 0 === (int) $changed ) { return new WP_Error( 'wca_consent_not_active', __( 'No active consent matched this revocation request.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			$event = WCA_Repository::append_event( 'AppointmentConsentRevoked.v1', 'appointment', self::appointment_ref( $appointment_id ), array( 'appointment_ref' => self::appointment_ref( $appointment_id ), 'scope' => $scope ), $actor_user_id, WCA_Observability::trace_id() );
+			return is_wp_error( $event ) ? $event : true;
+		}, 'wca_consent_revoke_transaction' );
+		return $result;
 	}
 
 	/** @return array<string,mixed>|WP_Error */
