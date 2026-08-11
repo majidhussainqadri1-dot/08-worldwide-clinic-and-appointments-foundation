@@ -17,7 +17,7 @@ $status=t710src('STATUS.md');
 $changelog=t710src('CHANGELOG.md');
 t710has('continuity eraser cursor namespace',$continuity,'wca_continuity_erase_');
 t710has('continuity eraser keyset cursor',$continuity,'AND id>%d ORDER BY id ASC LIMIT %d');
-t710has('continuity eraser computed done',$continuity,"'done' => $done");
+t710has('continuity eraser computed done',$continuity,'\'done\' => $done');
 t710has('continuity retention bounded keyset',$continuity,'$batch = 200;');
 t710has('continuity intake retention cursor',$continuity,'updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d');
 t710has('continuity followup retention cursor',$continuity,"status IN ('completed','cancelled') AND id>%d ORDER BY id ASC LIMIT %d");
