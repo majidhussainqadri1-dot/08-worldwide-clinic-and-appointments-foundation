@@ -750,15 +750,18 @@ final class WCA_Future24 {
 		}
 		$frequency = sanitize_key( isset( $data['frequency'] ) ? $data['frequency'] : 'weekly' );
 		if ( ! in_array( $frequency, array( 'weekly', 'monthly', 'custom_days' ), true ) ) { return new WP_Error( 'wca_series_frequency', __( 'Unsupported recurrence frequency.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$count = min( 24, max( 1, absint( isset( $data['count'] ) ? $data['count'] : 1 ) ) );
-		$interval = min( 12, max( 1, absint( isset( $data['interval'] ) ? $data['interval'] : 1 ) ) );
+		$count = filter_var( isset( $data['count'] ) ? $data['count'] : 1, FILTER_VALIDATE_INT );
+		if ( false === $count || $count < 1 || $count > 24 ) { return new WP_Error( 'wca_series_count_range', __( 'Recurrence count must be an integer from 1 through 24.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$interval = filter_var( isset( $data['interval'] ) ? $data['interval'] : 1, FILTER_VALIDATE_INT );
+		if ( false === $interval || $interval < 1 || $interval > 12 ) { return new WP_Error( 'wca_series_interval_range', __( 'Recurrence interval must be an integer from 1 through 12.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$origin = self::utc( SWC_Helpers::meta( $appointment, 'preferred_at_utc', '' ) );
 		if ( ! $origin ) { return new WP_Error( 'wca_series_origin', __( 'The originating appointment needs a valid scheduled time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$occurrences = array();
 		$cursor = new DateTimeImmutable( $origin . ' UTC' );
 		$origin_ts = $cursor->getTimestamp();
 		$anchor_day = absint( $cursor->format( 'j' ) );
-		$custom_days = min( 365, max( 1, absint( isset( $data['custom_days'] ) ? $data['custom_days'] : $interval ) ) );
+		$custom_days = filter_var( isset( $data['custom_days'] ) ? $data['custom_days'] : $interval, FILTER_VALIDATE_INT );
+		if ( false === $custom_days || $custom_days < 1 || $custom_days > 365 ) { return new WP_Error( 'wca_series_custom_days_range', __( 'Custom recurrence days must be an integer from 1 through 365.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		for ( $i = 1; $i <= $count; $i++ ) {
 			if ( 'weekly' === $frequency ) { $cursor = $cursor->modify( '+' . $interval . ' weeks' ); }
 			elseif ( 'monthly' === $frequency ) { $cursor = self::advance_months_anchored( $cursor, $interval, $anchor_day ); }

@@ -21,5 +21,6 @@
 | T12-R13 | DEFECT CORRECTED | Sensitive appointment/calendar reads lacked explicit abuse-rate limiting. |
 | T12-R14 | DEFECT CORRECTED | Idempotency release treated a zero-row delete as successful release. |
 | T12-R15 | DEFECT CORRECTED | Public clinic pagination advertised a cursor even when cursor-state persistence failed. |
+| T12-R16 | DEFECT CORRECTED | Recurrence count/interval/custom-day inputs were silently clamped instead of rejected. |
 
-Rounds T12-R16–T12-R20 remain unreviewed in this sequential cycle at this commit.
+Rounds T12-R17–T12-R20 remain unreviewed in this sequential cycle at this commit.
