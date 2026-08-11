@@ -624,23 +624,29 @@ final class WCA_Future24 {
 		if ( ! WCA_Service::valid_timezone( $timezone ) ) { return new WP_Error( 'wca_waitlist_timezone', __( 'A valid time zone is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$fingerprint = hash( 'sha256', implode( '|', array( $clinic_id, $context['patient_user_id'], $service_ref, $date_from, $date_to, $timezone ) ) );
 		$table = self::tables()['records'];
-		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( $existing ) { return self::public_record( $existing ); }
-		return self::put_record( 'F08-FUT-01', array(
-			'clinic_id' => $clinic_id,
-			'subject_user_id' => $context['patient_user_id'],
-			'parent_ref' => $fingerprint,
-			'status' => 'waiting',
-			'expires_at' => gmdate( 'Y-m-d H:i:s', min( strtotime( $date_to . ' 23:59:59 UTC' ) + DAY_IN_SECONDS, time() + 181 * DAY_IN_SECONDS ) ),
-			'payload' => array(
-				'service_ref' => $service_ref,
-				'date_from' => $date_from,
-				'date_to' => $date_to,
-				'timezone' => $timezone,
-				'guardian_user_id' => $context['guardian_user_id'],
-				'auto_book' => false,
-			),
-		), $context['actor_user_id'] );
+		$lock = self::semantic_lock( 'waitlist', $fingerprint );
+		if ( is_wp_error( $lock ) ) { return $lock; }
+		try {
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( $existing ) { return self::public_record( $existing ); }
+			return self::put_record( 'F08-FUT-01', array(
+				'clinic_id' => $clinic_id,
+				'subject_user_id' => $context['patient_user_id'],
+				'parent_ref' => $fingerprint,
+				'status' => 'waiting',
+				'expires_at' => gmdate( 'Y-m-d H:i:s', min( strtotime( $date_to . ' 23:59:59 UTC' ) + DAY_IN_SECONDS, time() + 181 * DAY_IN_SECONDS ) ),
+				'payload' => array(
+					'service_ref' => $service_ref,
+					'date_from' => $date_from,
+					'date_to' => $date_to,
+					'timezone' => $timezone,
+					'guardian_user_id' => $context['guardian_user_id'],
+					'auto_book' => false,
+				),
+			), $context['actor_user_id'] );
+		} finally {
+			self::release_semantic_lock( $lock );
+		}
 	}
 
 	/* FUT-02 */
