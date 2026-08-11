@@ -1299,7 +1299,7 @@ final class WCA_Future24 {
 		}
 		$effective_start=gmdate('Y-m-d H:i:s',max($start_ts,$now));
 		$affected=array();
-		foreach(self::clinic_appointments_between($clinic_id,$effective_start,$end,1000) as $appointment_id){
+		foreach(self::clinic_appointments_between_all($clinic_id,$effective_start,$end) as $appointment_id){
 			if(!in_array(SWC_Helpers::status($appointment_id),array('requested','confirmed','reschedule_pending'),true)){continue;}
 			$scheduled=self::utc(SWC_Helpers::meta($appointment_id,'preferred_at_utc',''));
 			if(!$scheduled||strtotime($scheduled.' UTC')<$now){continue;}
@@ -1500,6 +1500,33 @@ final class WCA_Future24 {
 	private static function clinic_appointments( $clinic_id, $days, $limit ) {
 		$after = gmdate( 'Y-m-d H:i:s', time() - absint( $days ) * DAY_IN_SECONDS );
 		return self::clinic_appointments_between( $clinic_id, $after, gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ), $limit );
+	}
+
+	/** Return the complete affected appointment set in bounded pages; no silent fixed-count truncation. */
+	private static function clinic_appointments_between_all( $clinic_id, $from, $to ) {
+		$out = array();
+		$page = 1;
+		$batch = 200;
+		do {
+			$q = new WP_Query( array(
+				'post_type' => SWC_Helpers::TYPE,
+				'post_status' => array( 'private','publish' ),
+				'fields' => 'ids',
+				'posts_per_page' => $batch,
+				'paged' => $page,
+				'orderby' => 'ID',
+				'order' => 'ASC',
+				'no_found_rows' => true,
+				'meta_query' => array(
+					array( 'key' => '_swc_clinic_id', 'value' => absint( $clinic_id ), 'compare' => '=' ),
+					array( 'key' => '_swc_preferred_at_utc', 'value' => array( self::utc( $from ), self::utc( $to ) ), 'compare' => 'BETWEEN', 'type' => 'DATETIME' ),
+				),
+			) );
+			$ids = array_map( 'absint', (array) $q->posts );
+			$out = array_merge( $out, $ids );
+			$page++;
+		} while ( count( $ids ) === $batch );
+		return array_values( array_unique( $out ) );
 	}
 
 	private static function clinic_appointments_between( $clinic_id, $from, $to, $limit ) {
