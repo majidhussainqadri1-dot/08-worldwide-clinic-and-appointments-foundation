@@ -46,7 +46,7 @@ Supported public/cross-file mutation paths remain authorization-, idempotency-, 
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
 
-No older v1.2.1/v1.2.2/v1.2.3 artifact or older CI run may be used as evidence for the v1.2.4 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
+No older v1.2.1/v1.2.2/v1.2.3/v1.2.4 artifact or older CI run may be used as evidence for the v1.2.5 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
 
 ## Mandatory staging / production gates
 
