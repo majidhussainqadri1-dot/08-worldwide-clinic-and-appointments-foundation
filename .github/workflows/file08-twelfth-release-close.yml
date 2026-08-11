@@ -77,4 +77,4 @@ jobs:
           test ! -e tools/t12-r19-r20-final.py
           qa
           echo 'POST_FINAL_REVIEW_B=PASS'
-          # retry-generation: 2
+          # retry-generation: 3
