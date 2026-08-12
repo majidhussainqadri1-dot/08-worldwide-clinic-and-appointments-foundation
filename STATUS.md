@@ -36,15 +36,15 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — thirteenth-cycle source corrections are present. |
-| Fresh post-final-code reviews | **Complete at repository/source-review level.** |
+| Coded | **Corrected candidate** — fourteenth-cycle source corrections and post-main corrections are present. |
+| Fresh post-final-code reviews | **Complete at repository/source-review level for Fourteenth closure.** |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
 | Staging-Accepted | **Pending / not claimed.** |
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
 
-No older v1.2.1 through v1.2.12 artifact or older CI run may be used as evidence for the v1.2.13 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
+No older v1.2.1 through v1.2.13 artifact or older CI run may be used as evidence for the v1.2.14 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
 
 ## Mandatory staging / production gates
 
@@ -63,4 +63,14 @@ This repository status does not prove the current staging or live installation. 
 - Two fresh post-coding source reviews: PASS / PASS, no new supported defect.
 - Runtime: 1.2.13; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.
 - Staging-Accepted: false; Live-Deployed: unverified; Operational: not claimed.
-- Exact-head canonical CI/package trigger: this evidence-only status commit intentionally contains no product-code change; its exact run/artifact identifiers are recorded in PR metadata after CI completion.
+
+## Fourteenth fresh 20-round corrected-state closure
+
+- Frozen baseline: `fe10d05bdb4d1ffb726063f657f283097e65abbd` / runtime 1.2.13.
+- Main review rounds: T14-R01 through T14-R20. Supported product defects were corrected in R01-R18; R19-R20 were clean corrected-state reviews at that point.
+- Broader post-main sweep then found and corrected three additional repository defects: rule-local timezone/DST/effective-range heatmap projection, low-volume outcome privacy suppression, and deterministic signed stateless public clinic cursors for stable ETags.
+- Because post-main source changed, the two required fresh post-coding reviews were restarted and both passed.
+- Fourteenth corrected source/tooling cleanup checkpoint: `f976c7c8e64d4303a1e8ce07af97430b36551bc3`.
+- Runtime: 1.2.14; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.
+- Temporary T14 workflows/scripts were removed; only the canonical quality workflow remains.
+- Staging-Accepted: false; Live-Deployed: unverified; Operational: not claimed.
