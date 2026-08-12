@@ -71,6 +71,9 @@ final class WCA_Ten_Review_Hardening {
 		}
 		$route  = (string) $request->get_route();
 		$method = strtoupper( (string) $request->get_method() );
+		if ( self::is_legacy_numeric_rest_route( $route ) && ! (bool) apply_filters( 'wca_allow_legacy_numeric_rest_routes', false ) ) {
+			return new WP_Error( 'wca_legacy_numeric_rest_disabled', __( 'This legacy numeric-ID endpoint is disabled. Use the current opaque-reference endpoint.', 'worldwide-clinic-appointments' ), array( 'status' => 410 ) );
+		}
 		if ( ! in_array( $method, array( 'POST', 'PUT', 'PATCH', 'DELETE' ), true ) || ! self::is_core_mutation_route( $route ) ) {
 			return $result;
 		}
@@ -242,12 +245,18 @@ final class WCA_Ten_Review_Hardening {
 		return is_array( $data ) ? $data : array();
 	}
 
+	private static function is_legacy_numeric_rest_route( $route ) {
+		return (bool) preg_match( '#^/wca/v1/(?:clinics/[0-9]+/(?:submit-review|activate)|appointments/[0-9]+(?:/transitions|/calendar\.ics|/payment-intents)?)$#', (string) $route );
+	}
+
 	private static function is_core_mutation_route( $route ) {
 		if ( 0 === strpos( $route, '/wca/v1/future24/' ) || 0 === strpos( $route, '/wca/v1/continuity/' ) ) { return false; }
 		$patterns = array(
 			'#^/wca/v1/(?:clinics|branches|services|availability|slot-holds|appointments|complaints)$#',
 			'#^/wca/v1/clinic-refs/[0-9a-fA-F-]{36}/(?:submit-review|activate)$#',
 			'#^/wca/v1/appointment-refs/[0-9a-fA-F-]{36}/(?:transitions|payment-intents)$#',
+			'#^/wca/v1/clinics/[0-9]+/(?:submit-review|activate)$#',
+			'#^/wca/v1/appointments/[0-9]+/(?:transitions|payment-intents)$#',
 		);
 		foreach ( $patterns as $pattern ) { if ( preg_match( $pattern, $route ) ) { return true; } }
 		return false;
