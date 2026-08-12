@@ -132,27 +132,39 @@ final class WCA_Outbox {
 	}
 
 	private static function dispatch_notification( $payload, $trace_id ) {
-		if ( function_exists( 'sn_notify_users' ) ) {
+		$provider = function_exists( 'sn_notify_users' ) ? 'file19' : 'fallback_mail';
+		if ( WCA_Observability::circuit_open( $provider ) ) {
+			return new WP_Error( 'wca_provider_circuit_open', 'Notification provider circuit is temporarily open.', array( 'retry_after' => 60 ) );
+		}
+		if ( 'file19' === $provider ) {
 			$result = sn_notify_users( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ), sanitize_key( $payload['event'] ?? 'clinic_update' ), array(
 				'appointment_ref' => sanitize_text_field( $payload['appointment_ref'] ?? '' ),
 				'trace_id'        => $trace_id,
 			) );
-			return false === $result ? new WP_Error( 'wca_file19_delivery', 'File 19 rejected the notification.' ) : true;
+			if ( false === $result ) {
+				WCA_Observability::circuit_failure( $provider, 'File 19 rejected the notification.' );
+				return new WP_Error( 'wca_file19_delivery', 'File 19 rejected the notification.' );
+			}
+			WCA_Observability::circuit_success( $provider );
+			return true;
 		}
 
 		// Privacy-minimal fallback: no clinical reason, note, phone, or appointment time.
 		$subject = __( 'Clinic appointment update', 'worldwide-clinic-appointments' );
 		$message = __( 'There is an update to your clinic appointment. Sign in to the platform to view it securely.', 'worldwide-clinic-appointments' );
 		$recipients = array_unique( array_filter( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ) ) );
-		if ( empty( $recipients ) ) { return true; }
+		if ( empty( $recipients ) ) { WCA_Observability::circuit_success( $provider ); return true; }
 		$all_sent = true;
 		foreach ( $recipients as $user_id ) {
 			$user = get_userdata( $user_id );
-			if ( ! $user || ! is_email( $user->user_email ) || ! wp_mail( $user->user_email, $subject, $message ) ) {
-				$all_sent = false;
-			}
+			if ( ! $user || ! is_email( $user->user_email ) || ! wp_mail( $user->user_email, $subject, $message ) ) { $all_sent = false; }
 		}
-		return $all_sent ? true : new WP_Error( 'wca_mail_delivery', 'Notification fallback did not deliver to every intended recipient.' );
+		if ( ! $all_sent ) {
+			WCA_Observability::circuit_failure( $provider, 'Notification fallback did not deliver to every intended recipient.' );
+			return new WP_Error( 'wca_mail_delivery', 'Notification fallback did not deliver to every intended recipient.' );
+		}
+		WCA_Observability::circuit_success( $provider );
+		return true;
 	}
 
 	public static function maintenance() {

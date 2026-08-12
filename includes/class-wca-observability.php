@@ -142,8 +142,10 @@ final class WCA_Observability {
 			$state['open_until'] = gmdate( 'Y-m-d H:i:s', time() + min( HOUR_IN_SECONDS, 60 * (int) pow( 2, min( 6, $state['failures'] - 5 ) ) ) );
 		}
 		$all[ $key ] = $state;
-		update_option( 'wca_circuit_breakers', $all, false );
+		$written = SWC_Helpers::update_option_strict( 'wca_circuit_breakers', $all, 'wca_circuit_state_write' );
 		self::log( 'warning', 'provider_failure', array( 'provider' => $key, 'failures' => $state['failures'] ) );
+		if ( is_wp_error( $written ) ) { self::log( 'error', 'provider_circuit_state_persistence_failed', array( 'provider' => $key ) ); return $written; }
+		return true;
 	}
 
 	public static function circuit_success( $provider ) {
@@ -151,7 +153,9 @@ final class WCA_Observability {
 		$key = sanitize_key( $provider );
 		if ( isset( $all[ $key ] ) ) {
 			unset( $all[ $key ] );
-			update_option( 'wca_circuit_breakers', $all, false );
+			$written = SWC_Helpers::update_option_strict( 'wca_circuit_breakers', $all, 'wca_circuit_state_clear' );
+			if ( is_wp_error( $written ) ) { self::log( 'error', 'provider_circuit_state_persistence_failed', array( 'provider' => $key ) ); return $written; }
 		}
+		return true;
 	}
 }
