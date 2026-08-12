@@ -10,6 +10,11 @@ foreach(array('AppointmentRequested.v1','ClinicActivated.v1','ClinicBranchChange
 t10has('generic transaction helper',$repo,'public static function transaction'); t10has('rollback',$repo,"query( 'ROLLBACK' )");
 t10has('idempotency status repository',$repo,'public static function idempotency_status'); t10has('mutation status route',$hard,"'/mutation-status'"); t10has('replay finalization fail closed',$hard,'wca_idempotency_finalize_failed'); t10has('reconciliation flag',$hard,"'reconciliation_required' => true");
 t10has('branch timezone validation',$service,'wca_branch_timezone'); t10has('availability timezone validation',$service,'wca_availability_timezone'); t10has('availability window validation',$service,'wca_availability_window'); t10has('availability range validation',$service,'wca_availability_effective_range');
-t10has('clinic cursor',$rest,"get_param( 'cursor' )"); t10has('opaque cursor state',$rest,"'wca_clinic_cursor_' . md5("); t10has('next cursor',$rest,"'next_cursor'"); t10has('conditional request',$rest,"get_header( 'If-None-Match' )"); t10has('etag header',$rest,"header( 'ETag'"); t10has('cursor keyset repository',$repo,'c.updated_at<%s OR (c.updated_at=%s AND c.id<%d)');
-t10has('plugin 1.2.13',$boot,'Version: 1.2.14'); t10has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.14'"); t10has('schema stays 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
+t10has('clinic cursor',$rest,"get_param( 'cursor' )");
+t10has('signed cursor hmac',$rest,"hash_hmac( 'sha256', $payload");
+t10has('signed cursor decode',$rest,"hex2bin( $matches[1] )");
+t10lacks('no transient cursor read',$rest,"get_transient( 'wca_clinic_cursor_'");
+t10lacks('no transient cursor write',$rest,"set_transient( 'wca_clinic_cursor_'");
+t10has('next cursor',$rest,"'next_cursor'"); t10has('conditional request',$rest,"get_header( 'If-None-Match' )"); t10has('etag header',$rest,"header( 'ETag'"); t10has('cursor keyset repository',$repo,'c.updated_at<%s OR (c.updated_at=%s AND c.id<%d)');
+t10has('plugin 1.2.14',$boot,'Version: 1.2.14'); t10has('runtime 1.2.14',$contracts,"RUNTIME_VERSION                 = '1.2.14'"); t10has('schema stays 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
 $runtime=implode("\n",array($boot,$contracts,$repo,$service,$rest,$hard)); foreach(array('eval(','base64_decode(','shell_exec(','unserialize(') as $t){t10lacks('forbidden runtime primitive',$runtime,$t);} if($failures){fwrite(STDERR,"File 08 tenth-ten-review regression gate failed:\n- ".implode("\n- ",$failures)."\n");exit(1);} echo 'File 08 tenth fresh ten-round regression assertions passed: '.$checks.'/'.$checks.".\n";
