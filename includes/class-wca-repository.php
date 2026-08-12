@@ -175,6 +175,10 @@ final class WCA_Repository {
 		if ( ! WCA_Service::valid_timezone( $timezone ) ) {
 			return new WP_Error( 'wca_repository_branch_timezone', __( 'Branch persistence requires a valid IANA time zone.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
+		$visibility = $data['visibility'] ?? 'public';
+		$status = $data['status'] ?? 'active';
+		if ( ! in_array( $visibility, array( 'public', 'restricted', 'private' ), true ) ) { return new WP_Error( 'wca_branch_visibility', __( 'Branch visibility is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( ! in_array( $status, array( 'active', 'paused', 'archived' ), true ) ) { return new WP_Error( 'wca_branch_status', __( 'Branch status is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$row   = array(
 			'public_ref'      => self::uuid(),
 			'clinic_id'       => absint( $data['clinic_id'] ?? 0 ),
@@ -186,8 +190,8 @@ final class WCA_Repository {
 			'address_private' => sanitize_textarea_field( $data['address_private'] ?? '' ),
 			'timezone'        => $timezone,
 			'contacts_json'   => self::json( self::sanitize_contacts( (array) ( $data['contacts'] ?? array() ) ) ),
-			'visibility'      => in_array( $data['visibility'] ?? 'public', array( 'public', 'restricted', 'private' ), true ) ? $data['visibility'] : 'public',
-			'status'          => in_array( $data['status'] ?? 'active', array( 'active', 'paused', 'archived' ), true ) ? $data['status'] : 'active',
+			'visibility'      => $visibility,
+			'status'          => $status,
 			'version'         => 1,
 			'created_at'      => self::now(),
 			'updated_at'      => self::now(),
