@@ -373,17 +373,16 @@ final class WCA_Schema {
 			throw new RuntimeException( 'File 08 canonical tables missing: ' . implode( ', ', $missing ) );
 		}
 
-		update_option( self::OPTION_DB_VERSION, WCA_Contracts::SCHEMA_VERSION, false );
-		update_option(
-			self::OPTION_MIGRATION_STATE,
-			array(
-				'status'       => 'installed',
-				'from_version' => (string) get_option( 'swc_db_version', '' ),
-				'to_version'   => WCA_Contracts::SCHEMA_VERSION,
-				'completed_at' => current_time( 'mysql', true ),
-			),
-			false
+		$written = SWC_Helpers::update_option_strict( self::OPTION_DB_VERSION, WCA_Contracts::SCHEMA_VERSION, 'wca_schema_version_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical schema version could not be persisted.' ); }
+		$migration_state = array(
+			'status'       => 'installed',
+			'from_version' => (string) get_option( 'swc_db_version', '' ),
+			'to_version'   => WCA_Contracts::SCHEMA_VERSION,
+			'completed_at' => current_time( 'mysql', true ),
 		);
+		$written = SWC_Helpers::update_option_strict( self::OPTION_MIGRATION_STATE, $migration_state, 'wca_migration_state_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical migration state could not be persisted.' ); }
 	}
 
 	public static function maybe_upgrade() {
@@ -401,18 +400,16 @@ final class WCA_Schema {
 		if ( get_option( self::OPTION_SCHEMA_SNAPSHOT, false ) ) {
 			return;
 		}
-		update_option(
-			self::OPTION_SCHEMA_SNAPSHOT,
-			array(
-				'captured_at'       => current_time( 'mysql', true ),
-				'swc_version'       => (string) get_option( 'swc_version', '' ),
-				'swc_db_version'    => (string) get_option( 'swc_db_version', '' ),
-				'wca_db_version'    => (string) get_option( self::OPTION_DB_VERSION, '' ),
-				'swc_page_map'      => (array) get_option( 'swc_page_map', array() ),
-				'wca_page_map'      => (array) get_option( 'wca_page_map', array() ),
-			),
-			false
+		$snapshot = array(
+			'captured_at'       => current_time( 'mysql', true ),
+			'swc_version'       => (string) get_option( 'swc_version', '' ),
+			'swc_db_version'    => (string) get_option( 'swc_db_version', '' ),
+			'wca_db_version'    => (string) get_option( self::OPTION_DB_VERSION, '' ),
+			'swc_page_map'      => (array) get_option( 'swc_page_map', array() ),
+			'wca_page_map'      => (array) get_option( 'wca_page_map', array() ),
 		);
+		$written = SWC_Helpers::update_option_strict( self::OPTION_SCHEMA_SNAPSHOT, $snapshot, 'wca_schema_snapshot_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical schema snapshot could not be persisted.' ); }
 	}
 
 	/** @return array<string,bool> */
@@ -430,21 +427,20 @@ final class WCA_Schema {
 		if ( ! $snapshot ) {
 			return new WP_Error( 'wca_no_snapshot', __( 'No File 08 schema snapshot is available.', 'worldwide-clinic-appointments' ) );
 		}
-		update_option( 'swc_page_map', (array) ( $snapshot['swc_page_map'] ?? array() ), false );
-		update_option( 'wca_page_map', (array) ( $snapshot['wca_page_map'] ?? array() ), false );
-		update_option( 'swc_version', (string) ( $snapshot['swc_version'] ?? '' ), false );
-		update_option( 'swc_db_version', (string) ( $snapshot['swc_db_version'] ?? '' ), false );
-		update_option( self::OPTION_DB_VERSION, (string) ( $snapshot['wca_db_version'] ?? '' ), false );
-		update_option(
-			self::OPTION_MIGRATION_STATE,
-			array(
-				'status'       => 'rolled_back_metadata_only',
-				'completed_at' => current_time( 'mysql', true ),
-				'note'         => 'Canonical tables retained to prevent silent data loss.',
-			),
-			false
+		$restore = array(
+			'swc_page_map' => (array) ( $snapshot['swc_page_map'] ?? array() ),
+			'wca_page_map' => (array) ( $snapshot['wca_page_map'] ?? array() ),
+			'swc_version' => (string) ( $snapshot['swc_version'] ?? '' ),
+			'swc_db_version' => (string) ( $snapshot['swc_db_version'] ?? '' ),
+			self::OPTION_DB_VERSION => (string) ( $snapshot['wca_db_version'] ?? '' ),
 		);
-		return true;
+		foreach ( $restore as $option => $value ) {
+			$written = SWC_Helpers::update_option_strict( $option, $value, 'wca_schema_rollback_write' );
+			if ( is_wp_error( $written ) ) { return $written; }
+		}
+		$state = array( 'status' => 'rolled_back_metadata_only', 'completed_at' => current_time( 'mysql', true ), 'note' => 'Canonical tables retained to prevent silent data loss.' );
+		$written = SWC_Helpers::update_option_strict( self::OPTION_MIGRATION_STATE, $state, 'wca_schema_rollback_state_write' );
+		return is_wp_error( $written ) ? $written : true;
 	}
 
 	public static function purge_canonical_data() {
