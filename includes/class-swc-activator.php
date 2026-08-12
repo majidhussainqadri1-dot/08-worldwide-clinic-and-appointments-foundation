@@ -28,8 +28,8 @@ final class SWC_Activator {
 			wp_die( esc_html( self::dependency_message() ), '', array( 'back_link' => true ) );
 		}
 
-		self::create_activation_snapshot();
 		try {
+			self::create_activation_snapshot();
 			self::add_capabilities();
 			self::register_type();
 			self::install_schema();
@@ -321,16 +321,16 @@ final class SWC_Activator {
 		if ( get_option( 'swc_activation_snapshot', false ) ) {
 			return;
 		}
-		update_option(
-			'swc_activation_snapshot',
-			array(
-				'created_at' => current_time( 'mysql', true ),
-				'swc_map'    => (array) get_option( 'swc_page_map', array() ),
-				'spf_map'    => (array) get_option( 'spf_page_map', array() ),
-				'pages'      => array(),
-			),
-			false
+		$snapshot = array(
+			'created_at' => current_time( 'mysql', true ),
+			'swc_map'    => (array) get_option( 'swc_page_map', array() ),
+			'spf_map'    => (array) get_option( 'spf_page_map', array() ),
+			'pages'      => array(),
 		);
+		$written = SWC_Helpers::update_option_strict( 'swc_activation_snapshot', $snapshot, 'swc_activation_snapshot_write' );
+		if ( is_wp_error( $written ) ) {
+			throw new RuntimeException( 'File 08 activation rollback snapshot could not be persisted.' );
+		}
 	}
 
 	private static function snapshot_page( $id, $created ) {
