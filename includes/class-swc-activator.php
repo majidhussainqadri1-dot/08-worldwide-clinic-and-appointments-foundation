@@ -219,35 +219,51 @@ final class SWC_Activator {
 	}
 
 	public static function migrate_existing_records() {
-		$ids = get_posts(
-			array(
-				'post_type'      => SWC_Helpers::TYPE,
-				'post_status'    => array( 'publish', 'private', 'draft' ),
-				'posts_per_page' => -1,
-				'fields'         => 'ids',
-				'no_found_rows'  => true,
-			)
-		);
-		foreach ( $ids as $id ) {
-			if ( 'private' !== get_post_status( $id ) ) {
-				wp_update_post( array( 'ID' => $id, 'post_status' => 'private' ) );
+		global $wpdb;
+		$cursor = absint( get_option( 'swc_legacy_record_migration_cursor', 0 ) );
+		$migrated = 0;
+		do {
+			$ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT ID FROM {$wpdb->posts} WHERE post_type=%s AND post_status IN ('publish','private','draft') AND ID>%d ORDER BY ID ASC LIMIT 200",
+					SWC_Helpers::TYPE,
+					$cursor
+				)
+			); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $ids ) {
+				throw new RuntimeException( 'File 08 legacy migration could not read the next bounded batch.' );
 			}
-			if ( '' === get_post_meta( $id, '_swc_patient_user_id', true ) ) {
-				update_post_meta( $id, '_swc_patient_user_id', absint( get_post_field( 'post_author', $id ) ) );
+			foreach ( (array) $ids as $id ) {
+				$id = absint( $id );
+				if ( 'private' !== get_post_status( $id ) ) {
+					wp_update_post( array( 'ID' => $id, 'post_status' => 'private' ) );
+				}
+				if ( '' === get_post_meta( $id, '_swc_patient_user_id', true ) ) {
+					update_post_meta( $id, '_swc_patient_user_id', absint( get_post_field( 'post_author', $id ) ) );
+				}
+				if ( ! get_post_meta( $id, '_swc_record_version', true ) ) {
+					update_post_meta( $id, '_swc_record_version', 1 );
+				}
+				$legacy_note = get_post_meta( $id, '_swc_doctor_note', true );
+				if ( '' !== $legacy_note && '' === get_post_meta( $id, '_swc_doctor_private_note', true ) ) {
+					update_post_meta( $id, '_swc_doctor_private_note', $legacy_note );
+					delete_post_meta( $id, '_swc_doctor_note' );
+				}
+				if ( '' === get_post_meta( $id, '_swc_appointment_duration', true ) ) {
+					$doctor = absint( get_post_meta( $id, '_swc_doctor_id', true ) );
+					update_post_meta( $id, '_swc_appointment_duration', min( 180, max( 10, absint( SWC_Helpers::doctor_meta( $doctor, 'duration', 30 ) ) ) ) );
+				}
+				$cursor = max( $cursor, $id );
+				$migrated++;
 			}
-			if ( ! get_post_meta( $id, '_swc_record_version', true ) ) {
-				update_post_meta( $id, '_swc_record_version', 1 );
+			if ( $ids ) {
+				$checkpoint = SWC_Helpers::update_option_strict( 'swc_legacy_record_migration_cursor', $cursor, 'swc_migration_checkpoint_write' );
+				if ( is_wp_error( $checkpoint ) ) { throw new RuntimeException( 'File 08 legacy migration checkpoint could not be persisted.' ); }
 			}
-			$legacy_note = get_post_meta( $id, '_swc_doctor_note', true );
-			if ( '' !== $legacy_note && '' === get_post_meta( $id, '_swc_doctor_private_note', true ) ) {
-				update_post_meta( $id, '_swc_doctor_private_note', $legacy_note );
-				delete_post_meta( $id, '_swc_doctor_note' );
-			}
-			if ( '' === get_post_meta( $id, '_swc_appointment_duration', true ) ) {
-				$doctor = absint( get_post_meta( $id, '_swc_doctor_id', true ) );
-				update_post_meta( $id, '_swc_appointment_duration', min( 180, max( 10, absint( SWC_Helpers::doctor_meta( $doctor, 'duration', 30 ) ) ) ) );
-			}
-		}
+		} while ( 200 === count( $ids ) );
+		$cleared = SWC_Helpers::delete_option_strict( 'swc_legacy_record_migration_cursor', 'swc_migration_checkpoint_clear' );
+		if ( is_wp_error( $cleared ) ) { throw new RuntimeException( 'File 08 legacy migration checkpoint could not be cleared.' ); }
+		return $migrated;
 	}
 
 	public static function repair_pages() {
