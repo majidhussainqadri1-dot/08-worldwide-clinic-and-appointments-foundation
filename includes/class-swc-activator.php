@@ -235,24 +235,7 @@ final class SWC_Activator {
 			}
 			foreach ( (array) $ids as $id ) {
 				$id = absint( $id );
-				if ( 'private' !== get_post_status( $id ) ) {
-					wp_update_post( array( 'ID' => $id, 'post_status' => 'private' ) );
-				}
-				if ( '' === get_post_meta( $id, '_swc_patient_user_id', true ) ) {
-					update_post_meta( $id, '_swc_patient_user_id', absint( get_post_field( 'post_author', $id ) ) );
-				}
-				if ( ! get_post_meta( $id, '_swc_record_version', true ) ) {
-					update_post_meta( $id, '_swc_record_version', 1 );
-				}
-				$legacy_note = get_post_meta( $id, '_swc_doctor_note', true );
-				if ( '' !== $legacy_note && '' === get_post_meta( $id, '_swc_doctor_private_note', true ) ) {
-					update_post_meta( $id, '_swc_doctor_private_note', $legacy_note );
-					delete_post_meta( $id, '_swc_doctor_note' );
-				}
-				if ( '' === get_post_meta( $id, '_swc_appointment_duration', true ) ) {
-					$doctor = absint( get_post_meta( $id, '_swc_doctor_id', true ) );
-					update_post_meta( $id, '_swc_appointment_duration', min( 180, max( 10, absint( SWC_Helpers::doctor_meta( $doctor, 'duration', 30 ) ) ) ) );
-				}
+				self::migrate_existing_record_strict( $id );
 				$cursor = max( $cursor, $id );
 				$migrated++;
 			}
@@ -264,6 +247,44 @@ final class SWC_Activator {
 		$cleared = SWC_Helpers::delete_option_strict( 'swc_legacy_record_migration_cursor', 'swc_migration_checkpoint_clear' );
 		if ( is_wp_error( $cleared ) ) { throw new RuntimeException( 'File 08 legacy migration checkpoint could not be cleared.' ); }
 		return $migrated;
+	}
+
+	private static function migrate_existing_record_strict( $id ) {
+		global $wpdb;
+		$started = $wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		if ( false === $started ) { throw new RuntimeException( 'File 08 legacy record migration transaction could not start.' ); }
+		try {
+			if ( 'private' !== get_post_status( $id ) ) {
+				$updated = wp_update_post( array( 'ID' => $id, 'post_status' => 'private' ), true );
+				if ( is_wp_error( $updated ) || 'private' !== get_post_status( $id ) ) { throw new RuntimeException( 'File 08 legacy appointment visibility could not be migrated.' ); }
+			}
+			if ( '' === get_post_meta( $id, '_swc_patient_user_id', true ) ) {
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_patient_user_id', absint( get_post_field( 'post_author', $id ) ), 'swc_migration_patient_write' );
+				if ( is_wp_error( $written ) ) { throw new RuntimeException( $written->get_error_message() ); }
+			}
+			if ( ! get_post_meta( $id, '_swc_record_version', true ) ) {
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_record_version', 1, 'swc_migration_version_write' );
+				if ( is_wp_error( $written ) ) { throw new RuntimeException( $written->get_error_message() ); }
+			}
+			$legacy_note = get_post_meta( $id, '_swc_doctor_note', true );
+			if ( '' !== $legacy_note && '' === get_post_meta( $id, '_swc_doctor_private_note', true ) ) {
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_doctor_private_note', $legacy_note, 'swc_migration_note_write' );
+				if ( is_wp_error( $written ) ) { throw new RuntimeException( $written->get_error_message() ); }
+				$deleted = SWC_Helpers::delete_meta_strict( $id, '_swc_doctor_note', 'swc_migration_note_delete' );
+				if ( is_wp_error( $deleted ) ) { throw new RuntimeException( $deleted->get_error_message() ); }
+			}
+			if ( '' === get_post_meta( $id, '_swc_appointment_duration', true ) ) {
+				$doctor = absint( get_post_meta( $id, '_swc_doctor_id', true ) );
+				$duration = min( 180, max( 10, absint( SWC_Helpers::doctor_meta( $doctor, 'duration', 30 ) ) ) );
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_appointment_duration', $duration, 'swc_migration_duration_write' );
+				if ( is_wp_error( $written ) ) { throw new RuntimeException( $written->get_error_message() ); }
+			}
+			if ( false === $wpdb->query( 'COMMIT' ) ) { throw new RuntimeException( 'File 08 legacy record migration transaction could not commit.' ); } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		} catch ( Throwable $e ) {
+			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			wp_cache_delete( absint( $id ), 'post_meta' );
+			throw $e;
+		}
 	}
 
 	public static function repair_pages() {
