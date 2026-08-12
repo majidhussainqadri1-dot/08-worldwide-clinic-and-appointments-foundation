@@ -580,6 +580,22 @@ final class WCA_Service {
 				'metadata'           => array( 'telehealth' => $remote ? true : false, 'privacy' => true, 'emergency_acknowledged' => true ),
 			) );
 			if ( is_wp_error( $consent ) ) { return $consent; }
+			$context_scopes = array( 'privacy_notice' );
+			if ( $remote ) { $context_scopes[] = 'teleconsult'; }
+			foreach ( $context_scopes as $context_scope ) {
+				$context_consent = WCA_Repository::record_consent( array(
+					'appointment_id'     => $appointment_id,
+					'actor_user_id'      => $actor_user_id,
+					'actor_subject_uuid' => $claims['subject_uuid'],
+					'guardian_user_id'   => $guardian_user_id,
+					'scope'              => $context_scope,
+					'terms_version'      => self::TERMS_VERSION,
+					'terms_text'         => 'wca-context:' . $context_scope . ':' . self::TERMS_VERSION,
+					'legal_basis'        => 'consent',
+					'metadata'           => array( 'source' => 'appointment_owner_transaction', 'privacy' => true, 'telehealth' => $remote ),
+				) );
+				if ( is_wp_error( $context_consent ) ) { return $context_consent; }
+			}
 			$trace = WCA_Observability::trace_id();
 			$payload = array(
 				'event_id'             => WCA_Repository::uuid(),

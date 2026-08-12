@@ -81,10 +81,12 @@ final class WCA_Appointment_Command {
 		$result['remote_consultation_consent_verified'] = $remote;
 		$appointment_id = ! empty( $result['appointment_id'] ) ? absint( $result['appointment_id'] ) : 0;
 		if ( $remote && $appointment_id ) {
-			self::ensure_context_consent( $appointment_id, 'teleconsult', $actor_user_id );
+			$sync = self::ensure_context_consent( $appointment_id, 'teleconsult', $actor_user_id );
+			if ( is_wp_error( $sync ) ) { return $sync; }
 		}
 		if ( $appointment_id ) {
-			self::ensure_context_consent( $appointment_id, 'privacy_notice', $actor_user_id );
+			$sync = self::ensure_context_consent( $appointment_id, 'privacy_notice', $actor_user_id );
+			if ( is_wp_error( $sync ) ) { return $sync; }
 		}
 		// Public/cross-file command responses use the opaque appointment ref only.
 		unset( $result['appointment_id'] );
@@ -133,9 +135,9 @@ final class WCA_Appointment_Command {
 				$scope
 			)
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( $exists ) { return; }
+		if ( $exists ) { return true; }
 		$claims = WCA_Authorization::claims( $actor_user_id );
-		if ( is_wp_error( $claims ) ) { return; }
+		if ( is_wp_error( $claims ) ) { return $claims; }
 		$guardian_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );
 		$record = WCA_Repository::record_consent( array(
 			'appointment_id'     => $appointment_id,
@@ -149,9 +151,10 @@ final class WCA_Appointment_Command {
 			'metadata'           => array( 'source' => 'governed_appointment_request', 'contract' => self::CONTRACT_VERSION ),
 		) );
 		if ( is_wp_error( $record ) ) {
-			WCA_Observability::log( 'warning', 'context_consent_sync_pending', array( 'scope' => sanitize_key( $scope ), 'appointment_ref' => (string) SWC_Helpers::meta( $appointment_id, 'public_ref', '' ) ) );
-			WCA_Repository::enqueue( 'File24.AssuranceEvidenceRequested.v1', (string) SWC_Helpers::meta( $appointment_id, 'public_ref', '' ), array( 'entity' => 'appointment_consent', 'entity_ref' => (string) SWC_Helpers::meta( $appointment_id, 'public_ref', '' ), 'change' => 'consent_sync_pending', 'scope' => sanitize_key( $scope ) ), WCA_Observability::trace_id() );
+			WCA_Observability::log( 'error', 'context_consent_sync_failed', array( 'scope' => sanitize_key( $scope ), 'appointment_ref' => (string) SWC_Helpers::meta( $appointment_id, 'public_ref', '' ) ) );
+			return $record;
 		}
+		return true;
 	}
 }
 
