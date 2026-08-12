@@ -402,46 +402,48 @@ final class SWC_Activator {
 
 	public static function rollback_pages() {
 		$snapshot = (array) get_option( 'swc_activation_snapshot', array() );
-		if ( empty( $snapshot ) ) {
-			return;
-		}
+		if ( empty( $snapshot ) ) { return true; }
 		foreach ( (array) ( $snapshot['pages'] ?? array() ) as $id => $original ) {
 			$page = get_post( absint( $id ) );
-			if ( ! $page instanceof WP_Post ) {
-				continue;
-			}
+			if ( ! $page instanceof WP_Post ) { continue; }
 			$still_owned = '1' === get_post_meta( $page->ID, '_swc_managed_page', true ) && (bool) preg_match( '/^\s*\[swc_[a-z0-9_]+\]\s*$/', (string) $page->post_content );
-			if ( ! $still_owned ) {
-				// Never overwrite an administrator's post-activation page edits.
-				continue;
-			}
+			if ( ! $still_owned ) { continue; }
 			if ( ! empty( $original['created'] ) ) {
-				wp_update_post( array( 'ID' => $page->ID, 'post_status' => 'draft' ) );
+				$updated = wp_update_post( array( 'ID' => $page->ID, 'post_status' => 'draft' ), true );
+				if ( is_wp_error( $updated ) || 'draft' !== get_post_status( $page->ID ) ) { return new WP_Error( 'swc_rollback_created_page', __( 'A newly created File 08 page could not be disabled during rollback.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 				continue;
 			}
-			wp_update_post(
+			$updated = wp_update_post(
 				array(
 					'ID'           => $page->ID,
 					'post_title'   => $original['post_title'],
 					'post_name'    => $original['post_name'],
 					'post_content' => $original['post_content'],
 					'post_status'  => $original['post_status'],
-				)
+				),
+				true
 			);
+			if ( is_wp_error( $updated ) ) { return new WP_Error( 'swc_rollback_page_write', __( 'A File 08 page could not be restored during rollback.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			if ( '' === $original['managed_meta'] ) {
-				delete_post_meta( $page->ID, '_swc_managed_page' );
+				$meta = SWC_Helpers::delete_meta_strict( $page->ID, '_swc_managed_page', 'swc_rollback_page_meta_delete' );
 			} else {
-				update_post_meta( $page->ID, '_swc_managed_page', $original['managed_meta'] );
+				$meta = SWC_Helpers::update_meta_strict( $page->ID, '_swc_managed_page', $original['managed_meta'], 'swc_rollback_page_meta_write' );
 			}
+			if ( is_wp_error( $meta ) ) { return $meta; }
 		}
-		update_option( 'swc_page_map', (array) ( $snapshot['swc_map'] ?? array() ), false );
-		update_option( 'spf_page_map', (array) ( $snapshot['spf_map'] ?? array() ), false );
-		delete_option( 'swc_activation_snapshot' );
+		foreach ( array( 'swc_page_map' => (array) ( $snapshot['swc_map'] ?? array() ), 'spf_page_map' => (array) ( $snapshot['spf_map'] ?? array() ) ) as $option => $value ) {
+			$written = SWC_Helpers::update_option_strict( $option, $value, 'swc_rollback_map_write' );
+			if ( is_wp_error( $written ) ) { return $written; }
+		}
+		$deleted = SWC_Helpers::delete_option_strict( 'swc_activation_snapshot', 'swc_rollback_snapshot_delete' );
+		return is_wp_error( $deleted ) ? $deleted : true;
 	}
 
 	private static function rollback_activation() {
-		self::rollback_pages();
+		$rolled_back = self::rollback_pages();
+		if ( is_wp_error( $rolled_back ) ) { WCA_Observability::log( 'error', 'activation_rollback_incomplete', array( 'code' => $rolled_back->get_error_code() ) ); }
 		self::remove_capabilities();
+		return $rolled_back;
 	}
 
 	public static function system_checks() {
