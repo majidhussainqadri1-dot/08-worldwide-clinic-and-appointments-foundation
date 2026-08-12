@@ -297,9 +297,11 @@ final class SWC_Activator {
 		$map['doctor']       = self::ensure_page( absint( $map['doctor'] ?? 0 ), 'Doctor Appointments', 'doctor-appointments', '[swc_doctor_appointments]' );
 		$map['availability'] = self::ensure_page( absint( $map['availability'] ?? 0 ), 'Doctor Availability', 'doctor-availability', '[swc_doctor_availability]' );
 
-		update_option( 'swc_page_map', $map, false );
+		$written = SWC_Helpers::update_option_strict( 'swc_page_map', $map, 'swc_page_map_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 page map could not be persisted.' ); }
 		$spf['clinic'] = $map['clinic'];
-		update_option( 'spf_page_map', $spf, false );
+		$written = SWC_Helpers::update_option_strict( 'spf_page_map', $spf, 'swc_shared_page_map_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'Shared platform page map could not be persisted safely.' ); }
 		return $map;
 	}
 
