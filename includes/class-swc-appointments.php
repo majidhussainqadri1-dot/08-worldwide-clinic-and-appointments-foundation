@@ -353,16 +353,22 @@ final class SWC_Appointments {
 		}
 		check_admin_referer( 'swc_save_availability', 'swc_nonce' );
 
-		$days = isset( $_POST['days'] ) ? array_values( array_intersect( array_map( 'sanitize_key', (array) wp_unslash( $_POST['days'] ) ), SWC_Helpers::weekdays() ) ) : array();
-		$zone = isset( $_POST['timezone'] ) ? SWC_Helpers::limit_text( $_POST['timezone'], 100 ) : 'UTC';
+		$raw_days = isset( $_POST['days'] ) ? (array) wp_unslash( $_POST['days'] ) : array();
+		$days = array_values( array_unique( array_map( 'sanitize_key', $raw_days ) ) );
+		if ( count( $days ) !== count( $raw_days ) || array_diff( $days, SWC_Helpers::weekdays() ) ) {
+			wp_die( esc_html__( 'Availability contains an invalid or duplicate weekday.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
+		}
+		$zone = isset( $_POST['timezone'] ) ? SWC_Helpers::limit_text( $_POST['timezone'], 100 ) : '';
 		$start = isset( $_POST['start_time'] ) ? SWC_Helpers::limit_text( $_POST['start_time'], 5 ) : '';
 		$end   = isset( $_POST['end_time'] ) ? SWC_Helpers::limit_text( $_POST['end_time'], 5 ) : '';
+		$duration = WCA_Service::strict_int( isset( $_POST['duration'] ) ? wp_unslash( $_POST['duration'] ) : null, 10, 180 );
+		if ( null === $duration ) { wp_die( esc_html__( 'Availability requires a duration between 10 and 180 minutes.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) ); }
 		$data  = array(
 			'days'        => $days,
 			'start'       => $start,
 			'end'         => $end,
 			'timezone'    => $zone,
-			'duration'    => min( 180, max( 10, isset( $_POST['duration'] ) ? absint( $_POST['duration'] ) : 30 ) ),
+			'duration'    => $duration,
 			'online'      => isset( $_POST['online'] ),
 			'in_person'   => isset( $_POST['in_person'] ),
 			'accepting'   => isset( $_POST['accepting'] ),
