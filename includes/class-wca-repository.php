@@ -868,7 +868,7 @@ final class WCA_Repository {
 		global $wpdb;
 		$table  = WCA_Schema::tables()['outbox'];
 		$limit  = min( 100, max( 1, absint( $limit ) ) );
-		$worker = sanitize_text_field( $worker ?: 'worker-' . substr( md5( wp_salt( 'nonce' ) . microtime( true ) ), 0, 12 ) );
+		$worker = sanitize_text_field( $worker ?: 'worker-' . str_replace( '-', '', self::uuid() ) );
 		$now = self::now();
 		$stale_before = gmdate( 'Y-m-d H:i:s', time() - 300 );
 		$ids = (array) $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s) ORDER BY id ASC LIMIT %d", $now, $stale_before, $limit ) );
