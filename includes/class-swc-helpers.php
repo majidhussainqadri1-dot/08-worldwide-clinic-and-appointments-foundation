@@ -409,6 +409,11 @@ final class SWC_Helpers {
 		return false;
 	}
 
+	public static function appointment_public_ref( $id ) {
+		$ref = strtolower( (string) self::meta( absint( $id ), 'public_ref', '' ) );
+		return preg_match( '/^[0-9a-f-]{36}$/', $ref ) ? $ref : '';
+	}
+
 	public static function record_version( $id ) {
 		return max( 1, absint( self::meta( $id, 'record_version', 1 ) ) );
 	}
@@ -669,6 +674,7 @@ final class SWC_Helpers {
 		if ( ! $user ) {
 			return false;
 		}
+		$appointment_ref = self::appointment_public_ref( $appointment_id );
 		$args = array(
 			'user_id'       => $user_id,
 			'actor_user_id' => get_current_user_id(),
@@ -679,11 +685,11 @@ final class SWC_Helpers {
 			'body'          => sanitize_textarea_field( $body ),
 			'link'          => esc_url_raw( $link ),
 			'entity_type'   => 'appointment',
-			'entity_id'     => absint( $appointment_id ),
+			'entity_ref'    => $appointment_ref,
 			'source'        => 'file08',
-			'source_id'     => absint( $appointment_id ),
-			'dedupe_key'    => 'file08|' . sanitize_key( $event ) . '|' . absint( $appointment_id ) . '|' . self::record_version( $appointment_id ),
-			'context'       => array( 'appointment_reference' => absint( $appointment_id ) ),
+			'source_ref'    => $appointment_ref,
+			'dedupe_key'    => 'file08|' . sanitize_key( $event ) . '|' . $appointment_ref . '|' . self::record_version( $appointment_id ),
+			'context'       => array( 'appointment_ref' => $appointment_ref ),
 		);
 		if ( class_exists( 'SUN_Core' ) ) {
 			return (bool) SUN_Core::create( $args );
@@ -693,7 +699,7 @@ final class SWC_Helpers {
 			return true;
 		}
 		$subject = __( 'Worldwide Clinic Appointment Update', 'worldwide-clinic-appointments' );
-		$message = sanitize_textarea_field( $body ) . "\n\n" . sprintf( __( 'Appointment reference: %d', 'worldwide-clinic-appointments' ), absint( $appointment_id ) ) . "\n" . __( 'Do not send sensitive medical information by email.', 'worldwide-clinic-appointments' );
+		$message = sanitize_textarea_field( $body ) . "\n\n" . ( $appointment_ref ? sprintf( __( 'Appointment reference: %s', 'worldwide-clinic-appointments' ), $appointment_ref ) . "\n" : '' ) . __( 'Do not send sensitive medical information by email.', 'worldwide-clinic-appointments' );
 		$sent    = is_email( $user->user_email ) && wp_mail( $user->user_email, $subject, $message );
 		if ( ! $sent ) {
 			update_option(

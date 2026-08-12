@@ -254,6 +254,10 @@ final class SWC_Activator {
 		$started = $wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		if ( false === $started ) { throw new RuntimeException( 'File 08 legacy record migration transaction could not start.' ); }
 		try {
+			if ( '' === SWC_Helpers::appointment_public_ref( $id ) ) {
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_public_ref', WCA_Repository::uuid(), 'swc_migration_public_ref_write' );
+				if ( is_wp_error( $written ) ) { throw new RuntimeException( $written->get_error_message() ); }
+			}
 			if ( 'private' !== get_post_status( $id ) ) {
 				$updated = wp_update_post( array( 'ID' => $id, 'post_status' => 'private' ), true );
 				if ( is_wp_error( $updated ) || 'private' !== get_post_status( $id ) ) { throw new RuntimeException( 'File 08 legacy appointment visibility could not be migrated.' ); }

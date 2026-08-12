@@ -77,6 +77,7 @@ final class SWC_Appointments {
 		}
 
 		$meta = array(
+			'public_ref'           => WCA_Repository::uuid(),
 			'patient_user_id'      => $user_id,
 			'doctor_id'            => $doctor,
 			'status'               => 'requested',
