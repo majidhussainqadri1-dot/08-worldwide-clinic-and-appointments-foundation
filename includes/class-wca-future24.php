@@ -605,6 +605,13 @@ final class WCA_Future24 {
 		return is_wp_error( $access ) ? $access : $id;
 	}
 
+	private static function clinic_id_from_public_ref( $ref ) {
+		$ref = strtolower( trim( sanitize_text_field( (string) $ref ) ) );
+		if ( ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $ref ) ) { return 0; }
+		$clinic = WCA_Repository::get_clinic( $ref, false );
+		return $clinic ? absint( $clinic['id'] ) : 0;
+	}
+
 	private static function require_clinic_manager( $clinic_id, $actor = 0 ) {
 		$clinic = WCA_Repository::get_clinic( absint( $clinic_id ), false );
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
@@ -1770,9 +1777,9 @@ final class WCA_Future24 {
 	public static function rest_group_cancel( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'group_cancel','cancel_group_session',array($r['ref'],$d),200); }
 	public static function rest_safe_reschedule( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'safe_reschedule','safe_reschedule',array($r['ref'],$d),200); }
 	public static function rest_buffers( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'buffers','set_buffers',array($d),200); }
-	public static function rest_heatmap( WP_REST_Request $r ){ $days=$r->get_param('days'); if(null===$days||''===$days){$days=30;} return self::respond(self::heatmap(absint($r->get_param('clinic_id')),$days)); }
-	public static function rest_advisor( WP_REST_Request $r ){ return self::respond(self::advisor(absint($r->get_param('clinic_id')))); }
-	public static function rest_no_show( WP_REST_Request $r ){ return self::respond(self::no_show_forecast(absint($r->get_param('clinic_id')))); }
+	public static function rest_heatmap( WP_REST_Request $r ){ $days=$r->get_param('days'); if(null===$days||''===$days){$days=30;} $clinic_id=self::clinic_id_from_public_ref($r->get_param('clinic_ref')); if(!$clinic_id){return new WP_Error('wca_clinic_ref_required',__('A valid opaque clinic reference is required.','worldwide-clinic-appointments'),array('status'=>400));} return self::respond(self::heatmap($clinic_id,$days)); }
+	public static function rest_advisor( WP_REST_Request $r ){ $clinic_id=self::clinic_id_from_public_ref($r->get_param('clinic_ref')); if(!$clinic_id){return new WP_Error('wca_clinic_ref_required',__('A valid opaque clinic reference is required.','worldwide-clinic-appointments'),array('status'=>400));} return self::respond(self::advisor($clinic_id)); }
+	public static function rest_no_show( WP_REST_Request $r ){ $clinic_id=self::clinic_id_from_public_ref($r->get_param('clinic_ref')); if(!$clinic_id){return new WP_Error('wca_clinic_ref_required',__('A valid opaque clinic reference is required.','worldwide-clinic-appointments'),array('status'=>400));} return self::respond(self::no_show_forecast($clinic_id)); }
 	public static function rest_questionnaire( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'questionnaire','save_questionnaire',array($d),201); }
 	public static function rest_questionnaire_for_appointment( WP_REST_Request $r ){ return self::respond(self::questionnaire_for_appointment($r['ref'])); }
 	public static function rest_readiness( WP_REST_Request $r ){ return self::respond(self::readiness($r['ref'])); }
