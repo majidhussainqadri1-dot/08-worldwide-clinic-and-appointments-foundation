@@ -1,0 +1,98 @@
+name: File 08 T14 Sequential 20-Round Review
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+permissions:
+  contents: write
+jobs:
+  sequential:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Reconstruct correction series
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/t14/part01 .github/t14/part02 .github/t14/part03 .github/t14/part04 .github/t14/part05 > /tmp/t14.b64
+          base64 -d /tmp/t14.b64 > /tmp/t14-patches.tar.gz
+          mkdir -p /tmp/t14patches
+          tar -xzf /tmp/t14-patches.tar.gz -C /tmp/t14patches
+          test "$(find /tmp/t14patches -maxdepth 1 -type f -name '*.patch' | wc -l)" -eq 23
+      - name: Configure review committer
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Apply twenty main rounds sequentially with corrected-state QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa() {
+            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+            php tests/run-all.php
+            node --check assets/js/clinic.js
+            node --check assets/js/continuity.js
+            node --check assets/js/future24.js
+            test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' \) -print -quit)"
+            test -z "$(find . -type l -print -quit)"
+            test ! -e .gitmodules
+            ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          }
+          for n in $(seq -w 1 20); do
+            echo "===== T14-R${n}: apply correction ====="
+            git am "/tmp/t14patches/${n}.patch"
+            echo "===== T14-R${n}: corrected-state QA ====="
+            qa
+          done
+      - name: Apply post-main corrective sweep fixes sequentially
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa() {
+            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+            php tests/run-all.php
+            node --check assets/js/clinic.js
+            node --check assets/js/continuity.js
+            node --check assets/js/future24.js
+          }
+          for n in 21 22 23; do
+            echo "===== post-main corrective patch ${n} ====="
+            git am "/tmp/t14patches/${n}.patch"
+            qa
+          done
+      - name: Fresh post-final coding review A
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint-a.log
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Fresh post-final coding review B
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint-b.log
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Remove transient review tooling and push corrected source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -r .github/t14 .github/workflows/t14-sequential.yml
+          git commit -m "File 08: close T14 sequential review tooling"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
