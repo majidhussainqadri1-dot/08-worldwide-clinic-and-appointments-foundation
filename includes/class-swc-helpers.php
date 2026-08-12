@@ -80,11 +80,14 @@ final class SWC_Helpers {
 	 *
 	 * @return int[]
 	 */
-	public static function doctor_ids() {
+	public static function doctor_ids( $limit = 100, $offset = 0 ) {
+		$limit = min( 200, max( 1, absint( $limit ) ) );
+		$offset = max( 0, absint( $offset ) );
 		$users = get_users(
 			array(
 				'role__in' => array( 'sabri_doctor_verified', 'sabri_doctor' ),
-				'number'   => -1,
+				'number'   => $limit,
+				'offset'   => $offset,
 				'fields'   => 'ID',
 				'orderby'  => 'display_name',
 				'order'    => 'ASC',
@@ -113,8 +116,8 @@ final class SWC_Helpers {
 			&& empty( $availability['unavailable'] );
 	}
 
-	public static function requestable_doctor_ids() {
-		return array_values( array_filter( self::doctor_ids(), array( __CLASS__, 'doctor_is_requestable' ) ) );
+	public static function requestable_doctor_ids( $limit = 100, $offset = 0 ) {
+		return array_values( array_filter( self::doctor_ids( $limit, $offset ), array( __CLASS__, 'doctor_is_requestable' ) ) );
 	}
 
 	/** Public/browser doctor references must remain opaque. */

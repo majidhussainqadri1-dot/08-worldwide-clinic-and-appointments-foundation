@@ -18,10 +18,11 @@ final class SWC_Frontend {
 
 	public function clinic() {
 		$pages    = SWC_Helpers::pages();
-		$all      = SWC_Helpers::doctor_ids();
 		$paged    = max( 1, isset( $_GET['swc_doctors_page'] ) ? absint( $_GET['swc_doctors_page'] ) : 1 );
 		$per_page = 12;
-		$doctors  = array_slice( $all, ( $paged - 1 ) * $per_page, $per_page );
+		$window   = SWC_Helpers::doctor_ids( $per_page + 1, ( $paged - 1 ) * $per_page );
+		$has_more = count( $window ) > $per_page;
+		$doctors  = array_slice( $window, 0, $per_page );
 		$founder  = class_exists( 'SPD_Helpers' ) ? SPD_Helpers::founder() : array( 'phone' => '', 'whatsapp' => '' );
 		$phone    = get_option( 'swc_clinic_phone', $founder['phone'] ?? '' );
 		$whatsapp = get_option( 'swc_clinic_whatsapp', $founder['whatsapp'] ?? '' );
@@ -55,7 +56,7 @@ final class SWC_Frontend {
 					<?php if ( $doctors ) : foreach ( $doctors as $doctor_id ) : echo $this->doctor_card( $doctor_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 					endforeach; else : ?><div class="swc-empty"><?php esc_html_e( 'No eligible verified doctors have published clinic availability yet.', 'worldwide-clinic-appointments' ); ?></div><?php endif; ?>
 				</div>
-				<?php echo wp_kses_post( $this->pagination( 'swc_doctors_page', $paged, (int) ceil( count( $all ) / $per_page ) ) ); ?>
+				<?php echo wp_kses_post( $this->pagination( 'swc_doctors_page', $paged, $has_more ? $paged + 1 : $paged ) ); ?>
 			</section>
 			<p class="swc-disclaimer"><?php esc_html_e( 'Appointments do not establish emergency coverage. Confirm professional licensing, fees, scope, and suitability directly before care.', 'worldwide-clinic-appointments' ); ?></p>
 		</main>
