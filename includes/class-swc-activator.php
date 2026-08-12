@@ -38,8 +38,10 @@ final class SWC_Activator {
 			WCA_Outbox::schedule();
 			self::repair_pages();
 			self::migrate_existing_records();
-			update_option( 'swc_version', SWC_VERSION, false );
-			update_option( 'swc_db_version', self::DB_VERSION, false );
+			foreach ( array( 'swc_version' => SWC_VERSION, 'swc_db_version' => self::DB_VERSION ) as $option => $value ) {
+				$written = SWC_Helpers::update_option_strict( $option, $value, 'swc_activation_version_write' );
+				if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 activation version state could not be persisted.' ); }
+			}
 			set_transient( 'swc_activation_notice', '1', 120 );
 			flush_rewrite_rules();
 		} catch ( Throwable $e ) {
@@ -71,11 +73,14 @@ final class SWC_Activator {
 		if ( self::DB_VERSION !== (string) get_option( 'swc_db_version', '' ) ) {
 			self::install_schema();
 			self::migrate_existing_records();
-			update_option( 'swc_db_version', self::DB_VERSION, false );
+			$written = SWC_Helpers::update_option_strict( 'swc_db_version', self::DB_VERSION, 'swc_upgrade_db_version_write' );
+			if ( is_wp_error( $written ) ) { WCA_Observability::log( 'error', 'legacy_upgrade_marker_failed', array( 'option' => 'swc_db_version' ) ); return $written; }
 		}
 		if ( SWC_VERSION !== (string) get_option( 'swc_version', '' ) ) {
-			update_option( 'swc_version', SWC_VERSION, false );
+			$written = SWC_Helpers::update_option_strict( 'swc_version', SWC_VERSION, 'swc_upgrade_runtime_version_write' );
+			if ( is_wp_error( $written ) ) { WCA_Observability::log( 'error', 'legacy_upgrade_marker_failed', array( 'option' => 'swc_version' ) ); return $written; }
 		}
+		return true;
 	}
 
 	public static function register_type() {
