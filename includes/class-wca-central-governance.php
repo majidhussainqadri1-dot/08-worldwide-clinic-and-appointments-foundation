@@ -180,14 +180,13 @@ final class WCA_Central_Governance {
 	private static function age_from_birth_date( $value ) {
 		$value = trim( (string) $value );
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $value ) ) { return null; }
-		try {
-			$birth = new DateTimeImmutable( $value, new DateTimeZone( 'UTC' ) );
-			$today = new DateTimeImmutable( 'today', new DateTimeZone( 'UTC' ) );
-			if ( $birth > $today ) { return null; }
-			return (int) $birth->diff( $today )->y;
-		} catch ( Exception $e ) {
-			return null;
-		}
+		$utc = new DateTimeZone( 'UTC' );
+		$birth = DateTimeImmutable::createFromFormat( '!Y-m-d', $value, $utc );
+		$errors = DateTimeImmutable::getLastErrors();
+		if ( ! $birth || ( false !== $errors && ( $errors['warning_count'] || $errors['error_count'] ) ) || $birth->format( 'Y-m-d' ) !== $value ) { return null; }
+		$today = new DateTimeImmutable( 'today', $utc );
+		if ( $birth > $today ) { return null; }
+		return (int) $birth->diff( $today )->y;
 	}
 
 	/**
