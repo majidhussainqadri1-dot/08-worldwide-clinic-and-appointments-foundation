@@ -1,0 +1,90 @@
+name: File 08 T14 Post-Main Corrections and Fresh Reviews
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+permissions:
+  contents: write
+jobs:
+  close:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Apply post-main corrections
+        run: python3 .github/t14_postfix.py
+      - name: Corrected-state QA before fresh reviews
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit post-main corrected product source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-wca-future24.php includes/class-wca-rest.php tests/fourteenth-twenty-review-regressions.php FOURTEENTH-TWENTY-REVIEW-EVIDENCE.md
+          git commit -m "File 08: correct T14 post-main heatmap privacy and cursor defects"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+      - name: Fresh post-coding review A
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -n "wca_heatmap_outcome_privacy_threshold" includes/class-wca-future24.php
+          grep -n "effective_from" includes/class-wca-future24.php | head
+          grep -n "hash_hmac( 'sha256', \$payload" includes/class-wca-rest.php
+          ! grep -n "set_transient( 'wca_clinic_cursor_'" includes/class-wca-rest.php
+          php tests/run-all.php
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+          echo 'T14 FRESH REVIEW A: PASS — no new supported defect found in this corrected-state sweep.'
+      - name: Fresh post-coding review B
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -n 'Version: 1.2.14' worldwide-clinic.php
+          grep -n "RUNTIME_VERSION.*1.2.14" includes/class-wca-contracts.php
+          grep -n 'fourteenth-twenty-review-regressions.php' tests/run-all.php
+          grep -n 'wca_legacy_numeric_rest_disabled' includes/class-wca-ten-review-hardening.php
+          grep -n 'wca_public_numeric_id_disabled' includes/class-wca-rest.php
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          php tests/run-all.php
+          echo 'T14 FRESH REVIEW B: PASS — no new supported defect found in this independent corrected-state sweep.'
+      - name: Remove transient review tooling after both fresh reviews
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/t14_apply.py .github/t14_postfix.py .github/T14-PROGRESS.txt .github/T14-FAILURE.txt
+          rm -f .github/workflows/t14-audit.yml .github/workflows/t14-probe.yml .github/workflows/t14-postfix.yml
+      - name: Final source QA after tooling cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          php tests/run-all.php
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+      - name: Commit final T14 cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "File 08: close fourteenth 20-round review after two fresh post-coding reviews"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
