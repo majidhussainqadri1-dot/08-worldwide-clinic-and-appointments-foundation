@@ -9,12 +9,16 @@ defined( 'ABSPATH' ) || exit;
 
 final class WCA_Repository {
 	public static function uuid() {
-		return function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : sprintf(
-			'%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-			mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
-			mt_rand( 0, 0x0fff ) | 0x4000, mt_rand( 0, 0x3fff ) | 0x8000,
-			mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
-		);
+		if ( function_exists( 'wp_generate_uuid4' ) ) { return strtolower( wp_generate_uuid4() ); }
+		try {
+			$bytes = random_bytes( 16 );
+		} catch ( Throwable $error ) {
+			throw new RuntimeException( 'Secure UUID generation is unavailable.' );
+		}
+		$bytes[6] = chr( ( ord( $bytes[6] ) & 0x0f ) | 0x40 );
+		$bytes[8] = chr( ( ord( $bytes[8] ) & 0x3f ) | 0x80 );
+		$hex = bin2hex( $bytes );
+		return substr( $hex, 0, 8 ) . '-' . substr( $hex, 8, 4 ) . '-' . substr( $hex, 12, 4 ) . '-' . substr( $hex, 16, 4 ) . '-' . substr( $hex, 20, 12 );
 	}
 
 	public static function now() {
