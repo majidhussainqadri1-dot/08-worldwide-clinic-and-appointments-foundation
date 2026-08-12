@@ -438,6 +438,16 @@ final class SWC_Helpers {
 		return new WP_Error( sanitize_key( $error_code ), __( 'The File 08 setting could not be removed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'option' => $option ) );
 	}
 
+	/** Fail closed when module-owned user metadata does not persist with the requested value. */
+	public static function update_user_meta_strict( $user_id, $key, $value, $error_code = 'swc_user_meta_write_failed' ) {
+		$user_id = absint( $user_id );
+		$key = (string) $key;
+		$updated = update_user_meta( $user_id, $key, $value );
+		$current = get_user_meta( $user_id, $key, true );
+		if ( false !== $updated || maybe_serialize( $current ) === maybe_serialize( $value ) ) { return true; }
+		return new WP_Error( sanitize_key( $error_code ), __( 'The File 08 user setting could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'meta_key' => sanitize_key( $key ) ) );
+	}
+
 	/** Fail closed when an authoritative appointment meta write does not persist. */
 	public static function update_meta_strict( $id, $key, $value, $error_code = 'swc_meta_write_failed' ) {
 		$id = absint( $id );

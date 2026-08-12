@@ -378,13 +378,21 @@ final class SWC_Appointments {
 			wp_die( esc_html__( 'Publish at least one day, a valid start/end window, a valid time zone, and one consultation type. Accepting and unavailable cannot both be enabled.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
 		}
 
-		update_user_meta( $id, '_swc_available_days', $data['days'] );
-		update_user_meta( $id, '_swc_start_time', $data['start'] );
-		update_user_meta( $id, '_swc_end_time', $data['end'] );
-		update_user_meta( $id, '_swc_timezone', $data['timezone'] );
-		update_user_meta( $id, '_swc_duration', $data['duration'] );
-		foreach ( array( 'online', 'in_person', 'accepting', 'unavailable' ) as $key ) {
-			update_user_meta( $id, '_swc_' . $key, $data[ $key ] ? '1' : '0' );
+		$updates = array(
+			'_swc_available_days' => $data['days'], '_swc_start_time' => $data['start'], '_swc_end_time' => $data['end'],
+			'_swc_timezone' => $data['timezone'], '_swc_duration' => $data['duration'], '_swc_online' => $data['online'] ? '1' : '0',
+			'_swc_in_person' => $data['in_person'] ? '1' : '0', '_swc_accepting' => $data['accepting'] ? '1' : '0', '_swc_unavailable' => $data['unavailable'] ? '1' : '0',
+		);
+		$persisted = WCA_Repository::transaction( function () use ( $id, $updates ) {
+			foreach ( $updates as $key => $value ) {
+				$written = SWC_Helpers::update_user_meta_strict( $id, $key, $value, 'swc_availability_user_meta_write' );
+				if ( is_wp_error( $written ) ) { return $written; }
+			}
+			return true;
+		}, 'swc_availability_user_meta_transaction' );
+		if ( is_wp_error( $persisted ) ) {
+			wp_cache_delete( $id, 'user_meta' );
+			wp_die( esc_html__( 'Availability could not be persisted safely. No success state was recorded.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) );
 		}
 		$this->redirect( 'availability', array( 'updated' => '1' ) );
 	}
