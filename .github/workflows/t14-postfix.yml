@@ -22,6 +22,18 @@ jobs:
           extensions: zip
       - name: Apply post-main corrections
         run: python3 .github/t14_postfix.py
+      - name: Normalize generated PHP indentation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('includes/class-wca-future24.php'); s=p.read_text()
+          a=s.index(r'\t/* FUT-08 */'); b=s.index('\n\t/* FUT-09 */',a)
+          s=s[:a]+s[a:b].replace(r'\t','\t')+s[b:]; p.write_text(s)
+          p=Path('includes/class-wca-rest.php'); s=p.read_text()
+          a=s.index(r'\tprivate static function encode_clinic_cursor'); b=s.index('\n\tpublic static function clinic( WP_REST_Request $request ) {',a)
+          s=s[:a]+s[a:b].replace(r'\t','\t')+s[b:]; p.write_text(s)
+          PY
       - name: Corrected-state QA before fresh reviews
         shell: bash
         run: |
