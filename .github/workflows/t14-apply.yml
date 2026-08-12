@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           qa() {
-            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/t14-lint.log
+            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
             php tests/run-all.php
             node --check assets/js/clinic.js
             node --check assets/js/continuity.js
@@ -40,12 +40,42 @@ jobs:
             test -z "$(find . -type l -print -quit)"
             test ! -e .gitmodules
           }
+          persist_failure() {
+            round="$1"
+            phase="$2"
+            log="$3"
+            {
+              echo "Fourteenth sequential review failure"
+              echo "round=${round}"
+              echo "phase=${phase}"
+              echo "workflow_head=$(git rev-parse HEAD)"
+              echo "frozen_product_baseline=fe10d05bdb4d1ffb726063f657f283097e65abbd"
+              echo "--- diff stat ---"
+              git diff --stat || true
+              echo "--- failure log tail ---"
+              tail -n 250 "$log" || true
+            } > .github/T14-FAILURE.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/T14-FAILURE.txt
+            git commit -m "File 08: record T14 round ${round} failure diagnostic"
+            git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+          }
           for r in $(seq 1 20); do
-            echo "================ T14-R$(printf '%02d' "$r") REVIEW/FIX ================"
-            python3 .github/t14_apply.py "$r"
-            echo "T14-R$(printf '%02d' "$r"): correction/review applied; running complete corrected-state QA before next round"
-            qa
-            echo "T14-R$(printf '%02d' "$r"): QA PASS"
+            label=$(printf '%02d' "$r")
+            echo "================ T14-R${label} REVIEW/FIX ================"
+            tf=/tmp/t14-transform-${label}.log
+            if ! python3 .github/t14_apply.py "$r" 2>&1 | tee "$tf"; then
+              persist_failure "$label" transformer "$tf"
+              exit 1
+            fi
+            echo "T14-R${label}: correction/review applied; running complete corrected-state QA before next round"
+            qf=/tmp/t14-qa-${label}.log
+            if ! qa 2>&1 | tee "$qf"; then
+              persist_failure "$label" qa "$qf"
+              exit 1
+            fi
+            echo "T14-R${label}: QA PASS"
           done
       - name: Post-round source review A
         shell: bash
@@ -71,7 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .github/t14_apply.py
+          rm -f .github/T14-FAILURE.txt .github/t14_apply.py
           rm -f .github/workflows/t14-apply.yml .github/workflows/t14-audit.yml .github/workflows/t14-probe.yml
       - name: Final repository hygiene
         shell: bash
