@@ -63,57 +63,36 @@ final class SWC_Appointments {
 			wp_die( esc_html__( 'Complete the required contact, location, reason, emergency acknowledgment, and consent fields.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
 		}
 
-		$id = wp_insert_post(
-			array(
-				'post_type'   => SWC_Helpers::TYPE,
-				'post_status' => 'private',
-				'post_title'  => sprintf( __( 'Appointment Request — %s', 'worldwide-clinic-appointments' ), current_time( 'Y-m-d H:i' ) ),
-				'post_author' => $user_id,
-			),
-			true
-		);
-		if ( is_wp_error( $id ) ) {
-			wp_die( esc_html__( 'The request could not be saved.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) );
-		}
-
-		$meta = array(
-			'public_ref'           => WCA_Repository::uuid(),
-			'patient_user_id'      => $user_id,
-			'doctor_id'            => $doctor,
-			'status'               => 'requested',
-			'consultation_type'    => $mode,
-			'preferred_at_utc'     => $utc,
-			'patient_timezone'     => $zone,
-			'country'              => $country,
-			'city'                 => $city,
-			'phone'                => $phone,
-			'whatsapp'             => $whatsapp,
-			'reason'               => $reason,
-			'concern_duration'     => $concern,
-			'appointment_duration' => $duration,
-			'consent_at'           => current_time( 'mysql', true ),
-			'consent_version'      => '2026-07-30',
-			'record_version'       => 1,
-		);
-		foreach ( $meta as $key => $value ) {
-			$written = SWC_Helpers::update_meta_strict( $id, '_swc_' . $key, $value, 'swc_legacy_request_meta' );
-			if ( is_wp_error( $written ) ) { wp_delete_post( $id, true ); wp_die( esc_html__( 'The request could not be persisted safely. Nothing was submitted.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) ); }
-		}
-		update_user_meta( $user_id, '_swc_patient_timezone', $zone );
-
-		if ( ! SWC_Helpers::audit(
-			$id,
-			'appointment-requested',
-			array(
-				'old_status'    => '',
-				'new_status'    => 'requested',
-				'new_doctor_id' => $doctor,
-				'details'       => array( 'consultation_type' => $mode, 'appointment_duration' => $duration ),
-			)
-		) ) {
-			wp_delete_post( $id, true );
-			wp_die( esc_html__( 'The request could not be safely audited. Nothing was submitted.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) );
-		}
+		$public_ref = WCA_Repository::uuid();
+		$transaction = WCA_Repository::transaction( function () use ( $user_id, $doctor, $mode, $utc, $zone, $country, $city, $phone, $whatsapp, $reason, $concern, $duration, $public_ref ) {
+			$id = wp_insert_post(
+				array(
+					'post_type'   => SWC_Helpers::TYPE,
+					'post_status' => 'private',
+					'post_title'  => sprintf( __( 'Appointment Request — %s', 'worldwide-clinic-appointments' ), current_time( 'Y-m-d H:i' ) ),
+					'post_author' => $user_id,
+				),
+				true
+			);
+			if ( is_wp_error( $id ) ) { return new WP_Error( 'swc_legacy_request_insert', __( 'The request could not be saved.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$meta = array(
+				'public_ref' => $public_ref, 'patient_user_id' => $user_id, 'doctor_id' => $doctor, 'status' => 'requested', 'consultation_type' => $mode,
+				'preferred_at_utc' => $utc, 'patient_timezone' => $zone, 'country' => $country, 'city' => $city, 'phone' => $phone, 'whatsapp' => $whatsapp,
+				'reason' => $reason, 'concern_duration' => $concern, 'appointment_duration' => $duration, 'consent_at' => current_time( 'mysql', true ), 'consent_version' => '2026-07-30', 'record_version' => 1,
+			);
+			foreach ( $meta as $key => $value ) {
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_' . $key, $value, 'swc_legacy_request_meta' );
+				if ( is_wp_error( $written ) ) { return $written; }
+			}
+			if ( ! SWC_Helpers::audit( $id, 'appointment-requested', array( 'old_status' => '', 'new_status' => 'requested', 'new_doctor_id' => $doctor, 'details' => array( 'consultation_type' => $mode, 'appointment_duration' => $duration, 'public_ref' => $public_ref ) ) ) ) {
+				return new WP_Error( 'swc_legacy_request_audit', __( 'The request could not be safely audited.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
+			return absint( $id );
+		}, 'swc_legacy_request_transaction' );
+		if ( is_wp_error( $transaction ) ) { wp_die( esc_html__( 'The request could not be persisted safely. Nothing was submitted.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) ); }
+		$id = absint( $transaction );
+		$timezone_saved = SWC_Helpers::update_user_meta_strict( $user_id, '_swc_patient_timezone', $zone, 'swc_patient_timezone_preference_write' );
+		if ( is_wp_error( $timezone_saved ) ) { WCA_Observability::log( 'warning', 'patient_timezone_preference_not_saved', array( 'appointment_ref' => $public_ref ) ); }
 
 		$this->notify_participants( $id, 'appointment-requested', __( 'New appointment request', 'worldwide-clinic-appointments' ), __( 'A new appointment request was received.', 'worldwide-clinic-appointments' ), 'normal' );
 		$this->redirect( 'patient', array( 'requested' => '1' ) );
