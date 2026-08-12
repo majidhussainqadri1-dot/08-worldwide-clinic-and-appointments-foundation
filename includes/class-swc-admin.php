@@ -303,9 +303,10 @@ final class SWC_Admin {
 		if ( ( isset( $_POST['clinic_phone'] ) && '' !== trim( (string) $_POST['clinic_phone'] ) && ! $phone ) || ( isset( $_POST['clinic_whatsapp'] ) && '' !== trim( (string) $_POST['clinic_whatsapp'] ) && ! $whatsapp ) || '' === trim( $emergency ) ) {
 			wp_die( esc_html__( 'Provide valid clinic contact numbers and a nonempty emergency notice.', 'worldwide-clinic-appointments' ), '', array( 'response' => 400 ) );
 		}
-		update_option( 'swc_clinic_phone', $phone, false );
-		update_option( 'swc_clinic_whatsapp', $whatsapp, false );
-		update_option( 'swc_emergency_notice', $emergency, false );
+		foreach ( array( 'swc_clinic_phone' => $phone, 'swc_clinic_whatsapp' => $whatsapp, 'swc_emergency_notice' => $emergency ) as $option => $value ) {
+			$written = SWC_Helpers::update_option_strict( $option, $value, 'swc_settings_write_failed' );
+			if ( is_wp_error( $written ) ) { wp_die( esc_html( $written->get_error_message() ), '', array( 'response' => 500 ) ); }
+		}
 		wp_safe_redirect( add_query_arg( array( 'page' => 'clinic-settings', 'updated' => '1' ), admin_url( 'admin.php' ) ) );
 		exit;
 	}

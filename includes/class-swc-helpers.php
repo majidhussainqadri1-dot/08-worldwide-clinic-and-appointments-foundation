@@ -419,6 +419,25 @@ final class SWC_Helpers {
 		return $version;
 	}
 
+	/** Fail closed when a module-owned option does not persist with the requested value. */
+	public static function update_option_strict( $option, $value, $error_code = 'swc_option_write_failed' ) {
+		$option = sanitize_key( (string) $option );
+		$updated = update_option( $option, $value, false );
+		$current = get_option( $option, null );
+		$same = maybe_serialize( $current ) === maybe_serialize( $value );
+		if ( false !== $updated || $same ) { return true; }
+		return new WP_Error( sanitize_key( $error_code ), __( 'The File 08 setting could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'option' => $option ) );
+	}
+
+	/** Fail closed when a module-owned option remains after a required deletion. */
+	public static function delete_option_strict( $option, $error_code = 'swc_option_delete_failed' ) {
+		$option = sanitize_key( (string) $option );
+		if ( false === get_option( $option, false ) ) { return true; }
+		$deleted = delete_option( $option );
+		if ( false !== $deleted || false === get_option( $option, false ) ) { return true; }
+		return new WP_Error( sanitize_key( $error_code ), __( 'The File 08 setting could not be removed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'option' => $option ) );
+	}
+
 	/** Fail closed when an authoritative appointment meta write does not persist. */
 	public static function update_meta_strict( $id, $key, $value, $error_code = 'swc_meta_write_failed' ) {
 		$id = absint( $id );
