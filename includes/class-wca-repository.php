@@ -346,8 +346,24 @@ final class WCA_Repository {
 		if ( ! WCA_Service::valid_timezone( $timezone ) ) {
 			return new WP_Error( 'wca_repository_availability_timezone', __( 'Availability persistence requires a valid IANA time zone.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		$rrule = (array) ( $data['rrule'] ?? array() );
-		$interval = WCA_Service::strict_int( $rrule['interval_minutes'] ?? 30, 10, 1440 );
+		$rrule = $data['rrule'] ?? null;
+		if ( ! is_array( $rrule ) ) {
+			return new WP_Error( 'wca_repository_availability_rrule', __( 'Availability persistence requires an explicit recurrence rule.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$weekdays = array( 'monday','tuesday','wednesday','thursday','friday','saturday','sunday' );
+		$raw_days = $rrule['days'] ?? null;
+		if ( ! is_array( $raw_days ) || ! $raw_days ) {
+			return new WP_Error( 'wca_repository_availability_days', __( 'Availability persistence requires at least one explicit weekday.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$days = array_values( array_unique( array_map( 'sanitize_key', $raw_days ) ) );
+		if ( count( $days ) !== count( $raw_days ) || array_diff( $days, $weekdays ) ) {
+			return new WP_Error( 'wca_repository_availability_days', __( 'Availability persistence received an invalid or duplicate weekday.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$start = (string) ( $rrule['start'] ?? '' );
+		$end = (string) ( $rrule['end'] ?? '' );
+		$effective_from = (string) ( $rrule['effective_from'] ?? '' );
+		$effective_until = (string) ( $rrule['effective_until'] ?? '' );
+		$interval = WCA_Service::strict_int( $rrule['interval_minutes'] ?? null, 10, 1440 );
 		$buffer_before = WCA_Service::strict_int( $data['buffer_before'] ?? 0, 0, 240 );
 		$buffer_after = WCA_Service::strict_int( $data['buffer_after'] ?? 0, 0, 240 );
 		$capacity = WCA_Service::strict_int( $data['capacity'] ?? 1, 1, 50 );
@@ -355,17 +371,50 @@ final class WCA_Repository {
 		if ( null === $interval || null === $buffer_before || null === $buffer_after || null === $capacity ) {
 			return new WP_Error( 'wca_repository_availability_numeric_range', __( 'Availability persistence received an invalid interval, buffer, or capacity.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
+		if ( ! WCA_Service::valid_hhmm( $start ) || ! WCA_Service::valid_hhmm( $end ) || $end <= $start ) {
+			return new WP_Error( 'wca_repository_availability_window', __( 'Availability persistence requires a valid start/end window.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		if ( ! WCA_Service::valid_date( $effective_from ) || ! WCA_Service::valid_date( $effective_until ) || $effective_until < $effective_from ) {
+			return new WP_Error( 'wca_repository_availability_effective_range', __( 'Availability persistence requires a valid effective date range.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		if ( ! in_array( $status, array( 'active', 'paused', 'archived' ), true ) ) { return new WP_Error( 'wca_repository_availability_status', __( 'Availability persistence requires a valid status.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$rrule['interval_minutes'] = $interval;
+		$breaks = array();
+		foreach ( (array) ( $data['breaks'] ?? array() ) as $break ) {
+			if ( ! is_array( $break ) || ! WCA_Service::valid_hhmm( $break['start'] ?? '' ) || ! WCA_Service::valid_hhmm( $break['end'] ?? '' ) || $break['end'] <= $break['start'] ) {
+				return new WP_Error( 'wca_repository_availability_break', __( 'Availability persistence received an invalid break window.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+			}
+			$breaks[] = array( 'start' => (string) $break['start'], 'end' => (string) $break['end'] );
+		}
+		$exceptions = array();
+		foreach ( (array) ( $data['exceptions'] ?? array() ) as $exception ) {
+			if ( ! is_array( $exception ) || ! WCA_Service::valid_date( $exception['date'] ?? '' ) || ! in_array( $exception['type'] ?? '', array( 'closed','open','capacity' ), true ) ) {
+				return new WP_Error( 'wca_repository_availability_exception', __( 'Availability persistence received an invalid exception.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+			}
+			$type = (string) $exception['type'];
+			$exception_start = (string) ( $exception['start'] ?? '' );
+			$exception_end = (string) ( $exception['end'] ?? '' );
+			if ( 'open' === $type && ( ! WCA_Service::valid_hhmm( $exception_start ) || ! WCA_Service::valid_hhmm( $exception_end ) || $exception_end <= $exception_start ) ) {
+				return new WP_Error( 'wca_repository_availability_exception_window', __( 'An open exception requires a valid start/end window.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+			}
+			if ( 'closed' === $type && ( $exception_start || $exception_end ) && ( ! WCA_Service::valid_hhmm( $exception_start ) || ! WCA_Service::valid_hhmm( $exception_end ) || $exception_end <= $exception_start ) ) {
+				return new WP_Error( 'wca_repository_availability_exception_window', __( 'A bounded closed exception requires a valid start/end window.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+			}
+			$exception_capacity = WCA_Service::strict_int( $exception['capacity'] ?? 0, 0, 50 );
+			if ( null === $exception_capacity || ( 'capacity' === $type && $exception_capacity < 1 ) ) {
+				return new WP_Error( 'wca_repository_availability_exception_capacity', __( 'A capacity exception requires a valid capacity.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+			}
+			$exceptions[] = array( 'date' => (string) $exception['date'], 'type' => $type, 'start' => $exception_start, 'end' => $exception_end, 'capacity' => $exception_capacity, 'reason' => sanitize_text_field( $exception['reason'] ?? '' ) );
+		}
+		$rrule = array( 'days' => $days, 'start' => $start, 'end' => $end, 'interval_minutes' => $interval, 'effective_from' => $effective_from, 'effective_until' => $effective_until );
 		$row = array(
 			'clinic_id'      => absint( $data['clinic_id'] ?? 0 ),
 			'branch_id'      => absint( $data['branch_id'] ?? 0 ),
 			'service_id'     => absint( $data['service_id'] ?? 0 ),
 			'doctor_user_id' => absint( $data['doctor_user_id'] ?? 0 ),
 			'timezone'       => $timezone,
-			'rrule_json'      => self::json( WCA_Service::sanitize_rrule( $rrule ) ),
-			'breaks_json'     => self::json( WCA_Service::sanitize_time_ranges( (array) ( $data['breaks'] ?? array() ) ) ),
-			'exceptions_json' => self::json( WCA_Service::sanitize_exceptions( (array) ( $data['exceptions'] ?? array() ) ) ),
+			'rrule_json'      => self::json( $rrule ),
+			'breaks_json'     => self::json( $breaks ),
+			'exceptions_json' => self::json( $exceptions ),
 			'buffer_before'   => $buffer_before,
 			'buffer_after'    => $buffer_after,
 			'capacity'        => $capacity,
