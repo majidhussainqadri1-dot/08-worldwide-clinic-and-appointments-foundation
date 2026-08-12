@@ -179,11 +179,13 @@ final class WCA_Repository {
 		$status = $data['status'] ?? 'active';
 		if ( ! in_array( $visibility, array( 'public', 'restricted', 'private' ), true ) ) { return new WP_Error( 'wca_branch_visibility', __( 'Branch visibility is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		if ( ! in_array( $status, array( 'active', 'paused', 'archived' ), true ) ) { return new WP_Error( 'wca_branch_status', __( 'Branch status is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$country_raw = trim( (string) ( $data['country_code'] ?? '' ) );
+		if ( '' !== $country_raw && ! preg_match( '/^[A-Za-z]{2}$/', $country_raw ) ) { return new WP_Error( 'wca_branch_country', __( 'Branch country code must be an exact two-letter code.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$row   = array(
 			'public_ref'      => self::uuid(),
 			'clinic_id'       => absint( $data['clinic_id'] ?? 0 ),
 			'name'            => sanitize_text_field( $data['name'] ?? '' ),
-			'country_code'    => strtoupper( substr( preg_replace( '/[^A-Za-z]/', '', (string) ( $data['country_code'] ?? '' ) ), 0, 2 ) ),
+			'country_code'    => strtoupper( $country_raw ),
 			'region'          => sanitize_text_field( $data['region'] ?? '' ),
 			'city'            => sanitize_text_field( $data['city'] ?? '' ),
 			'address_public'  => sanitize_textarea_field( $data['address_public'] ?? '' ),
