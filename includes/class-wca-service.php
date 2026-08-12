@@ -17,12 +17,10 @@ final class WCA_Service {
 	}
 
 	public static function valid_timezone( $timezone ) {
-		try {
-			new DateTimeZone( (string) $timezone );
-			return true;
-		} catch ( Exception $e ) {
-			return false;
-		}
+		if ( ! is_string( $timezone ) ) { return false; }
+		$timezone = trim( $timezone );
+		if ( '' === $timezone ) { return false; }
+		return 'UTC' === $timezone || in_array( $timezone, timezone_identifiers_list(), true );
 	}
 
 	public static function valid_hhmm( $value ) {
