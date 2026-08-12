@@ -464,25 +464,25 @@ final class SWC_Activator {
 
 	public static function purge_all_data() {
 		global $wpdb;
-		$ids = get_posts(
-			array(
-				'post_type'      => SWC_Helpers::TYPE,
-				'post_status'    => 'any',
-				'posts_per_page' => -1,
-				'fields'         => 'ids',
-			)
-		);
-		foreach ( $ids as $id ) {
-			if ( false === wp_delete_post( $id, true ) ) { return new WP_Error( 'swc_purge_post_delete', __( 'A File 08 appointment could not be deleted during the guarded purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-		}
+		do {
+			$wpdb->last_error = '';
+			$ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type=%s ORDER BY ID ASC LIMIT 200", SWC_Helpers::TYPE ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $ids || $wpdb->last_error ) { return new WP_Error( 'swc_purge_post_query', __( 'File 08 appointments could not be enumerated safely for purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			foreach ( (array) $ids as $id ) {
+				if ( false === wp_delete_post( absint( $id ), true ) ) { return new WP_Error( 'swc_purge_post_delete', __( 'A File 08 appointment could not be deleted during the guarded purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			}
+		} while ( 200 === count( $ids ) );
 		if ( false === $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_audit_log" ) ) { return new WP_Error( 'swc_purge_audit_table', __( 'The File 08 audit table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( false === $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_rate_limits" ) ) { return new WP_Error( 'swc_purge_rate_table', __( 'The File 08 rate-limit table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$like = $wpdb->esc_like( '_swc_' ) . '%';
 		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s", $like ) ) ) { return new WP_Error( 'swc_purge_usermeta', __( 'File 08 user metadata could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		foreach ( array( 'swc_page_map', 'swc_version', 'swc_db_version', 'swc_clinic_phone', 'swc_clinic_whatsapp', 'swc_emergency_notice', 'swc_activation_snapshot', 'swc_last_audit_error', 'swc_last_delivery_error' ) as $option ) {
-			delete_option( $option );
+		$options = array( 'swc_page_map', 'swc_version', 'swc_db_version', 'swc_clinic_phone', 'swc_clinic_whatsapp', 'swc_emergency_notice', 'swc_activation_snapshot', 'swc_legacy_record_migration_cursor', WCA_Compatibility::MIGRATION_OPTION, 'swc_last_audit_error', 'swc_last_delivery_error' );
+		foreach ( $options as $option ) {
+			$deleted = SWC_Helpers::delete_option_strict( $option, 'swc_purge_option_delete' );
+			if ( is_wp_error( $deleted ) ) { return $deleted; }
 		}
 		self::remove_capabilities();
 		return true;
 	}
+
 }
