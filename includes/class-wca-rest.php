@@ -184,7 +184,9 @@ final class WCA_REST {
 	public static function clinic( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'public_clinic', 120, 60 );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		$projection = WCA_Service::public_clinic_projection( sanitize_text_field( $request['id'] ) );
+		$identifier = sanitize_text_field( $request['id'] );
+		if ( ctype_digit( $identifier ) ) { return new WP_Error( 'wca_public_numeric_id_disabled', __( 'Numeric internal clinic identifiers are not public API identities.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+		$projection = WCA_Service::public_clinic_projection( $identifier );
 		return $projection ? self::respond( $projection ) : new WP_Error( 'wca_clinic_not_found', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 	}
 
