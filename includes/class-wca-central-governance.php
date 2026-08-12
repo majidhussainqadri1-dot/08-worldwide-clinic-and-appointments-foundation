@@ -131,6 +131,9 @@ final class WCA_Central_Governance {
 		$minor = array_key_exists( 'is_minor', $raw ) && null !== $raw['is_minor'] ? (bool) $raw['is_minor'] : null;
 		$threshold = 'female' === $gender ? 12 : 15;
 		$threshold = max( $threshold, absint( apply_filters( 'wca_guardian_age_threshold', $threshold, $gender, $patient_user_id ) ) );
+		if ( null !== $age && $age < $threshold && false === $minor ) {
+			return new WP_Error( 'wca_age_claim_conflict', __( 'The current age and minor-status assertions conflict and cannot be used for booking until identity verification is reconciled.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
 		if ( null === $minor && null !== $age ) { $minor = $age < $threshold; }
 		if ( null === $minor ) {
 			return new WP_Error( 'wca_age_claim_incomplete', __( 'Age eligibility is incomplete and cannot be assumed.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
