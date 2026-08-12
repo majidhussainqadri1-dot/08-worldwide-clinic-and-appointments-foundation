@@ -111,7 +111,10 @@ final class WCA_Future24 {
 			KEY subject_feature (subject_user_id,feature_id,status)
 		) {$collate};";
 		dbDelta( $sql );
-		update_option( self::SCHEMA_OPTION, self::SCHEMA_VERSION, false );
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+		if ( $exists !== $table ) { throw new RuntimeException( 'File 08 Future24 operational table could not be created.' ); }
+		$written = SWC_Helpers::update_option_strict( self::SCHEMA_OPTION, self::SCHEMA_VERSION, 'wca_future24_schema_version_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 Future24 schema version could not be persisted.' ); }
 	}
 
 	public static function register_assets() {
