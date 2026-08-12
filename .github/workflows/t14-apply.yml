@@ -1,0 +1,93 @@
+name: File 08 T14 Sequential 20-Round Review Fix Retest
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+permissions:
+  contents: write
+jobs:
+  sequential:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Freeze fourteenth-cycle product baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "workflow input HEAD=$(git rev-parse HEAD)"
+          git cat-file -e fe10d05bdb4d1ffb726063f657f283097e65abbd^{commit}
+          echo "Frozen product baseline=fe10d05bdb4d1ffb726063f657f283097e65abbd / runtime 1.2.13"
+      - name: Run 20 reviews sequentially with fix-before-next full QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          qa() {
+            find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/t14-lint.log
+            php tests/run-all.php
+            node --check assets/js/clinic.js
+            node --check assets/js/continuity.js
+            node --check assets/js/future24.js
+            test -z "$(find . -type l -print -quit)"
+            test ! -e .gitmodules
+          }
+          for r in $(seq 1 20); do
+            echo "================ T14-R$(printf '%02d' "$r") REVIEW/FIX ================"
+            python3 .github/t14_apply.py "$r"
+            echo "T14-R$(printf '%02d' "$r"): correction/review applied; running complete corrected-state QA before next round"
+            qa
+            echo "T14-R$(printf '%02d' "$r"): QA PASS"
+          done
+      - name: Post-round source review A
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RIn "'number'[[:space:]]*=>[[:space:]]*-1" includes --include='*.php'
+          ! grep -RIn 'mt_rand( 0, 0xffff )' includes --include='*.php'
+          grep -RIn 'wca_legacy_numeric_rest_disabled' includes/class-wca-ten-review-hardening.php
+          php tests/run-all.php
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+          echo 'POST-FINAL REVIEW A: PASS — no new supported defect from this sweep.'
+      - name: Post-round source review B
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RIn 'Version: 1.2.14' worldwide-clinic.php
+          grep -RIn "RUNTIME_VERSION.*1.2.14" includes/class-wca-contracts.php
+          grep -RIn 'fourteenth-twenty-review-regressions.php' tests/run-all.php
+          php tests/run-all.php
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
+          echo 'POST-FINAL REVIEW B: PASS — no new supported defect from this sweep.'
+      - name: Remove transient fourteenth-cycle tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/t14_apply.py
+          rm -f .github/workflows/t14-apply.yml .github/workflows/t14-audit.yml .github/workflows/t14-probe.yml
+      - name: Final repository hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          php tests/run-all.php
+      - name: Commit fourteenth-cycle corrected source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "File 08: complete fourteenth fresh 20-round corrective review as v1.2.14"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
