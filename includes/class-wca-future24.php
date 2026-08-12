@@ -1201,10 +1201,10 @@ final class WCA_Future24 {
 			$capacity = max( 0, absint( isset( $row['configured_capacity'] ) ? $row['configured_capacity'] : 0 ) );
 			$booked = max( 0, absint( isset( $row['booked'] ) ? $row['booked'] : 0 ) );
 			$ratio = $capacity ? $booked / $capacity : 0;
-			if ( $capacity && $ratio >= 0.8 ) { $items[] = array( 'date' => $date, 'type' => 'high_demand', 'suggestion' => 'Consider opening additional capacity or buffer review.', 'auto_apply' => false ); }
-			if ( $capacity >= 4 && $ratio <= 0.2 ) { $items[] = array( 'date' => $date, 'type' => 'low_demand', 'suggestion' => 'Consider consolidating availability if clinically and operationally appropriate.', 'auto_apply' => false ); }
+			if ( $capacity && $ratio >= 0.8 ) { $items[] = array( 'date' => $date, 'type' => 'high_demand', 'suggestion' => 'Consider opening additional capacity or buffer review.', 'reason' => array( 'configured_capacity' => $capacity, 'booked' => $booked, 'utilization_ratio' => round( $ratio, 4 ) ), 'provenance' => array( 'source_contract' => 'wca.capacity-heatmap', 'window_days' => 30 ), 'auto_apply' => false ); }
+			if ( $capacity >= 4 && $ratio <= 0.2 ) { $items[] = array( 'date' => $date, 'type' => 'low_demand', 'suggestion' => 'Consider consolidating availability if clinically and operationally appropriate.', 'reason' => array( 'configured_capacity' => $capacity, 'booked' => $booked, 'utilization_ratio' => round( $ratio, 4 ) ), 'provenance' => array( 'source_contract' => 'wca.capacity-heatmap', 'window_days' => 30 ), 'auto_apply' => false ); }
 		}
-		return array( 'contract' => 'wca.schedule-advisor', 'version' => self::CONTRACT_VERSION, 'advisory_only' => true, 'recommendations' => array_slice( $items, 0, 30 ) );
+		return array( 'contract' => 'wca.schedule-advisor', 'version' => self::CONTRACT_VERSION, 'advisory_only' => true, 'auto_apply' => false, 'donor_or_paid_influence' => false, 'generated_at_utc' => gmdate( 'c' ), 'recommendations' => array_slice( $items, 0, 30 ) );
 	}
 
 	/* FUT-10 */
