@@ -22,7 +22,7 @@ jobs:
           extensions: zip
       - name: Apply post-main corrections
         run: python3 .github/t14_postfix.py
-      - name: Normalize generated PHP indentation
+      - name: Normalize generated PHP and cursor encoding
         shell: bash
         run: |
           python3 - <<'PY'
@@ -32,7 +32,16 @@ jobs:
           s=s[:a]+s[a:b].replace(r'\t','\t')+s[b:]; p.write_text(s)
           p=Path('includes/class-wca-rest.php'); s=p.read_text()
           a=s.index(r'\tprivate static function encode_clinic_cursor'); b=s.index('\n\tpublic static function clinic( WP_REST_Request $request ) {',a)
-          s=s[:a]+s[a:b].replace(r'\t','\t')+s[b:]; p.write_text(s)
+          block=s[a:b].replace(r'\t','\t')
+          block=block.replace("$payload = rtrim( strtr( base64_encode( $json ), '+/', '-_' ), '=' );", "$payload = bin2hex( $json );")
+          block=block.replace("/^([A-Za-z0-9_-]+)\\.([0-9a-f]{64})$/", "/^([0-9a-f]+)\\.([0-9a-f]{64})$/")
+          old="""$encoded = strtr( $matches[1], '-_', '+/' );
+		$padding = strlen( $encoded ) % 4; if ( $padding ) { $encoded .= str_repeat( '=', 4 - $padding ); }
+		$json = base64_decode( $encoded, true );"""
+          block=block.replace(old, "$json = hex2bin( $matches[1] );")
+          if 'base64_decode(' in block or 'base64_encode(' in block:
+              raise SystemExit('cursor still contains base64 primitive')
+          s=s[:a]+block+s[b:]; p.write_text(s)
           PY
       - name: Corrected-state QA before fresh reviews
         shell: bash
@@ -59,7 +68,9 @@ jobs:
           grep -n "wca_heatmap_outcome_privacy_threshold" includes/class-wca-future24.php
           grep -n "effective_from" includes/class-wca-future24.php | head
           grep -n "hash_hmac( 'sha256', \$payload" includes/class-wca-rest.php
+          grep -n "hex2bin( \$matches\[1\] )" includes/class-wca-rest.php
           ! grep -n "set_transient( 'wca_clinic_cursor_'" includes/class-wca-rest.php
+          ! grep -n 'base64_decode(' includes/class-wca-rest.php
           php tests/run-all.php
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
           node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
