@@ -328,14 +328,20 @@ final class SWC_Admin {
 	public function repair() {
 		$this->guard();
 		check_admin_referer( 'swc_complete_repair' );
-		SWC_Activator::add_capabilities();
-		SWC_Activator::install_schema();
-		SWC_Activator::repair_pages();
-		SWC_Activator::migrate_existing_records();
-		update_option( 'swc_db_version', SWC_Activator::DB_VERSION, false );
-		global $wpdb;
-		$cleaned = $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}swc_rate_limits WHERE expires_at < %s", current_time( 'mysql', true ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( false === $cleaned ) { wp_die( esc_html__( 'Repair could not complete the expired rate-limit cleanup safely.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) ); }
+		try {
+			SWC_Activator::add_capabilities();
+			SWC_Activator::install_schema();
+			SWC_Activator::repair_pages();
+			SWC_Activator::migrate_existing_records();
+			$written = SWC_Helpers::update_option_strict( 'swc_db_version', SWC_Activator::DB_VERSION, 'swc_repair_db_version_write' );
+			if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 repair version state could not be persisted.' ); }
+			global $wpdb;
+			$cleaned = $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}swc_rate_limits WHERE expires_at < %s", current_time( 'mysql', true ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( false === $cleaned ) { throw new RuntimeException( 'File 08 repair rate-limit cleanup failed.' ); }
+		} catch ( Throwable $error ) {
+			WCA_Observability::log( 'error', 'manual_repair_failed', array( 'class' => get_class( $error ) ) );
+			wp_die( esc_html__( 'File 08 repair did not complete safely. No success state was recorded; review the sanitized system log and retry after correcting the failure.', 'worldwide-clinic-appointments' ), '', array( 'response' => 500 ) );
+		}
 		wp_safe_redirect( add_query_arg( array( 'page' => 'clinic-system-check', 'repaired' => '1' ), admin_url( 'admin.php' ) ) );
 		exit;
 	}
