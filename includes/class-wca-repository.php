@@ -160,7 +160,11 @@ final class WCA_Repository {
 		if ( isset( $data['languages'] ) ) { $allowed['languages_json'] = self::json( array_values( array_filter( array_map( 'sanitize_text_field', (array) $data['languages'] ) ) ) ); }
 		if ( isset( $data['contacts'] ) ) { $allowed['contacts_json'] = self::json( self::sanitize_contacts( (array) $data['contacts'] ) ); }
 		if ( isset( $data['policies'] ) ) { $allowed['policies_json'] = self::json( self::sanitize_policies( (array) $data['policies'] ) ); }
-		if ( isset( $data['status'] ) && in_array( sanitize_key( $data['status'] ), WCA_Contracts::lifecycles()['clinic'], true ) ) { $allowed['status'] = sanitize_key( $data['status'] ); }
+		if ( isset( $data['status'] ) ) {
+			$status = sanitize_key( $data['status'] );
+			if ( ! in_array( $status, WCA_Contracts::lifecycles()['clinic'], true ) ) { return new WP_Error( 'wca_clinic_status', __( 'Invalid clinic status.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+			$allowed['status'] = $status;
+		}
 		$allowed['version']    = absint( $clinic['version'] ) + 1;
 		$allowed['updated_at'] = self::now();
 		$updated = $wpdb->update( $table, $allowed, array( 'id' => absint( $clinic_id ), 'version' => absint( $expected_version ) ) );
