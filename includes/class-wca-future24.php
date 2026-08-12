@@ -1151,28 +1151,80 @@ final class WCA_Future24 {
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$days = WCA_Service::strict_int( $days, 7, 90 );
 		if ( null === $days || ! in_array( $days, array( 7, 30, 90 ), true ) ) { return new WP_Error( 'wca_heatmap_window', __( 'Heatmap window must be exactly 7, 30, or 90 days.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$from = gmdate( 'Y-m-d 00:00:00' );
-		$to = gmdate( 'Y-m-d 23:59:59', time() + ( $days - 1 ) * DAY_IN_SECONDS );
+
+		$utc = new DateTimeZone( 'UTC' );
+		$window_start = new DateTimeImmutable( gmdate( 'Y-m-d 00:00:00' ), $utc );
+		$window_end = $window_start->modify( '+' . ( $days - 1 ) . ' days' )->setTime( 23, 59, 59 );
+		$from = $window_start->format( 'Y-m-d H:i:s' );
+		$to = $window_end->format( 'Y-m-d H:i:s' );
 		$ids = self::clinic_appointments_between_all( $clinic_id, $from, $to );
-		$rules_table = WCA_Schema::tables()['availability'];
-		$rules = (array) $wpdb->get_results( $wpdb->prepare( "SELECT rrule_json,capacity,status FROM {$rules_table} WHERE clinic_id=%d AND status='active' ORDER BY id ASC", absint( $clinic_id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
 		$map = array();
 		for ( $i = 0; $i < $days; $i++ ) {
-			$date = gmdate( 'Y-m-d', time() + $i * DAY_IN_SECONDS );
-			$map[ $date ] = array( 'booked' => 0, 'requested' => 0, 'confirmed' => 0, 'completed' => 0, 'cancelled' => 0, 'no_show' => 0, 'configured_capacity' => 0, 'free_estimate' => 0 );
-			$weekday = strtolower( gmdate( 'l', strtotime( $date . ' UTC' ) ) );
-			foreach ( $rules as $rule ) {
-				$rrule = json_decode( (string) $rule['rrule_json'], true );
-				if ( ! is_array( $rrule ) || ! in_array( $weekday, (array) ( isset( $rrule['days'] ) ? $rrule['days'] : array() ), true ) ) { continue; }
-				$start_h = isset( $rrule['start'] ) ? $rrule['start'] : '';
-				$end_h = isset( $rrule['end'] ) ? $rrule['end'] : '';
-				$interval = max( 10, absint( isset( $rrule['interval_minutes'] ) ? $rrule['interval_minutes'] : 30 ) );
-				if ( preg_match( '/^(\\d{2}):(\\d{2})$/', $start_h, $sm ) && preg_match( '/^(\\d{2}):(\\d{2})$/', $end_h, $em ) ) {
-					$minutes = ( (int) $em[1] * 60 + (int) $em[2] ) - ( (int) $sm[1] * 60 + (int) $sm[2] );
-					if ( $minutes > 0 ) { $map[ $date ]['configured_capacity'] += intdiv( $minutes, $interval ) * max( 1, absint( $rule['capacity'] ) ); }
+			$date = $window_start->modify( '+' . $i . ' days' )->format( 'Y-m-d' );
+			$map[ $date ] = array(
+				'booked' => 0, 'requested' => 0, 'confirmed' => 0,
+				'completed' => 0, 'cancelled' => 0, 'no_show' => 0,
+				'configured_capacity' => 0, 'free_estimate' => 0,
+				'outcome_counts_suppressed' => false,
+			);
+		}
+
+		$rules_table = WCA_Schema::tables()['availability'];
+		$rules = $wpdb->get_results( $wpdb->prepare( "SELECT id,rrule_json,breaks_json,exceptions_json,capacity,status,timezone FROM {$rules_table} WHERE clinic_id=%d AND status='active' ORDER BY id ASC", absint( $clinic_id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $rules ) { return new WP_Error( 'wca_heatmap_rules_query', __( 'Availability capacity could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+
+		foreach ( (array) $rules as $rule ) {
+			$timezone = (string) ( $rule['timezone'] ?? '' );
+			if ( ! WCA_Service::valid_timezone( $timezone ) ) { return new WP_Error( 'wca_heatmap_rule_timezone', __( 'An active availability rule contains an invalid time zone.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$tz = new DateTimeZone( $timezone );
+			$rrule = json_decode( (string) ( $rule['rrule_json'] ?? '' ), true );
+			$breaks = json_decode( (string) ( $rule['breaks_json'] ?? '[]' ), true );
+			$exceptions = json_decode( (string) ( $rule['exceptions_json'] ?? '[]' ), true );
+			if ( ! is_array( $rrule ) || ! is_array( $breaks ) || ! is_array( $exceptions ) ) { return new WP_Error( 'wca_heatmap_rule_payload', __( 'An active availability rule cannot be projected safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$start_h = (string) ( $rrule['start'] ?? '' );
+			$end_h = (string) ( $rrule['end'] ?? '' );
+			$interval = WCA_Service::strict_int( $rrule['interval_minutes'] ?? null, 10, 1440 );
+			$capacity = WCA_Service::strict_int( $rule['capacity'] ?? null, 1, 50 );
+			if ( ! WCA_Service::valid_hhmm( $start_h ) || ! WCA_Service::valid_hhmm( $end_h ) || $end_h <= $start_h || null === $interval || null === $capacity ) { return new WP_Error( 'wca_heatmap_rule_invalid', __( 'An active availability rule contains invalid scheduling values.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$effective_from = (string) ( $rrule['effective_from'] ?? '' );
+			$effective_until = (string) ( $rrule['effective_until'] ?? '' );
+			if ( $effective_from && ! WCA_Service::valid_date( $effective_from ) ) { return new WP_Error( 'wca_heatmap_effective_from', __( 'Availability effective-from data is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			if ( $effective_until && ! WCA_Service::valid_date( $effective_until ) ) { return new WP_Error( 'wca_heatmap_effective_until', __( 'Availability effective-until data is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+
+			$local_first = $window_start->setTimezone( $tz )->modify( '-1 day' )->format( 'Y-m-d' );
+			$local_last = $window_end->setTimezone( $tz )->modify( '+1 day' )->format( 'Y-m-d' );
+			$cursor_date = new DateTimeImmutable( $local_first . ' 00:00:00', $tz );
+			$last_date = new DateTimeImmutable( $local_last . ' 00:00:00', $tz );
+			while ( $cursor_date <= $last_date ) {
+				$local_date = $cursor_date->format( 'Y-m-d' );
+				if ( ( $effective_from && $local_date < $effective_from ) || ( $effective_until && $local_date > $effective_until ) ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
+				$weekday = strtolower( $cursor_date->format( 'l' ) );
+				if ( ! in_array( $weekday, (array) ( $rrule['days'] ?? array() ), true ) ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
+
+				$day_start = $start_h; $day_end = $end_h; $day_capacity = $capacity; $closed = false;
+				foreach ( $exceptions as $exception ) {
+					if ( ! is_array( $exception ) || (string) ( $exception['date'] ?? '' ) !== $local_date ) { continue; }
+					$type = sanitize_key( $exception['type'] ?? '' );
+					if ( 'closed' === $type ) { $closed = true; break; }
+					if ( 'capacity' === $type ) { $override = WCA_Service::strict_int( $exception['capacity'] ?? null, 0, 50 ); if ( null !== $override ) { $day_capacity = $override; } }
+					if ( 'open' === $type && WCA_Service::valid_hhmm( $exception['start'] ?? '' ) && WCA_Service::valid_hhmm( $exception['end'] ?? '' ) && $exception['end'] > $exception['start'] ) { $day_start=(string)$exception['start']; $day_end=(string)$exception['end']; }
 				}
+				if ( $closed || 0 === $day_capacity ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
+
+				$slot = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_start, $tz );
+				$end = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_end, $tz );
+				if ( ! $slot || ! $end || $end <= $slot ) { return new WP_Error( 'wca_heatmap_local_time', __( 'Availability local-time projection failed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				while ( $slot < $end ) {
+					$slot_hm = $slot->format( 'H:i' ); $in_break = false;
+					foreach ( $breaks as $break ) { if ( is_array( $break ) && WCA_Service::valid_hhmm( $break['start'] ?? '' ) && WCA_Service::valid_hhmm( $break['end'] ?? '' ) && $slot_hm >= $break['start'] && $slot_hm < $break['end'] ) { $in_break=true; break; } }
+					if ( ! $in_break ) { $utc_day = $slot->setTimezone( $utc )->format( 'Y-m-d' ); if ( isset( $map[$utc_day] ) ) { $map[$utc_day]['configured_capacity'] += $day_capacity; } }
+					$slot = $slot->modify( '+' . $interval . ' minutes' );
+				}
+				$cursor_date = $cursor_date->modify( '+1 day' );
 			}
 		}
+
 		foreach ( $ids as $id ) {
 			$when = (string) SWC_Helpers::meta( $id, 'preferred_at_utc', '' );
 			$day = substr( $when, 0, 10 );
@@ -1181,13 +1233,20 @@ final class WCA_Future24 {
 			if ( ! in_array( $status, array( 'declined','cancelled','no_show' ), true ) ) { $map[ $day ]['booked']++; }
 			if ( isset( $map[ $day ][ $status ] ) ) { $map[ $day ][ $status ]++; }
 		}
-		foreach ( $map as $date => $row ) { $map[ $date ]['free_estimate'] = max( 0, $row['configured_capacity'] - $row['booked'] ); }
+		$privacy_threshold = max( 3, min( 20, absint( apply_filters( 'wca_heatmap_outcome_privacy_threshold', 5, $clinic_id ) ) ) );
+		foreach ( $map as $date => $row ) {
+			$map[ $date ]['free_estimate'] = max( 0, $row['configured_capacity'] - $row['booked'] );
+			$outcome_n = absint( $row['completed'] ) + absint( $row['cancelled'] ) + absint( $row['no_show'] );
+			if ( $outcome_n < $privacy_threshold ) { $map[$date]['completed']=null; $map[$date]['cancelled']=null; $map[$date]['no_show']=null; $map[$date]['outcome_counts_suppressed']=true; }
+		}
 		return array(
 			'contract' => 'wca.capacity-heatmap',
 			'version' => self::CONTRACT_VERSION,
 			'clinic_ref' => (string) $clinic['public_ref'],
 			'days' => $map,
 			'privacy' => 'aggregate_only',
+			'outcome_privacy_threshold' => $privacy_threshold,
+			'time_basis' => 'UTC day; configured capacity is projected from each rule local timezone with DST and effective-range handling',
 			'projection_note' => 'Configured capacity is an operational estimate; current slot search remains authoritative.',
 		);
 	}

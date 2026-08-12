@@ -134,6 +134,25 @@ final class WCA_REST {
 		return self::respond( WCA_Contracts::contract_manifest() );
 	}
 
+	private static function encode_clinic_cursor( $state ) {
+		$json = wp_json_encode( $state );
+		if ( ! is_string( $json ) || '' === $json ) { return ''; }
+		$payload = bin2hex( $json );
+		$signature = hash_hmac( 'sha256', $payload, wp_salt( 'nonce' ) );
+		return $payload . '.' . $signature;
+	}
+
+	private static function decode_clinic_cursor( $cursor, $filter_hash ) {
+		$cursor = trim( (string) $cursor );
+		if ( ! preg_match( '/^([A-Za-z0-9_-]+)\\.([0-9a-f]{64})$/', $cursor, $matches ) ) { return new WP_Error( 'wca_cursor_invalid', __( 'The clinic cursor is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$expected = hash_hmac( 'sha256', $matches[1], wp_salt( 'nonce' ) );
+		if ( ! hash_equals( $expected, $matches[2] ) ) { return new WP_Error( 'wca_cursor_invalid', __( 'The clinic cursor signature is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$json = hex2bin( $matches[1] );
+		$state = is_string( $json ) ? json_decode( $json, true ) : null;
+		if ( ! is_array( $state ) || 1 !== absint( $state['v'] ?? 0 ) || ! hash_equals( (string) ( $state['f'] ?? '' ), (string) $filter_hash ) || empty( $state['u'] ) || empty( $state['i'] ) ) { return new WP_Error( 'wca_cursor_invalid', __( 'The clinic cursor does not match this query.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		return array( 'updated_at' => sanitize_text_field( $state['u'] ), 'id' => absint( $state['i'] ) );
+	}
+
 	public static function clinics( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'public_clinics', 120, 60 );
 		if ( is_wp_error( $rate ) ) { return $rate; }
@@ -145,36 +164,27 @@ final class WCA_REST {
 			'per_page'     => min( 50, max( 1, absint( $request->get_param( 'per_page' ) ?: 20 ) ) ),
 		);
 		$filter_hash = hash( 'sha256', wp_json_encode( array( $args['country_code'], $args['city'], $args['search'], $args['per_page'] ) ) );
-		$cursor = strtolower( sanitize_text_field( $request->get_param( 'cursor' ) ) );
+		$cursor = sanitize_text_field( (string) $request->get_param( 'cursor' ) );
 		if ( $cursor ) {
-			if ( ! preg_match( '/^[0-9a-f-]{36}$/', $cursor ) ) { return new WP_Error( 'wca_cursor_invalid', __( 'The clinic cursor is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-			$state = get_transient( 'wca_clinic_cursor_' . md5( $cursor ) );
-			if ( ! is_array( $state ) || ! hash_equals( (string) ( $state['filter_hash'] ?? '' ), $filter_hash ) ) { return new WP_Error( 'wca_cursor_expired', __( 'The clinic cursor expired or does not match these filters.', 'worldwide-clinic-appointments' ), array( 'status' => 410 ) ); }
-			$args['cursor_updated_at'] = sanitize_text_field( $state['updated_at'] ?? '' );
-			$args['cursor_id'] = absint( $state['id'] ?? 0 );
+			$state = self::decode_clinic_cursor( $cursor, $filter_hash );
+			if ( is_wp_error( $state ) ) { return $state; }
+			$args['cursor_updated_at'] = $state['updated_at'];
+			$args['cursor_id'] = $state['id'];
 		}
 		$rows = WCA_Repository::list_clinics( $args );
 		$items = array();
-		foreach ( $rows as $row ) {
-			$projection = WCA_Service::public_clinic_projection( $row['public_ref'] );
-			if ( $projection ) { $items[] = $projection; }
-		}
+		foreach ( $rows as $row ) { $projection = WCA_Service::public_clinic_projection( $row['public_ref'] ); if ( $projection ) { $items[] = $projection; } }
 		$next_cursor = '';
 		if ( count( $rows ) === $args['per_page'] ) {
 			$last = end( $rows );
 			if ( is_array( $last ) && ! empty( $last['id'] ) && ! empty( $last['updated_at'] ) ) {
-				$next_cursor = strtolower( wp_generate_uuid4() );
-				$stored = set_transient( 'wca_clinic_cursor_' . md5( $next_cursor ), array( 'id' => absint( $last['id'] ), 'updated_at' => (string) $last['updated_at'], 'filter_hash' => $filter_hash ), 15 * MINUTE_IN_SECONDS );
-				if ( ! $stored ) { return new WP_Error( 'wca_cursor_store_failed', __( 'Clinic pagination state could not be stored safely. Please retry the search.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'retry_after' => 1 ) ); }
+				$next_cursor = self::encode_clinic_cursor( array( 'v'=>1, 'f'=>$filter_hash, 'u'=>(string)$last['updated_at'], 'i'=>absint($last['id']) ) );
+				if ( '' === $next_cursor ) { return new WP_Error( 'wca_cursor_encode_failed', __( 'Clinic pagination cursor could not be generated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			}
 		}
 		$payload = array( 'items' => $items, 'per_page' => $args['per_page'], 'next_cursor' => $next_cursor, 'generated_at' => gmdate( 'c' ) );
 		$etag = '"' . hash( 'sha256', wp_json_encode( array( $filter_hash, array_map( static function ( $item ) { return array( $item['public_ref'] ?? '', $item['updated_at'] ?? '', $item['record_version'] ?? 0 ); }, $items ), $next_cursor ) ) ) . '"';
-		if ( hash_equals( $etag, (string) $request->get_header( 'If-None-Match' ) ) ) {
-			$response = new WP_REST_Response( null, 304 );
-		} else {
-			$response = rest_ensure_response( $payload );
-		}
+		if ( hash_equals( $etag, (string) $request->get_header( 'If-None-Match' ) ) ) { $response = new WP_REST_Response( null, 304 ); } else { $response = rest_ensure_response( $payload ); }
 		$response->header( 'ETag', $etag );
 		$response->header( 'Cache-Control', 'public, max-age=60, stale-while-revalidate=120' );
 		$response->header( 'X-Request-ID', WCA_Observability::trace_id() );
