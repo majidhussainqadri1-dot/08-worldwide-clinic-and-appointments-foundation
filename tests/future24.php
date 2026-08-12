@@ -16,7 +16,7 @@ $css = f24_file( 'assets/css/future24.css' );
 $doc = f24_file( 'docs/FUTURE-CLINIC-INTELLIGENCE-24-2026.md' );
 
 f24_has( 'runtime', $main, 'Version: 1.2.14' );
-f24_has( 'runtime', $main, "define( 'WCA_VERSION', '1.2.13' )" );
+f24_has( 'runtime', $main, "define( 'WCA_VERSION', '1.2.14' )" );
 f24_has( 'bootstrap', $main, 'class-wca-future24.php' );
 f24_has( 'bootstrap', $main, "array( 'WCA_Future24', 'activate' )" );
 f24_has( 'bootstrap', $main, 'WCA_Future24::boot()' );
