@@ -107,12 +107,11 @@ final class SWC_Frontend {
 		if ( ! is_user_logged_in() ) {
 			return '<div class="swc-notice"><h2>' . esc_html__( 'Log in to request an appointment', 'worldwide-clinic-appointments' ) . '</h2><p>' . esc_html__( 'You may browse the clinic publicly, but an account is required to submit private contact information.', 'worldwide-clinic-appointments' ) . '</p><a class="swc-button" href="' . esc_url( wp_login_url( get_permalink() ) ) . '">' . esc_html__( 'Log In', 'worldwide-clinic-appointments' ) . '</a></div>';
 		}
-		$ids          = SWC_Helpers::requestable_doctor_ids();
+		$ids          = SWC_Helpers::requestable_doctor_ids( 100, 0 );
 		$selected_ref = isset( $_GET['doctor_ref'] ) ? strtolower( sanitize_text_field( wp_unslash( $_GET['doctor_ref'] ) ) ) : '';
 		$selected     = $selected_ref ? SWC_Helpers::practitioner_id( $selected_ref ) : 0;
-		if ( ! in_array( $selected, $ids, true ) ) {
-			$selected = 0;
-		}
+		if ( $selected && SWC_Helpers::doctor_is_requestable( $selected ) && ! in_array( $selected, $ids, true ) ) { array_unshift( $ids, $selected ); }
+		if ( ! in_array( $selected, $ids, true ) ) { $selected = 0; }
 		$user = wp_get_current_user();
 		$zone = SWC_Helpers::user_timezone( $user->ID );
 		ob_start();

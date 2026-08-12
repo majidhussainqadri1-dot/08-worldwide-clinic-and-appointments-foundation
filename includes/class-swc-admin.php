@@ -57,7 +57,7 @@ final class SWC_Admin {
 			$args['meta_query'] = $meta_query;
 		}
 		$query   = new WP_Query( $args );
-		$doctors = SWC_Helpers::doctor_ids();
+		$doctors = SWC_Helpers::doctor_ids( 200, 0 );
 		?>
 		<div class="wrap swc-admin">
 			<h1><?php esc_html_e( 'Clinic Management', 'worldwide-clinic-appointments' ); ?></h1>
