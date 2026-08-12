@@ -25,34 +25,53 @@ final class WCA_Compatibility {
 	}
 
 	public static function maybe_migrate_legacy_statuses() {
-		if ( get_option( self::MIGRATION_OPTION ) ) {
-			return;
-		}
-		self::migrate_legacy_statuses( 500 );
+		if ( get_option( self::MIGRATION_OPTION ) ) { return; }
+		$result = self::migrate_legacy_statuses( 500 );
+		if ( is_wp_error( $result ) ) { WCA_Observability::log( 'error', 'legacy_status_migration_failed', array( 'code' => $result->get_error_code() ) ); }
 	}
 
 	public static function migrate_legacy_statuses( $limit = 500 ) {
+		global $wpdb;
 		$legacy = array_keys( WCA_Contracts::legacy_status_map() );
 		$batch_limit = min( 5000, max( 1, absint( $limit ) ) );
+		$wpdb->last_error = '';
 		$ids = get_posts( array(
 			'post_type'      => SWC_Helpers::TYPE,
 			'post_status'    => array( 'private', 'publish', 'draft' ),
 			'posts_per_page' => $batch_limit,
 			'fields'         => 'ids',
+			'no_found_rows'  => true,
 			'meta_query'     => array( array( 'key' => '_swc_status', 'value' => $legacy, 'compare' => 'IN' ) ),
 		) );
+		if ( $wpdb->last_error ) { return new WP_Error( 'wca_legacy_status_query', __( 'Legacy appointment status migration could not read its source batch safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		$migrated = 0;
 		foreach ( $ids as $id ) {
+			$id = absint( $id );
 			$old = (string) get_post_meta( $id, '_swc_status', true );
 			$new = WCA_Contracts::normalize_appointment_status( $old );
-			update_post_meta( $id, '_swc_status', $new );
-			update_post_meta( $id, '_swc_migrated_from_status', sanitize_key( $old ) );
-			SWC_Helpers::audit( $id, 'legacy-status-migrated', array( 'old_status' => $old, 'new_status' => $new ) );
+			$result = WCA_Repository::transaction( function () use ( $id, $old, $new ) {
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_status', $new, 'wca_legacy_status_write' );
+				if ( is_wp_error( $written ) ) { return $written; }
+				$written = SWC_Helpers::update_meta_strict( $id, '_swc_migrated_from_status', sanitize_key( $old ), 'wca_legacy_status_provenance_write' );
+				if ( is_wp_error( $written ) ) { return $written; }
+				if ( ! SWC_Helpers::audit( $id, 'legacy-status-migrated', array( 'old_status' => $old, 'new_status' => $new ) ) ) {
+					return new WP_Error( 'wca_legacy_status_audit', __( 'Legacy appointment status migration could not persist audit evidence.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+				}
+				return true;
+			}, 'wca_legacy_status_transaction' );
+			if ( is_wp_error( $result ) ) { wp_cache_delete( $id, 'post_meta' ); return $result; }
+			$migrated++;
 		}
 		if ( count( $ids ) < $batch_limit ) {
+			$wpdb->last_error = '';
 			$remaining = get_posts( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => array( 'private','publish','draft' ), 'posts_per_page' => 1, 'fields' => 'ids', 'no_found_rows' => true, 'meta_query' => array( array( 'key' => '_swc_status', 'value' => $legacy, 'compare' => 'IN' ) ) ) );
-			if ( ! $remaining ) { update_option( self::MIGRATION_OPTION, array( 'completed_at' => WCA_Repository::now(), 'migrated' => count( $ids ) ), false ); }
+			if ( $wpdb->last_error ) { return new WP_Error( 'wca_legacy_status_verify_query', __( 'Legacy appointment status migration could not verify completion safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			if ( ! $remaining ) {
+				$written = SWC_Helpers::update_option_strict( self::MIGRATION_OPTION, array( 'completed_at' => WCA_Repository::now(), 'migrated' => $migrated ), 'wca_legacy_status_completion_write' );
+				if ( is_wp_error( $written ) ) { return $written; }
+			}
 		}
-		return count( $ids );
+		return $migrated;
 	}
 
 	/** @return array<string,mixed> */
