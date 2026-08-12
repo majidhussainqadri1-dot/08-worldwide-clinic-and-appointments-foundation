@@ -107,10 +107,13 @@ final class WCA_Continuity {
 				KEY created_by_user_id (created_by_user_id)
 			) {$collate};",
 		);
-		foreach ( $definitions as $sql ) {
-			dbDelta( $sql );
+		foreach ( $definitions as $sql ) { dbDelta( $sql ); }
+		foreach ( $tables as $name => $table ) {
+			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+			if ( $exists !== $table ) { throw new RuntimeException( 'File 08 continuity table could not be created: ' . sanitize_key( $name ) ); }
 		}
-		update_option( self::SCHEMA_OPTION, self::SCHEMA_VERSION, false );
+		$written = SWC_Helpers::update_option_strict( self::SCHEMA_OPTION, self::SCHEMA_VERSION, 'wca_continuity_schema_version_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 continuity schema version could not be persisted.' ); }
 	}
 
 	/** @return array<string,mixed> */
