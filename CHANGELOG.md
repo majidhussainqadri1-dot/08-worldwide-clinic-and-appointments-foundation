@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.14 — 2026-08-12
+
+- Fourteenth fresh sequential 20-round review: consent atomicity, strict IANA timezone and age/guardian validation, Future24 heatmap/advisor contract corrections, bounded legacy doctor discovery, secure UUID/worker identity, branch/clinic fail-closed validation, and legacy numeric REST retirement.
+- Runtime 1.2.14; core schema remains 3.2.0, continuity 1.1.0, Future24 1.0.0. Staging/live acceptance remains separate.
+
+
 ## 1.2.13 — 2026-08-11
 
 - Completed the thirteenth fresh sequential 20-round review/fix/retest cycle from exact v1.2.12 source.

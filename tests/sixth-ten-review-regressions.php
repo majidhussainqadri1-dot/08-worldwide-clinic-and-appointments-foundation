@@ -37,12 +37,12 @@ t610has('monthly recurrence uses anchor',$future,'self::advance_months_anchored(
 t610lacks('no raw monthly modify drift',$future,'$cursor = $cursor->modify( \'+\' . $interval . \' months\' )');
 t610has('followup keyset cursor',$continuity,'WHERE appointment_id=%d AND id>%d ORDER BY id ASC LIMIT %d');
 t610lacks('no followup limit100',$continuity,'WHERE appointment_id=%d ORDER BY due_at ASC,id ASC LIMIT 100');
-t610has('plugin 1.2.13',$bootstrap,'Version: 1.2.13');
-t610has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.13'");
+t610has('plugin 1.2.13',$bootstrap,'Version: 1.2.14');
+t610has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.14'");
 t610has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
-t610has('readme stable 1.2.13',$readme,'Stable tag: 1.2.13');
-t610has('repository readme 1.2.13',$repo_readme,'Runtime candidate: **1.2.13**');
-t610has('status 1.2.13',$status,'Runtime candidate: **1.2.13**');
+t610has('readme stable 1.2.13',$readme,'Stable tag: 1.2.14');
+t610has('repository readme 1.2.13',$repo_readme,'Runtime candidate: **1.2.14**');
+t610has('status 1.2.13',$status,'Runtime candidate: **1.2.14**');
 t610has('changelog 1.2.13',$changelog,'## 1.2.7 — 2026-08-11');
 t610has('zero commission',$contracts,"'commission_percent' => 0");
 t610has('no automated diagnosis',$contracts,"'automated_diagnosis' => false");
