@@ -115,11 +115,15 @@ final class WCA_Observability {
 
 	public static function capture_health_snapshot() {
 		$health = self::health();
-		update_option( 'wca_health_snapshot', $health, false );
-		self::metric( 'health_snapshot', ! empty( $health['ok'] ) ? 1 : 0 );
-		if ( empty( $health['ok'] ) ) {
-			self::log( 'error', 'health_snapshot_failed', $health );
+		$written = SWC_Helpers::update_option_strict( 'wca_health_snapshot', $health, 'wca_health_snapshot_write' );
+		if ( is_wp_error( $written ) ) {
+			self::metric( 'health_snapshot_persistence_failure_total', 1 );
+			self::log( 'error', 'health_snapshot_persistence_failed', array( 'trace_id' => self::trace_id() ) );
+			return $written;
 		}
+		self::metric( 'health_snapshot', ! empty( $health['ok'] ) ? 1 : 0 );
+		if ( empty( $health['ok'] ) ) { self::log( 'error', 'health_snapshot_failed', $health ); }
+		return $health;
 	}
 
 	public static function circuit_open( $provider ) {
