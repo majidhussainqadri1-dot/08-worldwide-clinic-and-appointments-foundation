@@ -324,7 +324,8 @@ final class SWC_Activator {
 				if ( is_wp_error( $result ) ) {
 					throw new RuntimeException( $result->get_error_message() );
 				}
-				update_post_meta( $page->ID, '_swc_managed_page', '1' );
+				$owned_write = SWC_Helpers::update_meta_strict( $page->ID, '_swc_managed_page', '1', 'swc_managed_page_write' );
+				if ( is_wp_error( $owned_write ) ) { throw new RuntimeException( 'File 08 page ownership marker could not be persisted.' ); }
 				return $page->ID;
 			}
 		}
@@ -352,7 +353,8 @@ final class SWC_Activator {
 		if ( is_wp_error( $new_id ) ) {
 			throw new RuntimeException( $new_id->get_error_message() );
 		}
-		update_post_meta( $new_id, '_swc_managed_page', '1' );
+		$owned_write = SWC_Helpers::update_meta_strict( $new_id, '_swc_managed_page', '1', 'swc_managed_page_write' );
+		if ( is_wp_error( $owned_write ) ) { wp_delete_post( $new_id, true ); throw new RuntimeException( 'File 08 page ownership marker could not be persisted.' ); }
 		self::snapshot_page( $new_id, true );
 		return absint( $new_id );
 	}
