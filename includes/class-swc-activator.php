@@ -393,7 +393,11 @@ final class SWC_Activator {
 			'post_status'  => $page instanceof WP_Post ? $page->post_status : '',
 			'managed_meta' => $page instanceof WP_Post ? get_post_meta( $page->ID, '_swc_managed_page', true ) : '',
 		);
-		update_option( 'swc_activation_snapshot', $snapshot, false );
+		$written = SWC_Helpers::update_option_strict( 'swc_activation_snapshot', $snapshot, 'swc_page_snapshot_write' );
+		if ( is_wp_error( $written ) ) {
+			if ( $created ) { wp_delete_post( absint( $id ), true ); }
+			throw new RuntimeException( 'File 08 page rollback snapshot could not be persisted.' );
+		}
 	}
 
 	public static function rollback_pages() {
