@@ -1152,7 +1152,7 @@ final class WCA_Future24 {
 		$map = array();
 		for ( $i = 0; $i < $days; $i++ ) {
 			$date = gmdate( 'Y-m-d', time() + $i * DAY_IN_SECONDS );
-			$map[ $date ] = array( 'booked' => 0, 'requested' => 0, 'confirmed' => 0, 'configured_capacity' => 0, 'free_estimate' => 0 );
+			$map[ $date ] = array( 'booked' => 0, 'requested' => 0, 'confirmed' => 0, 'completed' => 0, 'cancelled' => 0, 'no_show' => 0, 'configured_capacity' => 0, 'free_estimate' => 0 );
 			$weekday = strtolower( gmdate( 'l', strtotime( $date . ' UTC' ) ) );
 			foreach ( $rules as $rule ) {
 				$rrule = json_decode( (string) $rule['rrule_json'], true );
