@@ -33,10 +33,11 @@ final class WCA_Compatibility {
 
 	public static function migrate_legacy_statuses( $limit = 500 ) {
 		$legacy = array_keys( WCA_Contracts::legacy_status_map() );
+		$batch_limit = min( 5000, max( 1, absint( $limit ) ) );
 		$ids = get_posts( array(
 			'post_type'      => SWC_Helpers::TYPE,
 			'post_status'    => array( 'private', 'publish', 'draft' ),
-			'posts_per_page' => min( 5000, max( 1, absint( $limit ) ) ),
+			'posts_per_page' => $batch_limit,
 			'fields'         => 'ids',
 			'meta_query'     => array( array( 'key' => '_swc_status', 'value' => $legacy, 'compare' => 'IN' ) ),
 		) );
@@ -47,8 +48,9 @@ final class WCA_Compatibility {
 			update_post_meta( $id, '_swc_migrated_from_status', sanitize_key( $old ) );
 			SWC_Helpers::audit( $id, 'legacy-status-migrated', array( 'old_status' => $old, 'new_status' => $new ) );
 		}
-		if ( count( $ids ) < $limit ) {
-			update_option( self::MIGRATION_OPTION, array( 'completed_at' => WCA_Repository::now(), 'migrated' => count( $ids ) ), false );
+		if ( count( $ids ) < $batch_limit ) {
+			$remaining = get_posts( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => array( 'private','publish','draft' ), 'posts_per_page' => 1, 'fields' => 'ids', 'no_found_rows' => true, 'meta_query' => array( array( 'key' => '_swc_status', 'value' => $legacy, 'compare' => 'IN' ) ) ) );
+			if ( ! $remaining ) { update_option( self::MIGRATION_OPTION, array( 'completed_at' => WCA_Repository::now(), 'migrated' => count( $ids ) ), false ); }
 		}
 		return count( $ids );
 	}
