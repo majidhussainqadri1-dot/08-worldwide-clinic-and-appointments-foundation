@@ -1,0 +1,107 @@
+name: File 08 T14 Corrected Post-Main Closure
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+permissions:
+  contents: write
+jobs:
+  close:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Apply reviewed post-main source corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/t14_postfix.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('includes/class-wca-future24.php'); s=p.read_text()
+          a=s.index(r'\t/* FUT-08 */'); b=s.index('\n\t/* FUT-09 */',a)
+          s=s[:a]+s[a:b].replace(r'\t','\t')+s[b:]; p.write_text(s)
+          p=Path('includes/class-wca-rest.php'); s=p.read_text()
+          a=s.index(r'\tprivate static function encode_clinic_cursor'); b=s.index('\n\tpublic static function clinic( WP_REST_Request $request ) {',a)
+          s=s[:a]+s[a:b].replace(r'\t','\t')+s[b:]; p.write_text(s)
+          PY
+          python3 .github/t14_cursorfix.py
+      - name: Complete corrected-state QA before accepting source
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+      - name: Commit reviewed post-main product corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-wca-future24.php includes/class-wca-rest.php tests/fourteenth-twenty-review-regressions.php FOURTEENTH-TWENTY-REVIEW-EVIDENCE.md
+          git commit -m "File 08: correct T14 post-main heatmap privacy and cursor defects"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+      - name: Fresh post-coding review A
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -n 'wca_heatmap_outcome_privacy_threshold' includes/class-wca-future24.php
+          grep -n "'time_basis'" includes/class-wca-future24.php
+          grep -n "hash_hmac( 'sha256', \$payload" includes/class-wca-rest.php
+          grep -n "hex2bin( \$matches\[1\] )" includes/class-wca-rest.php
+          ! grep -n "set_transient( 'wca_clinic_cursor_'" includes/class-wca-rest.php
+          ! grep -n 'base64_decode(' includes/class-wca-rest.php
+          php tests/run-all.php
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+          echo 'T14 FRESH REVIEW A: PASS — no new supported defect found.'
+      - name: Fresh post-coding review B
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -n 'Version: 1.2.14' worldwide-clinic.php
+          grep -n "RUNTIME_VERSION.*1.2.14" includes/class-wca-contracts.php
+          grep -n 'fourteenth-twenty-review-regressions.php' tests/run-all.php
+          grep -n 'wca_legacy_numeric_rest_disabled' includes/class-wca-ten-review-hardening.php
+          grep -n 'wca_public_numeric_id_disabled' includes/class-wca-rest.php
+          php tests/run-all.php
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          echo 'T14 FRESH REVIEW B: PASS — no new supported defect found.'
+      - name: Remove all transient fourteenth-cycle tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/t14_apply.py .github/t14_postfix.py .github/t14_cursorfix.py .github/T14-PROGRESS.txt .github/T14-FAILURE.txt
+          rm -f .github/workflows/t14-audit.yml .github/workflows/t14-probe.yml .github/workflows/t14-postfix.yml .github/workflows/t14-postfix2.yml
+      - name: Final QA after cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          php tests/run-all.php
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+      - name: Commit final cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "File 08: close fourteenth 20-round review after two fresh post-coding reviews"
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
