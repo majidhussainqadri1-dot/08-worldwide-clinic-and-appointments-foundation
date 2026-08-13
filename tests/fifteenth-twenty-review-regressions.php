@@ -87,4 +87,9 @@ t15h('R13 verification reconciliation retry hook','includes/class-wca-verificati
 t15h('R13 verification projection writes transactional','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_write');
 t15h('R13 verification clinic read failure explicit','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_read');
 t15h('R13 File19 WP_Error rejected','includes/class-wca-outbox.php','is_wp_error( $result ) || false === $result');
+
+t15h('R14 secure browser UUID fallback','assets/js/clinic.js','crypto.getRandomValues');
+t15h('R14 stable slot-hold replay key','assets/js/clinic.js','idempotency_key: holdRequestKey');
+t15h('R14 stable appointment replay key','assets/js/clinic.js','idempotency_key: appointmentRequestKey');
+t15h('R14 calendar same-origin validation','assets/js/future24.js','target.origin !== window.location.origin');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

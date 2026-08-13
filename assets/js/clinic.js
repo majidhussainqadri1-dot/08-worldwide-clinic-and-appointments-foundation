@@ -7,10 +7,13 @@
 
 	function uuid() {
 		if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
-		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-			var r = Math.random() * 16 | 0;
-			return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-		});
+		if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') throw new Error('Secure replay-key generation is unavailable in this browser.');
+		var bytes = new Uint8Array(16);
+		window.crypto.getRandomValues(bytes);
+		bytes[6] = (bytes[6] & 0x0f) | 0x40;
+		bytes[8] = (bytes[8] & 0x3f) | 0x80;
+		var hex = Array.prototype.map.call(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+		return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);
 	}
 
 	async function api(path, options) {
@@ -61,6 +64,7 @@
 		var slotsNode = root.querySelector('[data-wca-slots]');
 		if (!form || !searchButton || !slotsNode) return;
 		var selectedHold = null;
+		var appointmentRequestKey = null;
 
 		var tz = form.elements.timezone;
 		if (tz && (!tz.value || tz.value === 'UTC')) {
@@ -71,6 +75,7 @@
 			setStatus(root, (runtime.i18n && runtime.i18n.loading) || 'Loading…', false);
 			slotsNode.replaceChildren();
 			selectedHold = null;
+			appointmentRequestKey = null;
 			try {
 				var serviceSelect = form.elements.service_ref;
 				var selectedOption = serviceSelect && serviceSelect.options[serviceSelect.selectedIndex];
@@ -96,6 +101,7 @@
 					button.className = 'wca-slot';
 					button.textContent = slot.display_start || slot.start_local || slot.start_utc;
 					button.setAttribute('aria-pressed', 'false');
+					var holdRequestKey = uuid();
 					button.addEventListener('click', async function () {
 						Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) { item.setAttribute('aria-pressed', 'false'); });
 						button.disabled = true;
@@ -109,9 +115,10 @@
 								freshness_version: slot.freshness_version,
 								start_utc: slot.start_utc,
 								end_utc: slot.end_utc,
-								idempotency_key: uuid()
+								idempotency_key: holdRequestKey
 							})});
 							button.setAttribute('aria-pressed', 'true');
+							appointmentRequestKey = uuid();
 							setStatus(root, 'Time reserved temporarily. Complete your request now.', false);
 						} catch (error) {
 							setStatus(root, error.message, true);
@@ -141,9 +148,10 @@
 			var submit = form.querySelector('[type="submit"]');
 			submit.disabled = true;
 			try {
+				if (!appointmentRequestKey) appointmentRequestKey = uuid();
 				var result = await api('appointments', {method: 'POST', body: JSON.stringify({
 					hold_token: selectedHold.hold_token,
-					idempotency_key: uuid(),
+					idempotency_key: appointmentRequestKey,
 					timezone: query(form, 'timezone'),
 					category: query(form, 'category'),
 					reason: query(form, 'reason'),
@@ -155,6 +163,7 @@
 				form.reset();
 				slotsNode.replaceChildren();
 				selectedHold = null;
+				appointmentRequestKey = null;
 			} catch (error) { setStatus(root, error.message, true); }
 			finally { submit.disabled = false; }
 		});

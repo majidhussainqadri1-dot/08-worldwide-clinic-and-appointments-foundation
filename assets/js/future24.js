@@ -54,7 +54,9 @@
 				try {
 					var signed = await api('calendar-links/' + encodeURIComponent(match[1].toLowerCase()), baseRest);
 					if (!signed || !signed.url) throw new Error('Calendar download is unavailable.');
-					window.location.assign(signed.url);
+					var target = new URL(String(signed.url), window.location.origin);
+					if (target.origin !== window.location.origin) throw new Error('Calendar download destination is not permitted.');
+					window.location.assign(target.href);
 				} catch (error) {
 					var card = link.closest('[data-wca-appointment-ref]');
 					var status = card ? card.querySelector('[data-wca-status]') : null;

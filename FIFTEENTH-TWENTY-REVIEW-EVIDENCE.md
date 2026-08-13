@@ -93,3 +93,10 @@ R12 result: **SUPPORTED DEFECTS FOUND — corrected together after review comple
 R13 completed before correction. CF-01 care context could bypass the canonical purpose-limited appointment authorization root for generic clinic administrators. File09 verification reconciliation ignored event/File26 outbox write failures and could treat a failed clinic page read as completion. File19 notification delivery treated WP_Error as a truthy success. The post-review batch routes CF-01 through object authorization, makes verification projection writes atomic/retryable and makes File19 provider errors explicit.
 
 R13 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R14.**
+
+
+## R14 — browser workflows / JavaScript / accessibility / deep-link review
+
+R14 completed before correction. Browser replay keys used an insecure Math.random fallback; hold and appointment retries did not preserve the original semantic replay key across ambiguous retry; and signed calendar navigation did not enforce same-origin at the browser edge. The post-review batch uses Web Crypto only, gives each displayed slot and appointment intent a stable retry key until success/context change, and validates signed calendar destinations against the current origin.
+
+R14 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R15.**
