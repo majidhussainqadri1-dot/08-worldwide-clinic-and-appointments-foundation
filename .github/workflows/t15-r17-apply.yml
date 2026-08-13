@@ -1,0 +1,38 @@
+name: File 08 T15 R17 Post-Review Release Alignment
+on:
+  push:
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/t15-r17-apply.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - name: Apply all R17 findings after completed review
+        run: python3 tools/t15-r17-fix.py
+      - name: Full corrected-state retest
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+      - name: Commit corrected R17 state
+        run: |
+          set -euo pipefail
+          rm -f tools/t15-r17-fix.py .github/workflows/t15-r17-apply.yml
+          git config user.name 'File 08 Corrective Auditor'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'File 08 T15 R17: align release identity after completed review'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
