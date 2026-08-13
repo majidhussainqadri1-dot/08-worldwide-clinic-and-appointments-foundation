@@ -250,11 +250,16 @@ final class WCA_Ten_Review_Hardening {
 	}
 
 	private static function is_core_mutation_route( $route ) {
-		if ( 0 === strpos( $route, '/wca/v1/future24/' ) || 0 === strpos( $route, '/wca/v1/continuity/' ) ) { return false; }
+		/* Future24 owns its own durable mutate() replay ledger. Continuity mutations
+		 * intentionally use this cross-cutting HTTP guard so every write has one
+		 * explicit Idempotency-Key, uniform abuse control, and mutation-status path. */
+		if ( 0 === strpos( $route, '/wca/v1/future24/' ) ) { return false; }
 		$patterns = array(
 			'#^/wca/v1/(?:clinics|branches|services|availability|slot-holds|appointments|complaints)$#',
 			'#^/wca/v1/clinic-refs/[0-9a-fA-F-]{36}/(?:submit-review|activate)$#',
 			'#^/wca/v1/appointment-refs/[0-9a-fA-F-]{36}/(?:transitions|payment-intents)$#',
+			'#^/wca/v1/continuity/appointments/[0-9a-fA-F-]{36}/(?:intake(?:/submit)?|consents|followups)$#',
+			'#^/wca/v1/continuity/followups/[0-9a-fA-F-]{36}/complete$#',
 			'#^/wca/v1/clinics/[0-9]+/(?:submit-review|activate)$#',
 			'#^/wca/v1/appointments/[0-9]+/(?:transitions|payment-intents)$#',
 		);

@@ -93,7 +93,7 @@ r10has('no donor visibility advantage',$contracts,"'donation_visibility_link' =>
 r10has('no automated diagnosis',$contracts,"'automated_diagnosis' => false");
 r10has('no automated prescribing',$contracts,"'automated_prescribing' => false");
 r10has('Future24 excluded from core double guard',$hardening,"0 === strpos( \$route, '/wca/v1/future24/' )");
-r10has('continuity excluded from core double guard',$hardening,"0 === strpos( \$route, '/wca/v1/continuity/' )");
+r10has('continuity covered by core replay guard',$hardening,'continuity/appointments/[0-9a-fA-F-]{36}');
 r10true('no obsolete dashboard patch template',!is_file($root.'/templates/dashboard-hardening.php'));
 
 if($failures){ fwrite(STDERR,"File 08 ten-round regression gate failed:\n- ".implode("\n- ",$failures)."\n"); exit(1); }

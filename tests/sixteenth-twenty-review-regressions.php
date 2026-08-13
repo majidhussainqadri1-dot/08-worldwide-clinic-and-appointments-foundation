@@ -10,4 +10,11 @@ t16h('R1 privacy export propagates Future24 table failure','includes/class-wca-p
 t16h('R1 strict audit history read exists','includes/class-swc-helpers.php','public static function audit_rows_strict');
 t16h('R1 privacy export uses strict audit read','includes/class-swc-privacy.php','SWC_Helpers::audit_rows_strict');
 t16h('R1 review eligibility duplicate read fails closed','includes/class-wca-repository.php','wca_review_eligibility_read_failed');
+t16h('R4 continuity routes join HTTP idempotency guard','includes/class-wca-ten-review-hardening.php','continuity/appointments/[0-9a-fA-F-]{36}');
+t16h('R4 continuity completion joins HTTP idempotency guard','includes/class-wca-ten-review-hardening.php','continuity/followups/[0-9a-fA-F-]{36}/complete');
+t16h('R4 Future24 retains its own mutation guard','includes/class-wca-ten-review-hardening.php','strpos( $route, \'/wca/v1/future24/\' )');
+t16h('R4 intake version guard runs after replay guard','includes/class-wca-continuity-guards.php',"enforce_intake_version' ), 20, 3");
+t16h('R4 browser continuity sends idempotency header','assets/js/continuity.js',"'Idempotency-Key'");
+t16h('R4 browser continuity persists ambiguous mutation key','assets/js/continuity.js','sessionStorage.setItem');
+t16h('R4 browser mutation key uses secure randomness','assets/js/continuity.js','window.crypto.randomUUID');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

@@ -6,6 +6,54 @@
   }
 
   var config = window.WCAContinuity;
+  var pendingMutationKeys = Object.create(null);
+
+  function mutationStorageKey(method, path) {
+    var input = String(method || 'GET') + '|' + String(path || '');
+    var a = 2166136261;
+    var b = 2246822519;
+    for (var i = 0; i < input.length; i += 1) {
+      a ^= input.charCodeAt(i);
+      a = Math.imul(a, 16777619);
+      b ^= input.charCodeAt(i);
+      b = Math.imul(b, 3266489917);
+    }
+    return 'wca_idem_' + (a >>> 0).toString(16) + (b >>> 0).toString(16);
+  }
+
+  function secureMutationKey() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return 'wca-continuity-' + window.crypto.randomUUID();
+    }
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+      var bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      return 'wca-continuity-' + Array.prototype.map.call(bytes, function (value) {
+        return value.toString(16).padStart(2, '0');
+      }).join('');
+    }
+    throw new Error('Secure mutation identity is unavailable in this browser.');
+  }
+
+  function pendingMutationKey(method, path) {
+    var storageKey = mutationStorageKey(method, path);
+    var key = pendingMutationKeys[storageKey] || '';
+    if (!key) {
+      try { key = window.sessionStorage ? window.sessionStorage.getItem(storageKey) || '' : ''; } catch (e) { key = ''; }
+    }
+    if (!key) {
+      key = secureMutationKey();
+      pendingMutationKeys[storageKey] = key;
+      try { if (window.sessionStorage) window.sessionStorage.setItem(storageKey, key); } catch (e) { /* memory fallback remains authoritative for this page */ }
+    }
+    return { key: key, storageKey: storageKey };
+  }
+
+  function clearPendingMutation(state) {
+    if (!state) return;
+    delete pendingMutationKeys[state.storageKey];
+    try { if (window.sessionStorage) window.sessionStorage.removeItem(state.storageKey); } catch (e) { /* no-op */ }
+  }
 
   function status(node, message, isError) {
     if (!node) return;
@@ -16,14 +64,29 @@
 
   function request(path, options) {
     var opts = options || {};
+    var method = String(opts.method || 'GET').toUpperCase();
+    var mutation = ['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1;
+    var mutationState = null;
     opts.credentials = 'same-origin';
     opts.headers = Object.assign({
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'X-WP-Nonce': config.nonce
     }, opts.headers || {});
+    if (mutation && !opts.headers['Idempotency-Key']) {
+      mutationState = pendingMutationKey(method, path);
+      opts.headers['Idempotency-Key'] = mutationState.key;
+    }
     return fetch(config.root + path.replace(/^\//, ''), opts).then(function (response) {
       return response.json().catch(function () { return {}; }).then(function (data) {
+        var code = data && data.code ? String(data.code) : '';
+        var ambiguous = !response.ok && (
+          response.status >= 500 || response.status === 429 ||
+          code === 'wca_idempotency_in_progress' || code === 'wca_idempotency_finalize_failed'
+        );
+        if (mutationState && !ambiguous) {
+          clearPendingMutation(mutationState);
+        }
         if (!response.ok) {
           var message = data && data.message ? data.message : 'The request could not be completed.';
           var error = new Error(message);

@@ -19,7 +19,10 @@ final class WCA_Continuity_Guards {
 	const CURSOR_TTL = HOUR_IN_SECONDS;
 
 	public static function boot() {
-		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'enforce_intake_version' ), 10, 3 );
+		/* Priority 20 is deliberate: the cross-cutting idempotency claim/replay guard
+		 * runs at priority 15 and must be able to return a completed replay before
+		 * optimistic-version validation sees an intentionally stale retry body. */
+		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'enforce_intake_version' ), 20, 3 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ), 30 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_appointment_experience' ), 30 );
 		add_filter( 'wp_privacy_personal_data_erasers', array( __CLASS__, 'replace_continuity_eraser' ), 100 );
