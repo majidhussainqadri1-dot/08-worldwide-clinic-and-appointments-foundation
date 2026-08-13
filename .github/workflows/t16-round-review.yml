@@ -1,0 +1,60 @@
+name: File 08 T16 Sequential Round Review
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t16-round-review.yml
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Freeze reviewed source identity
+        run: |
+          echo "REVIEW_HEAD=$(git rev-parse HEAD)"
+          grep -n "Version:" worldwide-clinic-and-appointments.php || true
+      - name: Round 1 complete review - SQL read failure semantics
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          roots=[Path('includes')]
+          reads=[]
+          for root in roots:
+            for p in sorted(root.rglob('*.php')):
+              lines=p.read_text(errors='replace').splitlines()
+              for i,line in enumerate(lines):
+                if re.search(r'\$wpdb->get_(?:var|row|col|results)\s*\(', line):
+                  before='\n'.join(lines[max(0,i-2):i+1])
+                  after='\n'.join(lines[i:min(len(lines),i+8)])
+                  # Strong evidence that the caller distinguishes a DB failure from an empty/not-found result.
+                  guarded = ('last_error' in after or 'last_error' in before or
+                             re.search(r'null\s*===', after) or re.search(r'false\s*===', after) or
+                             'is_wp_error' in after or 'WP_Error' in after)
+                  reads.append((str(p),i+1,guarded,line.strip(),after))
+          suspicious=[r for r in reads if not r[2]]
+          print(f'T16-R1 TOTAL_SQL_READS={len(reads)}')
+          print(f'T16-R1 SUSPICIOUS_UNGUARDED_READS={len(suspicious)}')
+          for p,ln,guarded,line,ctx in suspicious:
+            print(f'\n@@ {p}:{ln}\n{ctx}')
+          # Review is intentionally non-mutating. Exit success so the full round can finish and evidence is inspectable.
+          PY
+      - name: Round 1 baseline regression confirmation
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
