@@ -347,7 +347,11 @@ final class WCA_Service {
 		$versions = array();
 		foreach ( $rules as $rule ) {
 			$versions[] = $rule['public_ref'] . ':' . $rule['version'];
-			$slots = array_merge( $slots, self::generate_rule_slots( $rule, $from, $to, $duration, $timezone, $limit, $display_from, $display_to ) );
+			WCA_Repository::clear_read_error();
+			$generated = self::generate_rule_slots( $rule, $from, $to, $duration, $timezone, $limit, $display_from, $display_to );
+			$projection_read_error = WCA_Repository::consume_read_error();
+			if ( is_wp_error( $projection_read_error ) ) { return $projection_read_error; }
+			$slots = array_merge( $slots, $generated );
 		}
 		usort( $slots, static function ( $a, $b ) { return strcmp( $a['start_utc'], $b['start_utc'] ); } );
 		WCA_Observability::metric( 'slot_search_total', 1, array( 'result_bucket' => count( $slots ) ? 'non_empty' : 'empty' ) );

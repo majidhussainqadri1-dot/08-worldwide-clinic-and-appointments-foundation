@@ -45,4 +45,9 @@ t16h('R9 runtime failure state is durable','worldwide-clinic.php','wca_runtime_m
 t16h('R9 legacy migration rollback uncertainty explicit','includes/class-swc-activator.php','rollback could not be verified; storage state is uncertain');
 t16h('R9 uninstall removes primitive edit capability','uninstall.php','edit_swc_appointment');
 t16h('R9 uninstall removes private delete capability','uninstall.php','delete_private_swc_appointments');
+t16h('R10 protected appointment clinic read failure propagates','includes/class-wca-rest.php','if ( is_wp_error( $clinic_read_error ) ) { return $clinic_read_error; }');
+t16h('R10 protected appointment service read failure propagates','includes/class-wca-rest.php','if ( is_wp_error( $service_read_error ) ) { return $service_read_error; }');
+t16h('R10 opaque appointment lookup DB failure is explicit','includes/class-wca-opaque-api.php','wca_appointment_ref_read_failed');
+t16h('R10 opaque clinic ref mutation consumes repository read errors','includes/class-wca-opaque-api.php','if ( is_wp_error( $read_error ) ) { return $read_error; }');
+t16h('R10 public per-rule slot projection propagates DB read errors','includes/class-wca-service.php','if ( is_wp_error( $projection_read_error ) ) { return $projection_read_error; }');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

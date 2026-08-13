@@ -275,8 +275,14 @@ final class WCA_REST {
 	}
 
 	private static function appointment_projection( $id ) {
+		WCA_Repository::clear_read_error();
 		$clinic = WCA_Repository::get_clinic( absint( SWC_Helpers::meta( $id, 'clinic_id' ) ), false );
+		$clinic_read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $clinic_read_error ) ) { return $clinic_read_error; }
+		WCA_Repository::clear_read_error();
 		$service = WCA_Repository::get_service( absint( SWC_Helpers::meta( $id, 'service_id' ) ), false );
+		$service_read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $service_read_error ) ) { return $service_read_error; }
 		return array(
 			'public_ref'        => (string) SWC_Helpers::meta( $id, 'public_ref', 'appointment-' . $id ),
 			'status'            => SWC_Helpers::status( $id ),

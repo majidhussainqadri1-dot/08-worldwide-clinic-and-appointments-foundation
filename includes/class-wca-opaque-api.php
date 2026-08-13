@@ -76,6 +76,7 @@ final class WCA_Opaque_API {
 
 	public static function appointment( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
+		if ( is_wp_error( $id ) ) { return $id; }
 		if ( ! $id ) { return self::not_found(); }
 		$access = self::appointment_access( $id, sanitize_key( $request->get_header( 'X-WCA-Access-Purpose' ) ) );
 		if ( is_wp_error( $access ) ) { return $access; }
@@ -84,6 +85,7 @@ final class WCA_Opaque_API {
 
 	public static function transition( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
+		if ( is_wp_error( $id ) ) { return $id; }
 		if ( ! $id ) { return self::not_found(); }
 		$access = self::appointment_access( $id );
 		if ( is_wp_error( $access ) ) { return $access; }
@@ -97,6 +99,7 @@ final class WCA_Opaque_API {
 
 	public static function calendar( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
+		if ( is_wp_error( $id ) ) { return $id; }
 		if ( ! $id ) { return self::not_found(); }
 		$access = self::appointment_access( $id );
 		if ( is_wp_error( $access ) ) { return $access; }
@@ -107,6 +110,7 @@ final class WCA_Opaque_API {
 
 	public static function payment_intent( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
+		if ( is_wp_error( $id ) ) { return $id; }
 		if ( ! $id ) { return self::not_found(); }
 		$access = self::appointment_access( $id );
 		if ( is_wp_error( $access ) ) { return $access; }
@@ -118,13 +122,19 @@ final class WCA_Opaque_API {
 	}
 
 	public static function submit_clinic_review( WP_REST_Request $request ) {
+		WCA_Repository::clear_read_error();
 		$clinic = WCA_Repository::get_clinic( sanitize_text_field( $request['ref'] ), false );
+		$read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		return self::respond( WCA_Service::submit_clinic_for_review( absint( $clinic['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
 	}
 
 	public static function activate_clinic( WP_REST_Request $request ) {
+		WCA_Repository::clear_read_error();
 		$clinic = WCA_Repository::get_clinic( sanitize_text_field( $request['ref'] ), false );
+		$read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		return self::respond( WCA_Service::activate_clinic( absint( $clinic['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
 	}
@@ -207,29 +217,25 @@ final class WCA_Opaque_API {
 	}
 
 	private static function appointment_id( $ref ) {
-		$ref = sanitize_text_field( $ref );
+		global $wpdb;
+		$ref = strtolower( sanitize_text_field( $ref ) );
 		if ( ! preg_match( '/^[0-9a-f-]{36}$/i', $ref ) ) { return 0; }
-		$ids = get_posts( array(
-			'post_type'      => SWC_Helpers::TYPE,
-			'post_status'    => 'any',
-			'fields'         => 'ids',
-			'posts_per_page' => 2,
-			'no_found_rows'  => true,
-			'meta_key'       => '_swc_public_ref',
-			'meta_value'     => $ref,
-		) );
-		if ( 1 !== count( $ids ) ) {
-			$ids = get_posts( array(
-				'post_type'      => SWC_Helpers::TYPE,
-				'post_status'    => 'any',
-				'fields'         => 'ids',
-				'posts_per_page' => 2,
-				'no_found_rows'  => true,
-				'meta_key'       => 'public_ref',
-				'meta_value'     => $ref,
-			) );
+		foreach ( array( '_swc_public_ref', 'public_ref' ) as $meta_key ) {
+			$sql = $wpdb->prepare(
+				"SELECT p.ID FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON pm.post_id=p.ID WHERE p.post_type=%s AND p.post_status NOT IN ('trash','auto-draft','inherit') AND pm.meta_key=%s AND pm.meta_value=%s ORDER BY p.ID ASC LIMIT 2",
+				SWC_Helpers::TYPE,
+				$meta_key,
+				$ref
+			);
+			$ids_raw = $wpdb->get_col( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_appointment_ref_read_failed', __( 'Appointment reference could not be resolved safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$ids = array_values( array_filter( array_map( 'absint', (array) $ids_raw ) ) );
+			if ( 1 === count( $ids ) ) { return $ids[0]; }
+			if ( count( $ids ) > 1 ) { return 0; }
 		}
-		return 1 === count( $ids ) ? absint( $ids[0] ) : 0;
+		return 0;
 	}
 
 	private static function appointment_ref( $id ) {
