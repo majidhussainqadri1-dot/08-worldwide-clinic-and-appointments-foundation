@@ -36,8 +36,8 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — fifteenth-cycle R1-R18 corrections/evidence cleanup are present; R19-R20 fresh closure reviews remain. |
-| Fresh post-final-code reviews | **Pending for Fifteenth closure** — R19-R20 have not yet been closed on the R18-corrected state. |
+| Coded | **Corrected candidate** — all fifteenth-cycle R1-R20 main reviews are complete; no new product-code defect was found in R19 or R20. |
+| Fresh post-final-code reviews | **Main R19/R20 closure reviews complete** — post-correction verification was restarted after Sweep B found and corrected this status-document contradiction. |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
 | Staging-Accepted | **Pending / not claimed.** |
@@ -82,7 +82,7 @@ This repository status does not prove the current staging or live installation. 
 - R1-R16 completed; R4 and R9 were clean, while supported findings in the other closed rounds were corrected and retested.
 - R17 identified stale runtime/release/document/package identity after the substantive corrections and aligns the current candidate to runtime **1.2.15** without schema inflation.
 - Core schema: **3.2.0**; continuity schema: **1.1.0**; Future24 schema: **1.0.0**.
-- R18 completed broad plan-to-code/repository-evidence review and its three findings were corrected/retested; R19-R20 remain required fresh corrected-state closure reviews. This checkpoint is not a claim of final repository closure, staging acceptance, live deployment or operational status.
+- R18 completed broad plan-to-code/repository-evidence review and its three findings were corrected/retested; R19 was clean; R20 found only closure-evidence/PR metadata lag and no new product-code defect. Post-correction verification is being repeated after the status contradiction found by Sweep B. This is not a claim of staging acceptance, live deployment or operational status.
 
 
 ## Fifteenth fresh 20-round main-cycle closure
@@ -94,3 +94,12 @@ This repository status does not prove the current staging or live installation. 
 - R20 finding class was closure/release evidence only; no new product-code/security/privacy/concurrency defect was proven in R19 or R20.
 - Because R20 changes closure evidence, two extra fresh post-correction verification sweeps will be completed before exact-final-head repository closure.
 - Staging-Accepted: **not claimed**; Live-Deployed: **unverified/not claimed**; Operational: **not claimed**.
+
+
+## Post-R20 verification restart
+
+- Corrected main-cycle HEAD after R20 evidence update: `0ddc816cba623404e79cf130491e6b77553b12c7`.
+- Post-correction Sweep A: **PASS** — compare from R18 source HEAD showed only documentation/permanent-regression evidence changed; no runtime PHP/JS file changed, and only the canonical quality workflow remained.
+- Post-correction Sweep B: **finding** — the lower main-cycle closure section was correct, but the upper status classification and R17 checkpoint still said R19/R20 were pending because a buffered documentation write restored stale text.
+- This status-only contradiction is corrected here. Because verification evidence changed, two final fresh read-only sweeps are restarted on the new corrected exact HEAD before exact-final-head CI/package closure.
+- Runtime remains **1.2.15**; schemas remain core **3.2.0**, continuity **1.1.0**, Future24 **1.0.0**.

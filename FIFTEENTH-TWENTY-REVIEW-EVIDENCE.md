@@ -148,3 +148,10 @@ R20 result: **CLOSURE-EVIDENCE DEFECTS FOUND; NO NEW PRODUCT DEFECT — reposito
 - Clean rounds: **R4, R9, R19**.
 - Runtime after main cycle: **1.2.15**; schemas unchanged at core **3.2.0**, continuity **1.1.0**, Future24 **1.0.0**.
 - Two extra post-correction verification sweeps are required because R20 changes closure evidence; they are not counted as additional main rounds.
+
+
+## Post-R20 verification restart record
+
+- Sweep A on `0ddc816cba623404e79cf130491e6b77553b12c7`: PASS. R20 changed only closure documentation/permanent regression evidence relative to the R18-reviewed product tree; no runtime PHP/JS changed and only the canonical quality workflow remained.
+- Sweep B on the same HEAD: found one evidence-only contradiction inside `STATUS.md`: its lower Fifteenth main-cycle closure was current, while the upper classification table and R17 checkpoint still said R19/R20 were pending.
+- The contradiction is corrected after Sweep B. No product runtime or schema change is made. Two final fresh read-only verification sweeps are restarted on the corrected status HEAD and are not counted among the 20 main review rounds.
