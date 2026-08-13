@@ -18,33 +18,38 @@ jobs:
         run: |
           echo "REVIEW_TOOL_HEAD=$(git rev-parse HEAD)"
           git log --format='%H %s' -8
-      - name: Round 13 timezone DST slot projection review
+      - name: Round 14 payment fee commission review
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          files=list(Path('includes').rglob('*.php'))
-          pat=re.compile(r'(timezone|to_utc|strict_utc|project_rule_slot|availability|slot|buffer|DST|ambiguous|effective_from|effective_until|SLOT_HORIZON)',re.I)
-          print('## TIME/SLOT TARGETS')
+          files=list(Path('includes').rglob('*.php'))+[Path('worldwide-clinic.php')]
+          pat=re.compile(r'(payment|fee_|fee\b|currency|commission|refund|provider|amount_minor|idempot|PaymentStatusChanged)',re.I)
+          print('## PAYMENT/FEE TARGET METHODS')
           for f in files:
             lines=f.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
               if re.search(r'function\s+\w+',line) and pat.search(line):
-                print(f'{f}:{i+1}: {line.strip()}')
-          print('## TIME CONVERSION / RANGE CONTEXTS')
+                print(f'\n### {f}:{i+1}: {line.strip()}')
+                print('\n'.join(lines[max(0,i-8):min(len(lines),i+80)]))
+          print('\n## PAYMENT/FEE WRITE AND EVENT CONTEXTS')
           for f in files:
             lines=f.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
-              if pat.search(line) and any(k in line for k in ('DateTime','strtotime','gmdate','timezone','effective_','start_utc','end_utc','SLOT_HORIZON')):
-                print(f'{f}:{i+1}: {line.strip()}')
-          print('## CONFLICT/OVERLAP CONTEXTS')
+              if pat.search(line) and any(x in line for x in ('$wpdb->insert','$wpdb->update','update_post_meta','apply_meta_mutations','enqueue(','append_event','register_rest_route')):
+                print(f'\n### {f}:{i+1}\n'+'\n'.join(lines[max(0,i-10):min(len(lines),i+18)]))
+          print('\n## COMMISSION INVARIANT OCCURRENCES')
+          for f in files:
+            for i,line in enumerate(f.read_text(errors='replace').splitlines()):
+              if re.search(r'(commission|platform_commission)',line,re.I): print(f'{f}:{i+1}: {line.strip()}')
+          print('\n## PAYMENT EXTERNAL OWNER / REPLAY CONTEXTS')
           for f in files:
             lines=f.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
-              if re.search(r'(has_conflict|start_utc<|end_utc>|status IN.*held.*booked)',line,re.I):
+              if re.search(r'(PaymentStatusChanged|payment_intent|provider_ref|idempotency_key|File18|ledger)',line,re.I):
                 print(f'{f}:{i+1}: {line.strip()}')
           PY
-      - name: Round 13 full regression confirmation
+      - name: Round 14 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
