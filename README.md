@@ -17,7 +17,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 The authoritative repository release identity is the **exact candidate HEAD + exact-head CI run + deterministic manifest + candidate SHA-256**. Repository evidence never proves the current staging or live installation.
 
-Current fifteenth-cycle runtime alignment is **1.2.15**; core schema remains **3.2.0**, restricted continuity **1.1.0**, and Future24 **1.0.0**. All 20 main reviews are complete. R19 was clean; R20 found no new product-code defect and corrected closure-evidence lag. Two extra post-correction verification sweeps and exact-final-head CI/package evidence remain before repository closure.
+Current sixteenth-cycle runtime alignment is **1.2.15**; core schema remains **3.2.0**, restricted continuity **1.1.0**, and Future24 **1.0.0**. All 20 sequential T16 reviews are complete. Defects were found in **R1, R4, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19 and R20**; **R2, R3 and R5** were clean. Every defect round was corrected only after its review closed and was fully retested before the next round. R20 found repository/release-evidence closure defects, not a new functional PHP/JavaScript defect. Exact-final-head canonical CI/package evidence remains an external release gate; staging/live evidence remains separate.
 
 ## Governing ownership boundaries
 

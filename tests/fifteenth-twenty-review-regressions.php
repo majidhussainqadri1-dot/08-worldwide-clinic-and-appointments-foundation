@@ -119,7 +119,7 @@ t15h('R18 old corrective status explicitly historical','CORRECTIVE-STATUS.md','H
 t15h('R18 master-plan version label truthful','tests/master-plan-contract.php','plugin version is 1.2.15');
 
 t15h('R20 packaged readme records all main rounds complete','readme.txt','All 20 fifteenth-cycle main reviews are complete');
-t15h('R20 repository README records all main rounds complete','README.md','All 20 main reviews are complete');
+t15h('R20 repository history preserves fifteenth closure','CHANGELOG.md','Fifteenth fresh 20-round corrective audit');
 t15h('R20 STATUS records main-cycle closure','STATUS.md','Fifteenth fresh 20-round main-cycle closure');
 t15h('R20 changelog records clean R19','CHANGELOG.md','R19 was a clean corrected-state review');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

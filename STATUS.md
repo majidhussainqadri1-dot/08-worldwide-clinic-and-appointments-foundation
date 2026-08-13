@@ -36,8 +36,8 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — all fifteenth-cycle R1-R20 main reviews are complete; no new product-code defect was found in R19 or R20. |
-| Fresh post-final-code reviews | **Main R19/R20 closure reviews complete** — post-correction verification was restarted after Sweep B found and corrected this status-document contradiction. |
+| Coded | **Corrected T16 candidate** — all sixteenth-cycle R1-R20 sequential reviews are complete; R20 found closure/release-evidence defects but no new functional PHP/JavaScript defect. |
+| Fresh post-final-code reviews | **R20 correction verification required on the corrected tree** — two fresh read-only verification sweeps plus exact-final-head canonical CI/package evidence are release gates. |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
 | Staging-Accepted | **Pending / not claimed.** |
@@ -55,6 +55,17 @@ Only after controlled production deployment may live re-test and repository/depl
 ## Live truth
 
 This repository status does not prove the current staging or live installation. Exact deployed plugin files/version, database/schema version, migration state, active configuration/dependencies, deployed artifact checksum, and post-deploy behavior must be independently frozen and verified before any live/operational assertion.
+
+## Sixteenth fresh 20-round sequential audit — repository closure checkpoint
+
+- Governing sequence: each round was reviewed to completion before any correction; the closed round's supported findings were corrected together and fully retested before the next round.
+- Defect rounds: **R1, R4, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20**.
+- Clean rounds: **R2, R3, R5**.
+- R20 classification: repository/release-evidence closure defects only; the final R20 review proved full source QA green and deterministic packaging before cleanup, with no new functional PHP/JavaScript defect.
+- Runtime: **1.2.15**; core schema **3.2.0**; continuity **1.1.0**; Future24 **1.0.0**.
+- Temporary T16 correction workflows/scripts/diagnostic evidence are removed by the R20 correction batch and guarded by a permanent closure-hygiene regression.
+- Exact-final-head canonical CI, candidate manifest/artifact/SHA-256 and PR evidence are external gates and must identify the same final commit.
+- Staging-Accepted: **not claimed**; Live-Deployed: **unverified/not claimed**; Operational: **not claimed**.
 
 ## Thirteenth fresh 20-round corrected-state closure
 
