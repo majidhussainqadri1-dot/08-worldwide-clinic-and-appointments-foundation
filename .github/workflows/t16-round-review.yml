@@ -1,51 +1,26 @@
-name: File 08 T16 Sequential Round Review
+name: File 08 T16 R17 Correction Gate
 on:
   push:
     branches: [codex/file08-new-governing-plans-completion-2026]
     paths: [.github/workflows/t16-round-review.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  review:
+  correct:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
-      - name: Freeze reviewed product identity
+      - name: Apply closed R17 corrections
         run: |
-          echo "REVIEW_TOOL_HEAD=$(git rev-parse HEAD)"
-          git log --format='%H %s' -10
-      - name: Round 17 consent guardian emergency relationship review
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          files=list(Path('includes').rglob('*.php'))+[Path('worldwide-clinic.php')]
-          pat=re.compile(r'(consent|guardian|minor|age_claim|emergency|urgent|clinical_relationship|relationship|review_eligib|CF01|File00|File09|doctor.*eligible)',re.I)
-          print('## R17 TARGET METHODS')
-          for f in files:
-            lines=f.read_text(errors='replace').splitlines()
-            for i,line in enumerate(lines):
-              if re.search(r'function\s+\w+',line) and pat.search(line):
-                print(f'\n### {f}:{i+1}: {line.strip()}')
-                print('\n'.join(lines[max(0,i-12):min(len(lines),i+110)]))
-          print('\n## CONSENT/GUARDIAN/RELATIONSHIP WRITE CONTEXTS')
-          for f in files:
-            lines=f.read_text(errors='replace').splitlines()
-            for i,line in enumerate(lines):
-              if pat.search(line) and any(x in line for x in ('$wpdb->insert','$wpdb->update','update_post_meta','apply_meta_mutations','enqueue(','append_event','add_action','add_filter')):
-                print(f'\n### {f}:{i+1}\n'+'\n'.join(lines[max(0,i-10):min(len(lines),i+30)]))
-          print('\n## FAIL-OPEN / DEFAULT CANDIDATES')
-          for f in files:
-            lines=f.read_text(errors='replace').splitlines()
-            for i,line in enumerate(lines):
-              if pat.search(line) and re.search(r'(?:\?:|\?\?|default|return true|return false|empty\(|!\s*class_exists|function_exists)',line,re.I):
-                print(f'{f}:{i+1}: {line.strip()}')
-          PY
-      - name: Round 17 full regression confirmation
+          set -euo pipefail
+          python3 tools/t16-r17-fix-central.py
+          python3 tools/t16-r17-fix-continuity.py
+          python3 tools/t16-r17-fix-tests.py
+      - name: Full warning-free File 08 QA
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
@@ -59,3 +34,12 @@ jobs:
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
+      - name: Commit R17 corrected product only after green QA
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add includes/class-wca-central-governance.php includes/class-wca-continuity-secure.php tests/sixteenth-twenty-review-regressions.php
+          git diff --cached --check
+          git commit -m 'fix(file08): close T16 R17 guardian consent degraded-state defects'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
