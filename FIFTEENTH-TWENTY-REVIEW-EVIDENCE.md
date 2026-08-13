@@ -52,3 +52,10 @@ R6 result: **SUPPORTED DEFECTS FOUND — full retest required before R7.**
 R7 completed before correction. Cross-plugin helper returns were not uniformly type-checked: error objects or unexpected values could become truthy in Founder, guardian, step-up, guardian-relationship or verification decisions. Versioned age/guardian helper failure could also fall through to legacy metadata. The post-review batch makes authority grants explicit and fail-closed and treats a versioned provider response as authoritative rather than silently downgrading to legacy state.
 
 R7 result: **SUPPORTED DEFECTS FOUND — full retest required before R8.**
+
+
+## R8 — REST routes / permission / opaque-reference / cache review
+
+R8 completed before correction. Numeric legacy protected endpoints remain disabled by default and external payload stripping/no-store layers were re-traced. Two supported defects remained: the canonical opaque payment-intent adapter did not copy the caller's Idempotency-Key into its internal proxy request, and the stale-idempotency precheck did not distinguish an SQL read failure from no existing replay row. Both are corrected together after R8 closure.
+
+R8 result: **SUPPORTED DEFECTS FOUND — full retest required before R9.**

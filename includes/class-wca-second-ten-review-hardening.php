@@ -60,6 +60,7 @@ final class WCA_Second_Ten_Review_Hardening {
 			),
 			ARRAY_A
 		);
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_stale_idempotency_read_failed', __( 'Current mutation replay state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( $row && 'processing' === (string) $row['status'] && strtotime( (string) $row['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {
 			WCA_Observability::metric( 'idempotency_stale_processing_blocked_total', 1, array( 'scope' => $scope ) );
 			return new WP_Error(

@@ -107,6 +107,7 @@ final class WCA_Opaque_API {
 		$proxy = new WP_REST_Request( 'POST', '/wca/v1/appointments/' . $id . '/payment-intents' );
 		$proxy->set_url_params( array( 'id' => $id ) );
 		$proxy->set_body_params( self::data( $request ) );
+		$proxy->set_header( 'Idempotency-Key', trim( (string) $request->get_header( 'Idempotency-Key' ) ) );
 		return WCA_REST::payment_intent( $proxy );
 	}
 
