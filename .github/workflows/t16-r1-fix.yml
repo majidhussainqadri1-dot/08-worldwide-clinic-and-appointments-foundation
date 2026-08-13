@@ -21,7 +21,7 @@ jobs:
           php-version: '8.3'
           coverage: none
       - name: Apply all R1 findings after completed review
-        run: python3 tools/t16-r1-fix.py
+        run: python3 tools/t16-r1-fix-v2.py
       - name: Full corrected-state retest
         run: |
           set -euo pipefail
@@ -33,7 +33,7 @@ jobs:
       - name: Commit corrected R1 state
         run: |
           set -euo pipefail
-          rm -f tools/t16-r1-fix.py .github/workflows/t16-r1-fix.yml
+          rm -f tools/t16-r1-fix.py tools/t16-r1-fix-v2.py .github/workflows/t16-r1-fix.yml
           git config user.name 'File 08 T16 Corrective Auditor'
           git config user.email 'actions@users.noreply.github.com'
           git add -A
