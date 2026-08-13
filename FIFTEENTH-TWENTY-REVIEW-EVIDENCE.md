@@ -107,3 +107,10 @@ R14 result: **SUPPORTED DEFECTS FOUND — corrected together after review comple
 R15 completed before correction. Guest rate limiting was verified as per-user/per-IP and the signed keyset cursor matches `updated_at DESC, id DESC`. The supported defect was a repository-read failure family: clinic collection, clinic/branch/service projection and availability-rule reads could flatten SQL failure into empty/null state. Public discovery could therefore cache a false empty 200, return a false 404/partial projection, or slot search could advertise no availability after a database failure. The post-review batch records repository read failures across nested hydration and makes public discovery/projection and slot search propagate them explicitly rather than cache or project false absence.
 
 R15 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R16.**
+
+
+## R16 — cron / CLI / maintenance / observability review
+
+R16 completed before correction. WP-CLI outbox could report success on a WP_Error, the CLI health command did not fail its exit status on unhealthy state, overall health ignored cron/legacy-system-check failures, and top-level cron/shutdown outbox errors could be returned without a guaranteed operational log. The post-review batch makes CLI outcomes authoritative, folds cron/system checks into health and wraps scheduled/opportunistic execution with explicit failure logging.
+
+R16 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R17.**

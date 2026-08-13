@@ -100,15 +100,14 @@ final class WCA_Observability {
 			'trace_id'         => self::trace_id(),
 			'generated_at_utc' => gmdate( 'c' ),
 		);
-		$checks['ok'] = self::all_true( $checks['schema'] ) && (bool) $checks['dependencies'];
+		$checks['ok'] = self::all_true( $checks['schema'] ) && (bool) $checks['dependencies'] && self::all_true( $checks['legacy_checks'] ) && self::all_true( $checks['cron'] );
 		return $checks;
 	}
 
 	private static function all_true( $values ) {
 		foreach ( (array) $values as $value ) {
-			if ( is_bool( $value ) && ! $value ) {
-				return false;
-			}
+			if ( is_array( $value ) && ! self::all_true( $value ) ) { return false; }
+			if ( is_bool( $value ) && ! $value ) { return false; }
 		}
 		return true;
 	}

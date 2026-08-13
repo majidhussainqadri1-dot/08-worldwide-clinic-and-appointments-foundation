@@ -14,8 +14,8 @@ final class WCA_Outbox {
 	const BATCH_SIZE     = 20;
 
 	public static function hooks() {
-		add_action( self::CRON_HOOK, array( __CLASS__, 'process' ) );
-		add_action( self::MAINTENANCE_HOOK, array( __CLASS__, 'maintenance' ) );
+		add_action( self::CRON_HOOK, array( __CLASS__, 'cron_process' ) );
+		add_action( self::MAINTENANCE_HOOK, array( __CLASS__, 'cron_maintenance' ) );
 		add_action( 'shutdown', array( __CLASS__, 'opportunistic_process' ), 99 );
 	}
 
@@ -41,6 +41,18 @@ final class WCA_Outbox {
 		return $schedules;
 	}
 
+	public static function cron_process() {
+		$result = self::process( self::BATCH_SIZE );
+		if ( is_wp_error( $result ) ) { WCA_Observability::log( 'error', 'outbox_cron_failed', array( 'error_code' => $result->get_error_code() ) ); }
+		return $result;
+	}
+
+	public static function cron_maintenance() {
+		$result = self::maintenance();
+		if ( is_wp_error( $result ) ) { WCA_Observability::log( 'error', 'maintenance_cron_failed', array( 'error_code' => $result->get_error_code() ) ); }
+		return $result;
+	}
+
 	public static function opportunistic_process() {
 		if ( wp_doing_cron() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 			return;
@@ -49,7 +61,9 @@ final class WCA_Outbox {
 			return;
 		}
 		set_transient( 'wca_outbox_opportunistic_lock', 1, MINUTE_IN_SECONDS );
-		self::process( 5 );
+		$result = self::process( 5 );
+		if ( is_wp_error( $result ) ) { WCA_Observability::log( 'error', 'outbox_opportunistic_failed', array( 'error_code' => $result->get_error_code() ) ); }
+		return $result;
 	}
 
 	public static function process( $limit = self::BATCH_SIZE ) {

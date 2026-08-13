@@ -11,8 +11,8 @@ final class WCA_CLI {
 		WP_CLI::add_command( 'wca contracts', array( __CLASS__, 'contracts' ) );
 	}
 
-	public static function health() { WP_CLI::line( wp_json_encode( WCA_Observability::health(), JSON_PRETTY_PRINT ) ); }
+	public static function health() { $health = WCA_Observability::health(); WP_CLI::line( wp_json_encode( $health, JSON_PRETTY_PRINT ) ); if ( empty( $health['ok'] ) ) { WP_CLI::error( 'File 08 health checks are not green.' ); } }
 	public static function migrate() { WCA_Schema::maybe_upgrade(); $count = WCA_Compatibility::migrate_legacy_statuses( 5000 ); WP_CLI::success( sprintf( 'Schema verified; %d legacy statuses migrated.', $count ) ); }
-	public static function outbox( $args, $assoc ) { $count = WCA_Outbox::process( absint( $assoc['limit'] ?? 100 ) ); WP_CLI::success( sprintf( '%d outbox messages processed.', $count ) ); }
+	public static function outbox( $args, $assoc ) { $count = WCA_Outbox::process( absint( $assoc['limit'] ?? 100 ) ); if ( is_wp_error( $count ) ) { WP_CLI::error( $count->get_error_message() ); } WP_CLI::success( sprintf( '%d outbox messages processed.', $count ) ); }
 	public static function contracts() { WP_CLI::line( wp_json_encode( WCA_Contracts::contract_manifest(), JSON_PRETTY_PRINT ) ); }
 }

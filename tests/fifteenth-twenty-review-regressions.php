@@ -99,4 +99,12 @@ t15h('R15 repository captures service read failure','includes/class-wca-reposito
 t15h('R15 repository captures availability read failure','includes/class-wca-repository.php','wca_availability_list_read_failed');
 t15h('R15 public collection propagates repository read errors','includes/class-wca-rest.php','WCA_Repository::consume_read_error');
 t15h('R15 public projection propagates nested read errors','includes/class-wca-service.php','WCA_Repository::consume_read_error');
+
+t15h('R16 CLI outbox fails on WP_Error','includes/class-wca-cli.php','if ( is_wp_error( $count ) )');
+t15h('R16 CLI health fails when unhealthy','includes/class-wca-cli.php','empty( $health[\'ok\'] )');
+t15h('R16 health includes cron state','includes/class-wca-observability.php','self::all_true( $checks[\'cron\'] )');
+t15h('R16 health includes legacy checks','includes/class-wca-observability.php','self::all_true( $checks[\'legacy_checks\'] )');
+t15h('R16 cron process wrapper logs worker failure','includes/class-wca-outbox.php','outbox_cron_failed');
+t15h('R16 maintenance cron wrapper logs failure','includes/class-wca-outbox.php','maintenance_cron_failed');
+t15h('R16 opportunistic worker logs failure','includes/class-wca-outbox.php','outbox_opportunistic_failed');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";
