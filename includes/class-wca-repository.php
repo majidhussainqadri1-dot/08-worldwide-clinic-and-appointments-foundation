@@ -800,6 +800,7 @@ final class WCA_Repository {
 		$appointment_id = absint( $data['appointment_id'] ?? 0 );
 		$provider = sanitize_key( $data['provider'] ?? 'manual' );
 		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND provider=%s AND request_key=%s LIMIT 1", $appointment_id, $provider, $request_key ), ARRAY_A );
+		if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_replay_read_failed', __( 'Current payment-intent replay state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( $existing ) { return $existing; }
 		$amount_raw = $data['amount_minor'] ?? 0;
 		if ( is_bool( $amount_raw ) || ! preg_match( '/^\d+$/', trim( (string) $amount_raw ) ) ) { return new WP_Error( 'wca_payment_amount_invalid', __( 'Payment amount must be a non-negative integer in minor currency units.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
@@ -822,6 +823,7 @@ final class WCA_Repository {
 		if ( ! $row['appointment_id'] || ! preg_match( '/^[A-Z]{3}$/', $row['currency'] ) ) { return new WP_Error( 'wca_payment_required', __( 'Valid appointment and ISO-style three-letter currency are required.', 'worldwide-clinic-appointments' ) ); }
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND provider=%s AND request_key=%s LIMIT 1", $appointment_id, $provider, $request_key ), ARRAY_A );
+			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_race_read_failed', __( 'Concurrent payment-intent state could not be reconciled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( $existing ) { return $existing; }
 			return new WP_Error( 'wca_payment_insert', __( 'Payment intent could not be recorded.', 'worldwide-clinic-appointments' ) );
 		}
@@ -861,7 +863,7 @@ final class WCA_Repository {
 		$stale_seconds = min( HOUR_IN_SECONDS, max( 60, absint( $stale_seconds ) ) );
 		$now = self::now();
 		$stale_before = gmdate( 'Y-m-d H:i:s', time() - $stale_seconds );
-		return (int) $wpdb->query( $wpdb->prepare(
+		$updated = $wpdb->query( $wpdb->prepare(
 			"UPDATE {$table}
 			 SET status=CASE WHEN attempts>=7 THEN 'dead_letter' ELSE 'retry' END,
 			     attempts=attempts+1,
@@ -876,9 +878,11 @@ final class WCA_Repository {
 			$now,
 			$stale_before
 		) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( false === $updated ) { return new WP_Error( 'wca_outbox_recovery_failed', __( 'Abandoned outbox leases could not be reconciled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		return (int) $updated;
 	}
 
-	/** @return array<int,array<string,mixed>> */
+	/** @return array<int,array<string,mixed>>|WP_Error */
 	public static function claim_outbox( $limit = 20, $worker = '' ) {
 		global $wpdb;
 		$table  = WCA_Schema::tables()['outbox'];
@@ -886,13 +890,16 @@ final class WCA_Repository {
 		$worker = sanitize_text_field( $worker ?: 'worker-' . str_replace( '-', '', self::uuid() ) );
 		$now = self::now();
 		$stale_before = gmdate( 'Y-m-d H:i:s', time() - 300 );
-		$ids = (array) $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s) ORDER BY id ASC LIMIT %d", $now, $stale_before, $limit ) );
+		$ids_raw = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s) ORDER BY id ASC LIMIT %d", $now, $stale_before, $limit ) );
+		if ( null === $ids_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_outbox_claim_read_failed', __( 'Pending outbox work could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$ids = (array) $ids_raw;
 		$claimed = array();
 		foreach ( $ids as $id ) {
 			$claimed_at = self::now();
 			$ok = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='processing',locked_at=%s,locked_by=%s,updated_at=%s WHERE id=%d AND status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s)", $claimed_at, $worker, $claimed_at, absint( $id ), $claimed_at, $stale_before ) );
 			if ( 1 === (int) $ok ) {
 				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d AND status='processing' AND locked_by=%s LIMIT 1", absint( $id ), $worker ), ARRAY_A );
+				if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_outbox_claim_readback_failed', __( 'Claimed outbox work could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 				if ( $row ) { $row['payload'] = self::decode( $row['payload_json'] ); unset( $row['payload_json'] ); $claimed[] = $row; }
 			}
 		}
@@ -928,6 +935,7 @@ final class WCA_Repository {
 		$key_hash = hash( 'sha256', (string) $key );
 		$request_hash = hash( 'sha256', self::json( $request ) );
 		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1", $scope, $key_hash, absint( $actor_user_id ) ), ARRAY_A );
+		if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_idempotency_claim_read_failed', __( 'Current idempotency state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( $existing ) {
 			if ( ! hash_equals( (string) $existing['request_hash'], $request_hash ) ) {
 				return new WP_Error( 'wca_idempotency_conflict', __( 'This idempotency key was used for a different request.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
@@ -958,6 +966,7 @@ final class WCA_Repository {
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			/* A concurrent request can win the unique key race after our initial read. Resolve it as an in-progress replay, not a 500. */
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1", $scope, $key_hash, absint( $actor_user_id ) ), ARRAY_A );
+			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_idempotency_race_read_failed', __( 'Concurrent idempotency state could not be reconciled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( $existing && hash_equals( (string) $existing['request_hash'], $request_hash ) ) {
 				$existing['response'] = self::decode( $existing['response_json'] );
 				$existing['claimed_new'] = false;
@@ -975,6 +984,7 @@ final class WCA_Repository {
 		$scope = sanitize_key( $scope );
 		$key_hash = hash( 'sha256', (string) $key );
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT status,response_code,response_json,updated_at,expires_at FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1", $scope, $key_hash, absint( $actor_user_id ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_idempotency_status_read_failed', __( 'Mutation reconciliation state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $row ) { return new WP_Error( 'wca_idempotency_not_found', __( 'No mutation reservation was found for this key.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$response = self::decode( $row['response_json'] );
 		return array(

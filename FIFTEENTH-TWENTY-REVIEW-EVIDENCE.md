@@ -18,3 +18,10 @@ R1 result: **SUPPORTED DEFECTS FOUND — corrected together after review complet
 R2 was completed against the R1-corrected state before any R2 source change. It found SQL-read failure paths that could be interpreted as an empty privacy set, a missing continuity row, or successful completion: canonical and legacy erasure cursors, Future24 retention, continuity optimistic-version/consent reads, follow-up list/reminder scans, and continuity retention. The post-review batch makes read failure explicit/retryable and prevents false completion.
 
 R2 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R3.**
+
+
+## R3 — complete outbox / idempotency / maintenance review
+
+R3 was completed against the R2-corrected state before any R3 correction. It found failure-visibility gaps in advisory lock acquisition, abandoned-outbox recovery, pending-claim/readback, payment/idempotency replay reads, and the authoritative reconciliation query. Database errors could be flattened into contention, no work, or not-found states. The post-review batch makes those reads and recovery operations explicit fail-closed errors and propagates outbox processing failures into maintenance.
+
+R3 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R4.**

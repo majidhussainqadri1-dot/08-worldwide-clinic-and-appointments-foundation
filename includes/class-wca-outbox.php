@@ -58,16 +58,20 @@ final class WCA_Outbox {
 		 * with a MySQL advisory lock so cron, shutdown, and overlapping workers cannot
 		 * claim/finalize the same outbox item. MySQL releases this lock on connection loss. */
 		$lock_name = 'wca-file08-outbox-dispatch';
-		$locked = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,0)', $lock_name ) );
+		$locked_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,0)', $lock_name ) );
+		if ( null === $locked_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_outbox_lock_read_failed', __( 'The outbox dispatcher lock could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$locked = (int) $locked_raw;
 		if ( 1 !== $locked ) {
 			WCA_Observability::metric( 'outbox_worker_contention_total', 1 );
 			return 0;
 		}
 		try {
 			$recovered = WCA_Repository::recover_stale_outbox( 300 );
+			if ( is_wp_error( $recovered ) ) { return $recovered; }
 			if ( $recovered > 0 ) { WCA_Observability::metric( 'outbox_stale_recovered_total', $recovered ); }
 			$worker = 'wp-' . substr( hash( 'sha256', wp_generate_uuid4() ), 0, 16 );
 			$items  = WCA_Repository::claim_outbox( min( 100, max( 1, absint( $limit ) ) ), $worker );
+			if ( is_wp_error( $items ) ) { return $items; }
 			foreach ( $items as $item ) {
 				$attempts = absint( $item['attempts'] ?? 0 );
 				try {
@@ -178,7 +182,8 @@ final class WCA_Outbox {
 		if ( is_wp_error( $retention ) ) {
 			$errors[] = $retention->get_error_code();
 		}
-		self::process( self::BATCH_SIZE );
+		$processed = self::process( self::BATCH_SIZE );
+		if ( is_wp_error( $processed ) ) { $errors[] = $processed->get_error_code(); WCA_Observability::log( 'error', 'outbox_process_failed', array( 'error_code' => $processed->get_error_code() ) ); }
 		WCA_Observability::health();
 		if ( $errors ) {
 			WCA_Observability::metric( 'maintenance_failure_total', 1, array( 'scope' => 'outbox' ) );

@@ -29,4 +29,13 @@ t15h('R2 intake retention read failure','includes/class-wca-continuity-secure.ph
 t15h('R2 followup retention read failure','includes/class-wca-continuity-secure.php','wca_followup_retention_read_failed');
 t15h('R2 legacy privacy ids read failure','includes/class-swc-privacy.php','swc_privacy_related_ids_read_failed');
 t15h('R2 legacy privacy count read failure','includes/class-swc-privacy.php','swc_privacy_related_count_read_failed');
+
+t15h('R3 dispatcher lock read failure','includes/class-wca-outbox.php','wca_outbox_lock_read_failed');
+t15h('R3 stale outbox recovery failure','includes/class-wca-repository.php','wca_outbox_recovery_failed');
+t15h('R3 outbox claim read failure','includes/class-wca-repository.php','wca_outbox_claim_read_failed');
+t15h('R3 outbox readback failure','includes/class-wca-repository.php','wca_outbox_claim_readback_failed');
+t15h('R3 idempotency initial read failure','includes/class-wca-repository.php','wca_idempotency_claim_read_failed');
+t15h('R3 idempotency race read failure','includes/class-wca-repository.php','wca_idempotency_race_read_failed');
+t15h('R3 idempotency status read failure','includes/class-wca-repository.php','wca_idempotency_status_read_failed');
+t15h('R3 payment replay read failure','includes/class-wca-repository.php','wca_payment_replay_read_failed');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";
