@@ -1,0 +1,19 @@
+name: File 08 T15 R17 Stale Version Scan
+on:
+  push:
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/t15-r17-stale-scan.yml]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: codex/file08-new-governing-plans-completion-2026}
+      - name: Apply R17 in workspace and list stale references
+        run: |
+          set -euo pipefail
+          python3 tools/t15-r17-fix.py
+          echo '--- TEST REFERENCES TO 1.2.14 AFTER R17 TRANSFORM ---'
+          grep -RInF '1.2.14' tests || true
+          echo '--- CURRENT DOC/SOURCE REFERENCES TO 1.2.14 ---'
+          grep -RInF '1.2.14' worldwide-clinic.php includes readme.txt STATUS.md CHANGELOG.md | head -200 || true
