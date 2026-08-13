@@ -643,14 +643,21 @@ final class SWC_Helpers {
 		return true;
 	}
 
-	public static function audit_rows( $appointment_id ) {
+	public static function audit_rows_strict( $appointment_id ) {
 		global $wpdb;
-		return $wpdb->get_results(
+		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT * FROM {$wpdb->prefix}swc_audit_log WHERE appointment_id=%d ORDER BY id DESC",
 				absint( $appointment_id )
 			)
 		);
+		if ( null === $rows && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_audit_read_failed', __( 'Appointment audit history could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		return (array) $rows;
+	}
+
+	public static function audit_rows( $appointment_id ) {
+		$rows = self::audit_rows_strict( $appointment_id );
+		return is_wp_error( $rows ) ? array() : $rows;
 	}
 
 	private static function actor_role() {

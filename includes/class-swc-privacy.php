@@ -69,7 +69,9 @@ final class SWC_Privacy {
 				$fields[ __( 'Private doctor/administrator note', 'worldwide-clinic-appointments' ) ] = SWC_Helpers::meta( $appointment_id, 'doctor_private_note' );
 			}
 			$audit = array();
-			foreach ( SWC_Helpers::audit_rows( $appointment_id ) as $row ) {
+			$audit_rows = SWC_Helpers::audit_rows_strict( $appointment_id );
+			if ( is_wp_error( $audit_rows ) ) { return $audit_rows; }
+			foreach ( $audit_rows as $row ) {
 				$audit[] = array(
 					'event'          => $row->event ? $row->event : $row->action,
 					'old_status'     => $row->old_status,

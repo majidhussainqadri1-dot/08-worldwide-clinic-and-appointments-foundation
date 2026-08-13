@@ -738,6 +738,7 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['review_eligibility'];
 		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND reviewer_user_id=%d LIMIT 1", absint( $appointment_id ), absint( $reviewer_user_id ) ), ARRAY_A );
+		if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_review_eligibility_read_failed', __( 'Current review eligibility could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( $existing ) { return $existing; }
 		$row = array(
 			'public_ref'       => self::uuid(),
@@ -760,6 +761,7 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['review_eligibility'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s AND reviewer_user_id=%d LIMIT 1", sanitize_text_field( $public_ref ), absint( $reviewer_user_id ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_review_eligibility_read_failed', __( 'Current review eligibility could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $row || 'eligible' !== $row['status'] || strtotime( (string) $row['expires_at'] . ' UTC' ) <= time() ) {
 			if ( $row && 'eligible' === $row['status'] ) {
 				$revoked = $wpdb->update( $table, array( 'status' => 'revoked', 'revoked_at' => self::now(), 'revocation_reason' => 'expired' ), array( 'id' => absint( $row['id'] ), 'status' => 'eligible' ) );

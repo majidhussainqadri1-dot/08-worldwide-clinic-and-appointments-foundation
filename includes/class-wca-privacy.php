@@ -81,6 +81,7 @@ final class WCA_Privacy {
 
 		$future_rows = array();
 		$table = self::future24_table();
+		if ( is_wp_error( $table ) ) { return $table; }
 		if ( $table ) {
 			$offset = ( $page - 1 ) * 50;
 			$future_rows_raw = $wpdb->get_results(
@@ -164,6 +165,7 @@ final class WCA_Privacy {
 		if ( is_wp_error( $appointment_more ) ) { $messages[] = __( 'Appointment privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; } elseif ( $appointment_more ) { $done = false; } else { delete_transient( $cursor_key ); }
 
 		$table = self::future24_table();
+		if ( is_wp_error( $table ) ) { $messages[] = __( 'Future24 privacy storage could not be verified safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; $table = ''; }
 		if ( $table ) {
 			$cursor_key = $base . '_future24';
 			$cursor = absint( get_transient( $cursor_key ) );
@@ -261,6 +263,7 @@ final class WCA_Privacy {
 		if ( ! class_exists( 'WCA_Future24' ) ) { return ''; }
 		$table = $wpdb->prefix . 'wca_future24_records';
 		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+		if ( null === $exists && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_privacy_future24_table_read_failed', __( 'Future24 privacy storage could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		return $exists === $table ? $table : '';
 	}
 
@@ -294,6 +297,7 @@ final class WCA_Privacy {
 		}
 
 		$table = self::future24_table();
+		if ( is_wp_error( $table ) ) { return $table; }
 		if ( $table ) {
 			$cutoff = gmdate( 'Y-m-d H:i:s', time() - max( 1, absint( $policy['future24_operational_days'] ) ) * DAY_IN_SECONDS );
 			$cursor = 0;

@@ -621,7 +621,13 @@ final class WCA_Continuity {
 			$table = self::tables()[ $type ];
 			$cursor_key = $base . '_' . $type;
 			$cursor = absint( get_transient( $cursor_key ) );
-			$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT %d", $user_id, $cursor, 100 ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$rows_raw = $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT %d", $user_id, $cursor, 100 ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) {
+				$messages[] = __( 'Continuity privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' );
+				$done = false;
+				continue;
+			}
+			$rows = (array) $rows_raw;
 			$last = $cursor;
 			foreach ( $rows as $row ) {
 				$row_id = absint( $row['id'] );
@@ -634,6 +640,7 @@ final class WCA_Continuity {
 				}
 				if ( 0 === (int) $deleted ) {
 					$still_exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE id=%d AND {$field}=%d", $row_id, $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( null === $still_exists && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Continuity privacy erasure could not verify a zero-row delete safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; break; }
 					if ( $still_exists ) { $messages[] = __( 'Continuity privacy erasure could not remove an affected record and will retry.', 'worldwide-clinic-appointments' ); $done = false; break; }
 				}
 				$last = max( $last, $row_id );
@@ -641,14 +648,16 @@ final class WCA_Continuity {
 			}
 			if ( $last > $cursor ) { set_transient( $cursor_key, $last, HOUR_IN_SECONDS ); }
 			$more = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT 1", $user_id, $last ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
+			if ( null === $more && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Continuity privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+			elseif ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
 		}
 		$intake_table = self::tables()['intake'];
 		$guardian_update = $wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d' ) );
 		if ( false === $guardian_update ) { $messages[] = __( 'Guardian continuity references could not be anonymized safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
 		elseif ( 0 === (int) $guardian_update ) {
 			$guardian_remaining = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$intake_table} WHERE guardian_user_id=%d LIMIT 1", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+			if ( null === $guardian_remaining && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Guardian continuity references could not be verified safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+			elseif ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
 		}
 		if ( $retained ) { $messages[] = __( 'Some clinic continuity records are retained under an active legal, safety or professional record hold.', 'worldwide-clinic-appointments' ); }
 		return array( 'items_removed' => $removed, 'items_retained' => $retained, 'messages' => $messages, 'done' => $done );
