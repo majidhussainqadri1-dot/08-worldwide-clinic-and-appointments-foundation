@@ -148,17 +148,37 @@ final class WCA_Ten_Review_Hardening {
 		if ( empty( self::$claims[ $hash ] ) ) { return $response; }
 		$claim = self::$claims[ $hash ];
 		unset( self::$claims[ $hash ] );
-		if ( is_wp_error( $response ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $response; }
+		if ( is_wp_error( $response ) ) {
+			$error_data = $response->get_error_data();
+			$status = absint( is_array( $error_data ) ? ( $error_data['status'] ?? 0 ) : 0 );
+			if ( ! $status || $status >= 500 ) {
+				WCA_Observability::metric( 'http_idempotency_ambiguous_error_total', 1, array( 'route_scope' => substr( hash( 'sha256', $claim['route'] ), 0, 12 ) ) );
+				$data = is_array( $error_data ) ? $error_data : array();
+				$data['status'] = $status ?: 503;
+				$data['reconciliation_required'] = true;
+				$data['idempotency_key'] = $claim['key'];
+				$response->add_data( $data, $response->get_error_code() );
+				return $response;
+			}
+			if ( ! WCA_Repository::release_idempotency( $claim['id'] ) ) { WCA_Observability::metric( 'http_idempotency_release_failed_total', 1 ); }
+			return $response;
+		}
 		$response = $response instanceof WP_REST_Response ? $response : rest_ensure_response( $response );
-		if ( ! ( $response instanceof WP_REST_Response ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $response; }
+		if ( ! ( $response instanceof WP_REST_Response ) ) {
+			WCA_Observability::metric( 'http_idempotency_unverifiable_response_total', 1 );
+			return new WP_Error( 'wca_idempotency_response_unverifiable', __( 'The mutation response could not be verified. Query mutation status before retrying.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'reconciliation_required' => true, 'idempotency_key' => $claim['key'] ) );
+		}
 		$status = absint( $response->get_status() );
 		if ( $status >= 200 && $status < 400 ) {
 			if ( ! WCA_Repository::complete_idempotency( $claim['id'], $status, $response->get_data() ) ) {
 				WCA_Observability::metric( 'http_idempotency_finalize_failed_total', 1, array( 'route_scope' => substr( hash( 'sha256', $claim['route'] ), 0, 12 ) ) );
-				return new WP_Error( 'wca_idempotency_finalize_failed', __( 'The mutation may have completed, but replay evidence could not be finalized. Query mutation status before retrying.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'reconciliation_required' => true ) );
+				return new WP_Error( 'wca_idempotency_finalize_failed', __( 'The mutation may have completed, but replay evidence could not be finalized. Query mutation status before retrying.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'reconciliation_required' => true, 'idempotency_key' => $claim['key'] ) );
 			}
-		} else {
-			WCA_Repository::release_idempotency( $claim['id'] );
+		} elseif ( $status >= 500 || ! $status ) {
+			WCA_Observability::metric( 'http_idempotency_ambiguous_response_total', 1, array( 'route_scope' => substr( hash( 'sha256', $claim['route'] ), 0, 12 ) ) );
+			$response->header( 'X-WCA-Reconciliation-Required', '1' );
+		} elseif ( ! WCA_Repository::release_idempotency( $claim['id'] ) ) {
+			WCA_Observability::metric( 'http_idempotency_release_failed_total', 1 );
 		}
 		$response->header( 'X-WCA-Idempotency-Key', $claim['key'] );
 		return $response;

@@ -115,7 +115,8 @@ final class WCA_Outbox {
 			}
 			return count( $items );
 		} finally {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+			$released_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+			if ( 1 !== (int) $released_raw ) { WCA_Observability::metric( 'outbox_lock_release_failed_total', 1 ); WCA_Observability::log( 'error', 'outbox_lock_release_failed', array( 'db_error' => '' !== (string) $wpdb->last_error ) ); }
 		}
 	}
 

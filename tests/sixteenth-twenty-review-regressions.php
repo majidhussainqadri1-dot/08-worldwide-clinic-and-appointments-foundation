@@ -17,4 +17,11 @@ t16h('R4 intake version guard runs after replay guard','includes/class-wca-conti
 t16h('R4 browser continuity sends idempotency header','assets/js/continuity.js',"'Idempotency-Key'");
 t16h('R4 browser continuity persists ambiguous mutation key','assets/js/continuity.js','sessionStorage.setItem');
 t16h('R4 browser mutation key uses secure randomness','assets/js/continuity.js','window.crypto.randomUUID');
+t16h('R6 outbox claim write failure explicit','includes/class-wca-repository.php','wca_outbox_claim_write_failed');
+t16h('R6 outbox successful claim requires readback','includes/class-wca-repository.php','wca_outbox_claim_readback_missing');
+t16h('R6 ambiguous WP error retains reconciliation evidence','includes/class-wca-ten-review-hardening.php','http_idempotency_ambiguous_error_total');
+t16h('R6 ambiguous response advertises reconciliation','includes/class-wca-ten-review-hardening.php','X-WCA-Reconciliation-Required');
+t16h('R6 unverifiable response fails closed','includes/class-wca-ten-review-hardening.php','wca_idempotency_response_unverifiable');
+t16h('R6 idempotency release DB failure observable','includes/class-wca-repository.php','idempotency_release_db_failed_total');
+t16h('R6 outbox advisory release failure observable','includes/class-wca-outbox.php','outbox_lock_release_failed_total');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

@@ -932,10 +932,12 @@ final class WCA_Repository {
 		foreach ( $ids as $id ) {
 			$claimed_at = self::now();
 			$ok = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='processing',locked_at=%s,locked_by=%s,updated_at=%s WHERE id=%d AND status IN ('pending','retry') AND next_attempt_at<=%s AND (locked_at IS NULL OR locked_at<%s)", $claimed_at, $worker, $claimed_at, absint( $id ), $claimed_at, $stale_before ) );
+			if ( false === $ok ) { return new WP_Error( 'wca_outbox_claim_write_failed', __( 'Pending outbox work could not be claimed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( 1 === (int) $ok ) {
 				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d AND status='processing' AND locked_by=%s LIMIT 1", absint( $id ), $worker ), ARRAY_A );
 				if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_outbox_claim_readback_failed', __( 'Claimed outbox work could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-				if ( $row ) { $row['payload'] = self::decode( $row['payload_json'] ); unset( $row['payload_json'] ); $claimed[] = $row; }
+				if ( ! $row ) { return new WP_Error( 'wca_outbox_claim_readback_missing', __( 'The outbox claim succeeded but its fenced row could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+				$row['payload'] = self::decode( $row['payload_json'] ); unset( $row['payload_json'] ); $claimed[] = $row;
 			}
 		}
 		return $claimed;
@@ -947,6 +949,7 @@ final class WCA_Repository {
 		$worker = sanitize_text_field( $worker );
 		if ( '' === $worker ) { return false; }
 		$updated = $wpdb->update( $table, array( 'status' => 'delivered', 'delivered_at' => self::now(), 'updated_at' => self::now(), 'locked_at' => null, 'locked_by' => '' ), array( 'id' => absint( $id ), 'status' => 'processing', 'locked_by' => $worker ) );
+		if ( false === $updated && class_exists( 'WCA_Observability' ) ) { WCA_Observability::metric( 'outbox_complete_db_failed_total', 1 ); WCA_Observability::log( 'error', 'outbox_complete_db_failed', array( 'outbox_id' => absint( $id ) ) ); }
 		return 1 === (int) $updated;
 	}
 
@@ -959,6 +962,7 @@ final class WCA_Repository {
 		$status  = $attempts >= 8 ? 'dead_letter' : 'retry';
 		$delay   = min( DAY_IN_SECONDS, (int) pow( 2, min( 10, $attempts ) ) * 60 );
 		$updated = $wpdb->update( $table, array( 'status' => $status, 'attempts' => $attempts, 'last_error' => substr( sanitize_text_field( $error ), 0, 500 ), 'next_attempt_at' => gmdate( 'Y-m-d H:i:s', time() + $delay ), 'updated_at' => self::now(), 'locked_at' => null, 'locked_by' => '' ), array( 'id' => absint( $id ), 'status' => 'processing', 'locked_by' => $worker ) );
+		if ( false === $updated && class_exists( 'WCA_Observability' ) ) { WCA_Observability::metric( 'outbox_fail_db_failed_total', 1 ); WCA_Observability::log( 'error', 'outbox_fail_db_failed', array( 'outbox_id' => absint( $id ) ) ); }
 		return 1 === (int) $updated;
 	}
 
@@ -1036,6 +1040,7 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['idempotency'];
 		$deleted = $wpdb->delete( $table, array( 'id' => absint( $id ), 'status' => 'processing' ) );
+		if ( false === $deleted && class_exists( 'WCA_Observability' ) ) { WCA_Observability::metric( 'idempotency_release_db_failed_total', 1 ); WCA_Observability::log( 'error', 'idempotency_release_db_failed', array( 'reservation_id' => absint( $id ) ) ); }
 		return 1 === (int) $deleted;
 	}
 
