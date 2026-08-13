@@ -104,8 +104,12 @@ final class WCA_Central_Governance {
 				$source = 'file00:smc_get_membership_claims';
 			}
 		}
-		$raw = apply_filters( 'wca_age_guardian_claim', $raw, $patient_user_id );
-		if ( is_array( $raw ) && ! $source ) { $source = 'versioned-filter'; }
+		// A local extension may provide a fallback only when no File 00 versioned provider exists.
+		// It may never overwrite a canonical File 00 age/guardian assertion.
+		if ( ! $versioned_attempted ) {
+			$filtered_raw = apply_filters( 'wca_age_guardian_claim', $raw, $patient_user_id );
+			if ( is_array( $filtered_raw ) ) { $raw = $filtered_raw; $source = $source ?: 'versioned-filter'; }
+		}
 
 		if ( ! is_array( $raw ) && $versioned_attempted ) {
 			return new WP_Error( 'wca_age_claim_invalid_provider_response', __( 'Current age and guardian eligibility returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
@@ -121,11 +125,19 @@ final class WCA_Central_Governance {
 				$value = (string) get_user_meta( $patient_user_id, $key, true );
 				if ( $value ) { $gender = $value; break; }
 			}
-			if ( $birth || $gender || function_exists( 'smc_user_is_minor' ) ) {
+			$legacy_minor = null;
+			if ( function_exists( 'smc_user_is_minor' ) ) {
+				try { $legacy_minor_raw = smc_user_is_minor( $patient_user_id ); } catch ( Throwable $e ) { return new WP_Error( 'wca_age_claim_provider_failure', __( 'Current minor eligibility could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+				if ( is_wp_error( $legacy_minor_raw ) || ! in_array( $legacy_minor_raw, array( true, false, 1, 0, '1', '0' ), true ) ) {
+					return new WP_Error( 'wca_age_claim_invalid_provider_response', __( 'Current minor eligibility returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$legacy_minor = true === $legacy_minor_raw || 1 === $legacy_minor_raw || '1' === $legacy_minor_raw;
+			}
+			if ( $birth || $gender || null !== $legacy_minor ) {
 				$raw = array(
 					'birth_date' => $birth,
 					'gender'     => $gender,
-					'is_minor'   => function_exists( 'smc_user_is_minor' ) ? (bool) smc_user_is_minor( $patient_user_id ) : null,
+					'is_minor'   => $legacy_minor,
 				);
 				$source = 'file00:legacy-read-projection';
 			}
@@ -213,6 +225,7 @@ final class WCA_Central_Governance {
 	public static function file26_clinic_projection( $clinic_ref ) {
 		$clinic_ref = sanitize_text_field( $clinic_ref );
 		$projection = WCA_Service::public_clinic_projection( $clinic_ref );
+		if ( is_wp_error( $projection ) ) { return $projection; }
 		if ( ! is_array( $projection ) || empty( $projection['verified_owner'] ) || empty( $projection['public_ref'] ) ) {
 			return new WP_Error( 'wca_projection_ineligible', __( 'Clinic is not currently eligible for public discovery.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 		}

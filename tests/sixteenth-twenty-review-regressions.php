@@ -50,4 +50,12 @@ t16h('R10 protected appointment service read failure propagates','includes/class
 t16h('R10 opaque appointment lookup DB failure is explicit','includes/class-wca-opaque-api.php','wca_appointment_ref_read_failed');
 t16h('R10 opaque clinic ref mutation consumes repository read errors','includes/class-wca-opaque-api.php','if ( is_wp_error( $read_error ) ) { return $read_error; }');
 t16h('R10 public per-rule slot projection propagates DB read errors','includes/class-wca-service.php','if ( is_wp_error( $projection_read_error ) ) { return $projection_read_error; }');
+t16h('R11 canonical subject helper failure never falls back to stale meta','includes/class-wca-authorization.php','wca_identity_claim_filter_invalid');
+t16h('R11 identity filter cannot elevate approved claim','includes/class-wca-authorization.php','authoritative_claims');
+t16h('R11 suspension filter is monotonic restrictive','includes/class-wca-authorization.php','filtered_claims');
+t16h('R11 doctor serving filter cannot create native relationship','includes/class-wca-authorization.php','return $allowed && $filtered;');
+t16h('R11 delegation scope filter cannot create a native scope','includes/class-wca-authorization.php','return $direct && $filtered;');
+t16h('R11 canonical File00 age claim cannot be overwritten by local filter','includes/class-wca-central-governance.php','if ( ! $versioned_attempted ) {');
+t16h('R11 legacy minor helper invalid response fails closed','includes/class-wca-central-governance.php','wca_age_claim_invalid_provider_response');
+t16h('R11 File26 projection propagates upstream repository errors','includes/class-wca-central-governance.php','if ( is_wp_error( $projection ) ) { return $projection; }');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

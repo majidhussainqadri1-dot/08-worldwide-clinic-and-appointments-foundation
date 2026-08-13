@@ -45,7 +45,20 @@ final class WCA_Authorization {
 			'issued_at_utc' => gmdate( 'c' ),
 			'expires_at_utc'=> gmdate( 'c', time() + 300 ),
 		);
-		$claims = apply_filters( 'wca_identity_claims', $claims, $user_id );
+		$authoritative_claims = $claims;
+		$filtered_claims = apply_filters( 'wca_identity_claims', $claims, $user_id );
+		if ( ! is_array( $filtered_claims ) ) {
+			return new WP_Error( 'wca_identity_claim_filter_invalid', __( 'Identity authorization could not be evaluated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$claims = $filtered_claims;
+		foreach ( array( 'contract', 'version', 'user_id', 'subject_uuid', 'capabilities', 'issued_at_utc', 'expires_at_utc' ) as $protected_key ) {
+			$claims[ $protected_key ] = $authoritative_claims[ $protected_key ];
+		}
+		foreach ( array( 'approved', 'founder', 'doctor', 'clinic_staff', 'guardian' ) as $monotonic_key ) {
+			$claims[ $monotonic_key ] = ! empty( $authoritative_claims[ $monotonic_key ] ) && ! empty( $filtered_claims[ $monotonic_key ] );
+		}
+		$claims['suspended'] = ! empty( $authoritative_claims['suspended'] ) || ! empty( $filtered_claims['suspended'] );
+		$claims['role'] = ! empty( $claims['founder'] ) ? 'founder' : ( ! empty( $claims['doctor'] ) ? 'doctor' : ( user_can( $user_id, 'manage_worldwide_clinic' ) ? 'administrator' : ( ! empty( $claims['clinic_staff'] ) ? 'clinic_staff' : 'member' ) ) );
 		if ( empty( $claims['approved'] ) || ! empty( $claims['suspended'] ) ) {
 			return new WP_Error( 'wca_account_ineligible', __( 'The account is not eligible for this protected action.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
@@ -55,10 +68,9 @@ final class WCA_Authorization {
 	public static function subject_uuid( $user_id ) {
 		$user_id = absint( $user_id );
 		if ( function_exists( 'smc_get_subject_uuid' ) ) {
-			$value = smc_get_subject_uuid( $user_id );
-			if ( is_string( $value ) && preg_match( '/^[0-9a-f-]{36}$/i', $value ) ) {
-				return strtolower( $value );
-			}
+			try { $value = smc_get_subject_uuid( $user_id ); } catch ( Throwable $e ) { return ''; }
+			if ( is_wp_error( $value ) || ! is_string( $value ) ) { return ''; }
+			return preg_match( '/^[0-9a-f-]{36}$/i', $value ) ? strtolower( $value ) : '';
 		}
 		$value = (string) get_user_meta( $user_id, '_smc_subject_uuid', true );
 		return preg_match( '/^[0-9a-f-]{36}$/i', $value ) ? strtolower( $value ) : '';
@@ -206,7 +218,8 @@ final class WCA_Authorization {
 			self::delegated_clinic_ids( $doctor_user_id, 'clinic_manage' )
 		);
 		$allowed = in_array( $clinic_id, array_map( 'absint', $delegated ), true );
-		return (bool) apply_filters( 'wca_doctor_may_serve_clinic', $allowed, $doctor_user_id, $clinic_id, $actor_user_id );
+		$filtered = (bool) apply_filters( 'wca_doctor_may_serve_clinic', $allowed, $doctor_user_id, $clinic_id, $actor_user_id );
+		return $allowed && $filtered;
 	}
 
 	public static function has_active_clinic_delegation( $user_id = 0 ) {
@@ -245,7 +258,8 @@ final class WCA_Authorization {
 			// Management is explicit; schedule/appointments grants are narrower and cannot escalate.
 			$direct = $direct || ! empty( $entry['manage'] ) || in_array( 'manage', $scopes, true );
 		}
-		return (bool) apply_filters( 'wca_clinic_delegation_allows_scope', $direct, $entry, $scope );
+		$filtered = (bool) apply_filters( 'wca_clinic_delegation_allows_scope', $direct, $entry, $scope );
+		return $direct && $filtered;
 	}
 
 	/** @return true|WP_Error */
