@@ -15,27 +15,40 @@ jobs:
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
-        run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Round 10 complete review - public private projection cache deep links opaque refs
+        run: |
+          echo "REVIEW_HEAD=$(git rev-parse HEAD)"
+          echo "PRODUCT_PARENT=$(git rev-parse HEAD^)"
+      - name: Round 12 complete review - lifecycle transitions stale state and single review eligibility
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
           files=list(Path('includes').rglob('*.php'))+[Path('worldwide-clinic.php')]
-          pats={'register_rest_route':'register_rest_route','public_ref':'public_ref','numeric_route':r'/appointments/\\d|clinics/\\d','no_store':r'no-store|DONOTCACHE|nocache_headers','noindex':r'noindex|wp_robots|X-Robots-Tag','private_fields':r'address_private|doctor_private_note|patient_user_id|guardian_user_id|ciphertext|auth_tag|evidence_refs','public_projection':r'public_.*projection|hydrate_.*public|public_only'}
-          for k,p in pats.items(): print(k,sum(len(re.findall(p,x.read_text(errors='replace'),re.I)) for x in files))
-          sensitive=('address_private','doctor_private_note','patient_user_id','guardian_user_id','ciphertext','auth_tag','evidence_refs_json','actor_user_id')
+          pats={
+            'transition':r'transition|status|requested|confirmed|declined|reschedul|cancel|check.?in|completed|no.?show',
+            'version_cas':r'row_version|expected_version|version_mismatch|stale',
+            'slot_hold_release':r'slot_hold|hold_expires|release_appointment_slot|release.*slot',
+            'review_eligibility':r'review_eligib|consume_review|grant_review|expires_at',
+            'transactions':r'START TRANSACTION|COMMIT|ROLLBACK|transaction\s*\('
+          }
+          for k,p in pats.items():
+            print(k,sum(len(re.findall(p,f.read_text(errors='replace'),re.I)) for f in files))
+          focus=('transition','reschedul','checkin','check_in','complete','no_show','cancel','review_eligib','consume_review','release_appointment_slot','row_version','expected_version')
           for f in files:
             lines=f.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
-              if any(x in line for x in sensitive) and any(x in '\n'.join(lines[max(0,i-8):min(len(lines),i+8)]) for x in ('return array','wp_send_json','rest_ensure_response','public_record','projection')):
-                print(f'\n## SENSITIVE_PROJECTION {f}:{i+1}\n'+'\n'.join(lines[max(0,i-10):min(len(lines),i+12)]))
-              if 'register_rest_route' in line:
-                print(f'\n## ROUTE {f}:{i+1}\n'+'\n'.join(lines[max(0,i-2):min(len(lines),i+8)]))
-              if re.search(r'(?<!public_)\b(?:appointment|clinic)_id\b',line) and ('return' in line or "'id'" in line):
-                print(f'\n?? NUMERIC_ID_RETURN {f}:{i+1}\n'+'\n'.join(lines[max(0,i-5):min(len(lines),i+7)]))
+              low=line.lower()
+              if re.search(r'function\s+\w+',line) and any(x in low for x in focus):
+                print(f'\n## FUNCTION {f}:{i+1} {line.strip()}')
+                print('\n'.join(lines[i:min(len(lines),i+95)]))
+          print('\n## TERMINAL-STATE MUTATION CANDIDATES')
+          for f in files:
+            lines=f.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if any(x in line for x in ("'completed'","'declined'","'cancelled'","'no_show'")) and any(x in '\n'.join(lines[max(0,i-8):min(len(lines),i+12)]) for x in ('$wpdb->update','$wpdb->query','transition_appointment','update_post_meta')):
+                print(f'{f}:{i+1}: {line.strip()}')
           PY
-      - name: Round 10 full regression confirmation
+      - name: Round 12 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
