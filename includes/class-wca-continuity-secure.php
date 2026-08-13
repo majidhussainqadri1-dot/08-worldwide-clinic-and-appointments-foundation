@@ -116,6 +116,18 @@ final class WCA_Continuity {
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 continuity schema version could not be persisted.' ); }
 	}
 
+	/** @return true|WP_Error */
+	public static function purge_owned_data() {
+		global $wpdb;
+		foreach ( array_reverse( self::tables() ) as $table ) {
+			if ( false === $wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $table ) . '`' ) ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				return new WP_Error( 'wca_continuity_purge_table_failed', __( 'A File 08 continuity table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			}
+		}
+		$deleted = SWC_Helpers::delete_option_strict( self::SCHEMA_OPTION, 'wca_continuity_purge_schema_option' );
+		return is_wp_error( $deleted ) ? $deleted : true;
+	}
+
 	/** @return array<string,mixed> */
 	public static function health() {
 		global $wpdb;
@@ -123,6 +135,7 @@ final class WCA_Continuity {
 			'contract'       => 'wca.continuity-health',
 			'version'        => self::CONTRACT_VERSION,
 			'schema_version' => (string) get_option( self::SCHEMA_OPTION, '' ),
+			'schema_current' => self::SCHEMA_VERSION === (string) get_option( self::SCHEMA_OPTION, '' ),
 			'tables'         => array(),
 			'keyring'        => self::keyring_health(),
 		);

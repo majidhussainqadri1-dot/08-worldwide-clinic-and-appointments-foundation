@@ -8,6 +8,7 @@ function f24_lacks( $label, $text, $needle ) { global $failures,$checks; $checks
 function f24_file( $path ) { global $root,$failures; $file=$root.'/'.$path; if(!is_file($file)){ $failures[]='Missing '.$path; return ''; } return (string) file_get_contents($file); }
 
 $main = f24_file( 'worldwide-clinic.php' );
+$activator = f24_file( 'includes/class-swc-activator.php' );
 $contracts = f24_file( 'includes/class-wca-contracts.php' );
 $future = f24_file( 'includes/class-wca-future24.php' );
 $calendar = f24_file( 'includes/class-wca-calendar-link.php' );
@@ -18,7 +19,7 @@ $doc = f24_file( 'docs/FUTURE-CLINIC-INTELLIGENCE-24-2026.md' );
 f24_has( 'runtime', $main, 'Version: 1.2.15' );
 f24_has( 'runtime', $main, "define( 'WCA_VERSION', '1.2.15' )" );
 f24_has( 'bootstrap', $main, 'class-wca-future24.php' );
-f24_has( 'bootstrap', $main, "array( 'WCA_Future24', 'activate' )" );
+f24_has( 'bootstrap', $activator, 'WCA_Future24::install_schema()' );
 f24_has( 'bootstrap', $main, 'WCA_Future24::boot()' );
 f24_has( 'bootstrap', $main, 'class-wca-calendar-link.php' );
 f24_has( 'bootstrap', $main, 'WCA_Calendar_Link::boot()' );

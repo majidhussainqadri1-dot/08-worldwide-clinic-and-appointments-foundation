@@ -119,6 +119,32 @@ final class WCA_Future24 {
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 Future24 schema version could not be persisted.' ); }
 	}
 
+	/** @return array<string,mixed> */
+	public static function health() {
+		global $wpdb;
+		$table = self::tables()['records'];
+		$wpdb->last_error = '';
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+		$read_ok = '' === (string) $wpdb->last_error;
+		return array(
+			'schema_version' => (string) get_option( self::SCHEMA_OPTION, '' ),
+			'schema_current' => self::SCHEMA_VERSION === (string) get_option( self::SCHEMA_OPTION, '' ),
+			'table_records'  => $read_ok && $exists === $table,
+			'db_read_ok'     => $read_ok,
+		);
+	}
+
+	/** @return true|WP_Error */
+	public static function purge_owned_data() {
+		global $wpdb;
+		$table = self::tables()['records'];
+		if ( false === $wpdb->query( 'DROP TABLE IF EXISTS `' . esc_sql( $table ) . '`' ) ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			return new WP_Error( 'wca_future24_purge_table_failed', __( 'The File 08 Future24 operational table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
+		$deleted = SWC_Helpers::delete_option_strict( self::SCHEMA_OPTION, 'wca_future24_purge_schema_option' );
+		return is_wp_error( $deleted ) ? $deleted : true;
+	}
+
 	public static function register_assets() {
 		wp_register_style( 'wca-future24', WCA_URL . 'assets/css/future24.css', array( 'wca-clinic' ), WCA_VERSION );
 		wp_register_script( 'wca-future24', WCA_URL . 'assets/js/future24.js', array(), WCA_VERSION, true );

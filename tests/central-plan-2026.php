@@ -44,7 +44,7 @@ f08_require_tokens( 'bootstrap', $bootstrap, array(
 	'class-wca-continuity-secure.php',
 	'WCA_Central_Governance::boot()',
 	'WCA_Continuity::boot()',
-	"register_activation_hook( WCA_FILE, array( 'WCA_Continuity', 'activate' ) )",
+	"register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) )",
 	'wca_get_file26_clinic_projection',
 ) );
 

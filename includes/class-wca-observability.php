@@ -87,9 +87,13 @@ final class WCA_Observability {
 
 	/** @return array<string,mixed> */
 	public static function health() {
+		$runtime_failure = get_option( 'wca_runtime_migration_failure', false );
 		$checks = array(
 			'runtime_version' => defined( 'WCA_VERSION' ) ? WCA_VERSION : '',
-			'schema'          => class_exists( 'WCA_Schema' ) ? WCA_Schema::health() : array(),
+			'schema'          => class_exists( 'WCA_Schema' ) ? WCA_Schema::health() : array( 'available' => false ),
+			'continuity'      => class_exists( 'WCA_Continuity' ) ? WCA_Continuity::health() : array( 'available' => false ),
+			'future24'        => class_exists( 'WCA_Future24' ) ? WCA_Future24::health() : array( 'available' => false ),
+			'migration'       => array( 'runtime_failure_absent' => false === $runtime_failure || empty( $runtime_failure ) ),
 			'dependencies'    => class_exists( 'SWC_Activator' ) ? SWC_Activator::dependencies_ready() : false,
 			'legacy_checks'   => class_exists( 'SWC_Activator' ) ? SWC_Activator::system_checks() : array(),
 			'cron'            => array(
@@ -100,7 +104,8 @@ final class WCA_Observability {
 			'trace_id'         => self::trace_id(),
 			'generated_at_utc' => gmdate( 'c' ),
 		);
-		$checks['ok'] = self::all_true( $checks['schema'] ) && (bool) $checks['dependencies'] && self::all_true( $checks['legacy_checks'] ) && self::all_true( $checks['cron'] );
+		$continuity_ok = isset( $checks['continuity']['status'] ) && 'ok' === $checks['continuity']['status'] && ! empty( $checks['continuity']['schema_current'] );
+		$checks['ok'] = self::all_true( $checks['schema'] ) && $continuity_ok && self::all_true( $checks['future24'] ) && self::all_true( $checks['migration'] ) && (bool) $checks['dependencies'] && self::all_true( $checks['legacy_checks'] ) && self::all_true( $checks['cron'] );
 		return $checks;
 	}
 

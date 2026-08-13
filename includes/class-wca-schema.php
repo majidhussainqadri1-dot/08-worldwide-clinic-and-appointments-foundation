@@ -376,8 +376,6 @@ final class WCA_Schema {
 			throw new RuntimeException( 'File 08 canonical tables missing: ' . implode( ', ', $missing ) );
 		}
 
-		$written = SWC_Helpers::update_option_strict( self::OPTION_DB_VERSION, WCA_Contracts::SCHEMA_VERSION, 'wca_schema_version_write' );
-		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical schema version could not be persisted.' ); }
 		$migration_state = array(
 			'status'       => 'installed',
 			'from_version' => $from_version,
@@ -386,6 +384,8 @@ final class WCA_Schema {
 		);
 		$written = SWC_Helpers::update_option_strict( self::OPTION_MIGRATION_STATE, $migration_state, 'wca_migration_state_write' );
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical migration state could not be persisted.' ); }
+		$written = SWC_Helpers::update_option_strict( self::OPTION_DB_VERSION, WCA_Contracts::SCHEMA_VERSION, 'wca_schema_version_write' );
+		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical schema version could not be persisted.' ); }
 	}
 
 

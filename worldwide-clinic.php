@@ -72,8 +72,6 @@ foreach ( $wca_files as $wca_relative_file ) {
 unset( $wca_files, $wca_relative_file );
 
 register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) );
-register_activation_hook( WCA_FILE, array( 'WCA_Continuity', 'activate' ) );
-register_activation_hook( WCA_FILE, array( 'WCA_Future24', 'activate' ) );
 register_deactivation_hook( WCA_FILE, array( 'SWC_Activator', 'deactivate' ) );
 
 function wca_start_plugin() {
@@ -93,11 +91,19 @@ function wca_start_plugin() {
 	} catch ( Throwable $wca_migration_error ) {
 		WCA_Observability::log( 'error', 'runtime_migration_failed', array( 'message' => sanitize_text_field( $wca_migration_error->getMessage() ) ) );
 		$failure = array( 'status' => 'failed', 'failed_at' => current_time( 'mysql', true ), 'message' => sanitize_text_field( $wca_migration_error->getMessage() ), 'runtime_version' => WCA_VERSION );
-		SWC_Helpers::update_option_strict( 'wca_runtime_migration_failure', $failure, 'wca_runtime_migration_failure_write' );
+		$failure_written = SWC_Helpers::update_option_strict( 'wca_runtime_migration_failure', $failure, 'wca_runtime_migration_failure_write' );
+		if ( is_wp_error( $failure_written ) ) {
+			WCA_Observability::log( 'critical', 'runtime_migration_failure_state_persistence_failed', array( 'code' => $failure_written->get_error_code() ) );
+		}
 		add_action( 'admin_notices', static function () use ( $wca_migration_error ) { if ( current_user_can( 'activate_plugins' ) ) { echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic migration paused:', 'worldwide-clinic-appointments' ) . '</strong> ' . esc_html( $wca_migration_error->getMessage() ) . '</p></div>'; } } );
 		return;
 	}
-	SWC_Helpers::delete_option_strict( 'wca_runtime_migration_failure', 'wca_runtime_migration_failure_clear' );
+	$failure_cleared = SWC_Helpers::delete_option_strict( 'wca_runtime_migration_failure', 'wca_runtime_migration_failure_clear' );
+	if ( is_wp_error( $failure_cleared ) ) {
+		WCA_Observability::log( 'critical', 'runtime_migration_failure_state_clear_failed', array( 'code' => $failure_cleared->get_error_code() ) );
+		add_action( 'admin_notices', static function () { if ( current_user_can( 'activate_plugins' ) ) { echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic migration state is inconsistent:', 'worldwide-clinic-appointments' ) . '</strong> ' . esc_html__( 'The previous failure marker could not be cleared safely; File 08 remains paused.', 'worldwide-clinic-appointments' ) . '</p></div>'; } } );
+		return;
+	}
 	WCA_Plugin::boot();
 	WCA_Central_Governance::boot();
 	WCA_Continuity::boot();

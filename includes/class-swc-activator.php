@@ -34,6 +34,8 @@ final class SWC_Activator {
 			self::register_type();
 			self::install_schema();
 			WCA_Schema::install();
+			WCA_Continuity::install_schema();
+			WCA_Future24::install_schema();
 			WCA_Routes::register();
 			WCA_Outbox::schedule();
 			self::repair_pages();
@@ -45,18 +47,18 @@ final class SWC_Activator {
 			set_transient( 'swc_activation_notice', '1', 120 );
 			flush_rewrite_rules();
 		} catch ( Throwable $e ) {
-			self::rollback_activation();
+			$rollback = self::rollback_activation();
 			deactivate_plugins( plugin_basename( SWC_FILE ) );
-			wp_die(
-				esc_html( sprintf( __( 'Worldwide Clinic activation was rolled back: %s', 'worldwide-clinic-appointments' ), $e->getMessage() ) ),
-				'',
-				array( 'back_link' => true )
-			);
+			$message = is_wp_error( $rollback )
+				? sprintf( __( 'Worldwide Clinic activation failed and rollback is incomplete (%1$s): %2$s', 'worldwide-clinic-appointments' ), $rollback->get_error_code(), $e->getMessage() )
+				: sprintf( __( 'Worldwide Clinic activation was rolled back: %s', 'worldwide-clinic-appointments' ), $e->getMessage() );
+			wp_die( esc_html( $message ), '', array( 'back_link' => true ) );
 		}
 	}
 
 	public static function deactivate() {
 		WCA_Outbox::unschedule();
+		wp_clear_scheduled_hook( 'wca_daily_health_snapshot' );
 		self::remove_capabilities();
 		// Data, owned pages, audit evidence, and migration snapshots are preserved.
 		flush_rewrite_rules();
@@ -443,6 +445,8 @@ final class SWC_Activator {
 	}
 
 	private static function rollback_activation() {
+		WCA_Outbox::unschedule();
+		wp_clear_scheduled_hook( 'wca_daily_health_snapshot' );
 		$rolled_back = self::rollback_pages();
 		if ( is_wp_error( $rolled_back ) ) { WCA_Observability::log( 'error', 'activation_rollback_incomplete', array( 'code' => $rolled_back->get_error_code() ) ); }
 		self::remove_capabilities();
@@ -467,6 +471,9 @@ final class SWC_Activator {
 
 	public static function purge_all_data() {
 		global $wpdb;
+		$allowed = WCA_Privacy::assert_purge_allowed( get_current_user_id() );
+		if ( is_wp_error( $allowed ) ) { return $allowed; }
+		WCA_Observability::log( 'warning', 'irreversible_purge_started', array( 'actor_user_id' => absint( get_current_user_id() ) ) );
 		do {
 			$wpdb->last_error = '';
 			$ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type=%s ORDER BY ID ASC LIMIT 200", SWC_Helpers::TYPE ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -475,16 +482,23 @@ final class SWC_Activator {
 				if ( false === wp_delete_post( absint( $id ), true ) ) { return new WP_Error( 'swc_purge_post_delete', __( 'A File 08 appointment could not be deleted during the guarded purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			}
 		} while ( 200 === count( $ids ) );
+		$canonical = WCA_Schema::purge_canonical_data();
+		if ( is_wp_error( $canonical ) ) { WCA_Observability::log( 'critical', 'irreversible_purge_partial_failure', array( 'scope' => 'canonical', 'code' => $canonical->get_error_code() ) ); return $canonical; }
+		$continuity = WCA_Continuity::purge_owned_data();
+		if ( is_wp_error( $continuity ) ) { WCA_Observability::log( 'critical', 'irreversible_purge_partial_failure', array( 'scope' => 'continuity', 'code' => $continuity->get_error_code() ) ); return $continuity; }
+		$future24 = WCA_Future24::purge_owned_data();
+		if ( is_wp_error( $future24 ) ) { WCA_Observability::log( 'critical', 'irreversible_purge_partial_failure', array( 'scope' => 'future24', 'code' => $future24->get_error_code() ) ); return $future24; }
 		if ( false === $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_audit_log" ) ) { return new WP_Error( 'swc_purge_audit_table', __( 'The File 08 audit table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( false === $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}swc_rate_limits" ) ) { return new WP_Error( 'swc_purge_rate_table', __( 'The File 08 rate-limit table could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$like = $wpdb->esc_like( '_swc_' ) . '%';
 		if ( false === $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s", $like ) ) ) { return new WP_Error( 'swc_purge_usermeta', __( 'File 08 user metadata could not be removed during purge.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$options = array( 'swc_page_map', 'swc_version', 'swc_db_version', 'swc_clinic_phone', 'swc_clinic_whatsapp', 'swc_emergency_notice', 'swc_activation_snapshot', 'swc_legacy_record_migration_cursor', WCA_Compatibility::MIGRATION_OPTION, 'swc_last_audit_error', 'swc_last_delivery_error' );
+		$options = array( 'swc_page_map', 'swc_version', 'swc_db_version', 'swc_clinic_phone', 'swc_clinic_whatsapp', 'swc_emergency_notice', 'swc_activation_snapshot', 'swc_legacy_record_migration_cursor', WCA_Compatibility::MIGRATION_OPTION, 'swc_last_audit_error', 'swc_last_delivery_error', 'wca_runtime_migration_failure' );
 		foreach ( $options as $option ) {
 			$deleted = SWC_Helpers::delete_option_strict( $option, 'swc_purge_option_delete' );
 			if ( is_wp_error( $deleted ) ) { return $deleted; }
 		}
 		self::remove_capabilities();
+		WCA_Observability::log( 'warning', 'irreversible_purge_completed', array( 'actor_user_id' => absint( get_current_user_id() ) ) );
 		return true;
 	}
 

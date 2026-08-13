@@ -258,6 +258,69 @@ final class WCA_Privacy {
 		return (bool) apply_filters( 'wca_future24_legal_hold', $default, $row );
 	}
 
+	/**
+	 * Destructive purge is forbidden until an external operations/assurance owner
+	 * attests that a restorable backup was verified for this exact purge attempt.
+	 * No mutation occurs here; the whole legal-hold inventory is read first.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function assert_purge_allowed( $actor_user_id = 0 ) {
+		global $wpdb;
+		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
+		$backup_verified = apply_filters( 'wca_purge_backup_verified', false, $actor_user_id );
+		if ( true !== $backup_verified ) {
+			return new WP_Error( 'wca_purge_backup_unverified', __( 'Irreversible File 08 purge is blocked until a verified restorable backup is attested by the approved operations/assurance integration.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+
+		$cursor = 0;
+		do {
+			$wpdb->last_error = '';
+			$ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type=%s AND ID>%d ORDER BY ID ASC LIMIT 200", SWC_Helpers::TYPE, $cursor ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $ids || '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_purge_hold_inventory_failed', __( 'File 08 purge could not verify appointment legal holds safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			foreach ( (array) $ids as $id_raw ) {
+				$id = absint( $id_raw );
+				$wpdb->last_error = '';
+				$hold_raw = $wpdb->get_var( $wpdb->prepare( "SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id=%d AND meta_key=%s ORDER BY meta_id DESC LIMIT 1", $id, '_swc_legal_hold' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+				if ( '' !== (string) $wpdb->last_error ) {
+					return new WP_Error( 'wca_purge_hold_read_failed', __( 'File 08 purge could not verify an appointment legal hold safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$held = (bool) apply_filters( 'wca_appointment_legal_hold', (bool) $hold_raw, $id );
+				if ( $held ) {
+					return new WP_Error( 'wca_purge_legal_hold', __( 'Irreversible File 08 purge is blocked because one or more records are under legal hold.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+				}
+				$cursor = max( $cursor, $id );
+			}
+		} while ( 200 === count( (array) $ids ) );
+
+		$table = self::future24_table();
+		if ( is_wp_error( $table ) ) { return $table; }
+		if ( $table ) {
+			$cursor = 0;
+			do {
+				$wpdb->last_error = '';
+				$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE id>%d ORDER BY id ASC LIMIT 200", $cursor ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+				if ( null === $rows || '' !== (string) $wpdb->last_error ) {
+					return new WP_Error( 'wca_purge_future24_hold_inventory_failed', __( 'File 08 purge could not verify Future24 legal holds safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				foreach ( (array) $rows as $row ) {
+					if ( ! empty( $row['appointment_id'] ) ) {
+						$appointment_id = absint( $row['appointment_id'] );
+						$wpdb->last_error = '';
+						$hold_raw = $wpdb->get_var( $wpdb->prepare( "SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id=%d AND meta_key=%s ORDER BY meta_id DESC LIMIT 1", $appointment_id, '_swc_legal_hold' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+						if ( '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_purge_future24_hold_read_failed', __( 'File 08 purge could not verify a Future24-linked legal hold safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+						if ( (bool) apply_filters( 'wca_appointment_legal_hold', (bool) $hold_raw, $appointment_id ) ) { return new WP_Error( 'wca_purge_legal_hold', __( 'Irreversible File 08 purge is blocked because one or more records are under legal hold.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+					}
+					if ( (bool) apply_filters( 'wca_future24_legal_hold', false, $row ) ) { return new WP_Error( 'wca_purge_legal_hold', __( 'Irreversible File 08 purge is blocked because one or more Future24 records are under legal hold.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+					$cursor = max( $cursor, absint( $row['id'] ?? 0 ) );
+				}
+			} while ( 200 === count( (array) $rows ) );
+		}
+		return true;
+	}
+
 	private static function future24_table() {
 		global $wpdb;
 		if ( ! class_exists( 'WCA_Future24' ) ) { return ''; }
