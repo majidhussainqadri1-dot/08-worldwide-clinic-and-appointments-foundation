@@ -1,0 +1,33 @@
+name: File 08 T16 R15 Corrected-State Diagnostic
+on:
+  push:
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/t16-r15-diagnostic.yml]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none}
+      - name: Apply same closed R15 correction in disposable runner
+        run: |
+          python3 tools/t16-r15-tool-repair.py
+          python3 tools/t16-r15-tool-repair-v2.py
+          python3 tools/t16-r15-correct.py
+      - name: Print PHP lint failures if any
+        run: |
+          set +e
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+          echo LINT_EXIT=$?
+          exit 0
+      - name: Print complete source-suite result
+        run: |
+          set +e
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1
+          echo TEST_EXIT=$?
+          exit 0
