@@ -18,7 +18,7 @@ t15h('R1 group leave read failure explicit','includes/class-wca-future24.php','w
 t15h('R1 queue position read failure explicit','includes/class-wca-future24.php','wca_queue_position_read_failed');
 t15h('R1 support participant read failure explicit','includes/class-wca-future24.php','wca_support_participant_read_failed');
 t15h('R1 virtual room read failure explicit','includes/class-wca-future24.php','wca_virtual_room_read_failed');
-t15h('R1 external busy read fails closed','includes/class-wca-future24.php',"return (bool) \$busy;");
+t15h('R1 external busy read fails closed','includes/class-wca-future24.php','wca_external_busy_read_failed');
 
 t15h('R2 core erasure record read failure','includes/class-wca-privacy.php','wca_privacy_appointment_read_failed');
 t15h('R2 future retention read failure','includes/class-wca-privacy.php','wca_retention_future24_read_failed');

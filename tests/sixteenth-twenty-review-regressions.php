@@ -83,4 +83,16 @@ t16h('R14 verified CF03 status event is idempotent','includes/class-wca-service.
 t16h('R14 payment status projection is durable','includes/class-wca-repository.php','public static function project_payment_status');
 t16h('R14 unknown payment projection status rejected','includes/class-wca-repository.php','wca_payment_status_untrusted');
 t16h('R14 authorized appointment includes safe payment projection','includes/class-wca-rest.php',"'payment'           => " . '$' . "payment_projection");
+t16h('R15 calendar subject lookup storage failure explicit','includes/class-wca-calendar-link.php','wca_calendar_subject_read_failed');
+t16h('R15 calendar appointment lookup storage failure explicit','includes/class-wca-calendar-link.php','wca_calendar_appointment_read_failed');
+t16h('R15 signed provider webhook endpoint exists','includes/class-wca-calendar-link.php','calendar-provider-webhooks');
+t16h('R15 provider signature verification delegated to adapter','includes/class-wca-calendar-link.php','wca_calendar_provider_verify_webhook');
+t16h('R15 provider webhook event is idempotent','includes/class-wca-calendar-link.php',"'calendar_provider_webhook'");
+t16h('R15 webhook never stores provider token','includes/class-wca-future24.php',"'provider_token_stored' => false");
+t16h('R15 calendar provider mapping projection is durable','includes/class-wca-repository.php','upsert_calendar_mapping_from_provider');
+t16h('R15 provider mapping cannot mutate canonical appointment','includes/class-wca-repository.php',"'canonical_appointment_mutated' => false");
+t16h('R15 strict external busy DB failure explicit','includes/class-wca-future24.php','wca_external_busy_read_failed');
+t16h('R15 standard slot response filters external busy','includes/class-wca-future24.php',"'external_calendar_filter_applied'");
+t16h('R15 slot hold rejects external busy','includes/class-wca-future24.php','wca_external_calendar_busy');
+t16h('R15 core hold cannot bypass external calendar','includes/class-wca-service.php','WCA_Future24::external_busy_conflict');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

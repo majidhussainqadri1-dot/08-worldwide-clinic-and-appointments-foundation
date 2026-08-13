@@ -496,8 +496,9 @@ final class WCA_Service {
 			return new WP_Error( 'wca_idempotency_required', __( 'A valid idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
 		$data['idempotency_key'] = $idempotency_key;
-		$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $patient_user_id );
+		$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $actor_user_id );
 		if ( is_wp_error( $canonical ) ) { return $canonical; }
+		if ( class_exists( 'WCA_Future24' ) ) { $external=WCA_Future24::external_busy_conflict( sanitize_text_field( $data['practitioner_ref'] ?? '' ), $canonical['start_utc'], $canonical['end_utc'] ); if(is_wp_error($external)){return $external;} if($external){return new WP_Error('wca_external_calendar_busy',__('The selected time conflicts with the practitioner external calendar.','worldwide-clinic-appointments'),array('status'=>409));} }
 		return WCA_Repository::hold_slot( $canonical );
 	}
 

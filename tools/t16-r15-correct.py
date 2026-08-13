@@ -170,10 +170,10 @@ p.write_text(s)
 # Convert private conflict checker into public strict checker preserving old private wrapper semantics.
 p=root/'includes/class-wca-future24.php'; s=p.read_text()
 old="""\tprivate static function external_busy_conflict_ref( $practitioner_ref, $start, $end ) {
-\t\tglobal $wpdb; $doctor_id=WCA_Plan_Guard::practitioner_id($practitioner_ref); if(!$doctor_id){return false;} $table=self::tables()['records'];
-\t\t$busy=$wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE feature_id='F08-FUT-22' AND subject_user_id=%d AND status='busy' AND expires_at>%s AND starts_at<%s AND ends_at>%s LIMIT 1",$doctor_id,self::now(),$end,$start));
+\t\tglobal $wpdb; $start=self::utc($start); $end=self::utc($end); $practitioner_ref=sanitize_text_field($practitioner_ref); if(!$practitioner_ref||!$start||!$end){return false;} $table=self::tables()['records'];
+\t\t$busy = $wpdb->get_var( $wpdb->prepare( \"SELECT id FROM {$table} WHERE feature_id='F08-FUT-22' AND parent_ref=%s AND status='busy' AND (expires_at IS NULL OR expires_at>%s) AND starts_at<%s AND ends_at>%s LIMIT 1\", $practitioner_ref, WCA_Repository::now(), $end, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 \t\tif ( '' !== (string) $wpdb->last_error ) { return true; }
-\t\treturn (bool)$busy;
+\t\treturn (bool) $busy;
 \t}
 """
 new="""\tpublic static function external_busy_conflict( $practitioner_ref, $start, $end ) {
@@ -230,7 +230,7 @@ p.write_text(s)
 
 # Core hold path also asks optional Future24 external-busy truth, preventing internal/API bypass.
 p=root/'includes/class-wca-service.php'; s=p.read_text()
-old="""\t\t$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $actor_user_id );
+old="""\t\t$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $patient_user_id );
 \t\tif ( is_wp_error( $canonical ) ) { return $canonical; }
 \t\treturn WCA_Repository::hold_slot( $canonical );
 """
