@@ -1,8 +1,10 @@
-name: File 08 T16 R20 Closed-Ledger Correction
+name: File 08 T16 R20 Correction Gate
 on:
   push:
-    branches: [codex/file08-new-governing-plans-completion-2026]
-    paths: [.github/workflows/t16-round-review.yml]
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t16-round-review.yml
 permissions:
   contents: write
 jobs:
@@ -19,144 +21,62 @@ jobs:
           php-version: '8.3'
           coverage: none
           extensions: zip
-      - name: Apply only closed R20 repository and release-evidence corrections
+      - name: Apply closed R20 batch
         run: |
           set -euo pipefail
           rm -f tools/t16-*
           rm -f .github/workflows/t16-*
           rm -f review-evidence/t16-*
-          python3 - <<'PY'
-          from pathlib import Path
-
-          # README current state: replace only the stale current-cycle paragraph.
-          p=Path('README.md'); s=p.read_text()
-          old="Current fifteenth-cycle runtime alignment is **1.2.15**; core schema remains **3.2.0**, restricted continuity **1.1.0**, and Future24 **1.0.0**. All 20 main reviews are complete. R19 was clean; R20 found no new product-code defect and corrected closure-evidence lag. Two extra post-correction verification sweeps and exact-final-head CI/package evidence remain before repository closure."
-          new="Current sixteenth-cycle runtime alignment is **1.2.15**; core schema remains **3.2.0**, restricted continuity **1.1.0**, and Future24 **1.0.0**. All 20 sequential T16 reviews are complete. Supported defects were found in **R1, R4, R6-R20 except none in R2, R3 and R5**; every defect round was corrected only after its review closed and was fully retested before the next round. R20 found repository/release-evidence closure defects, not a new functional PHP/JavaScript defect. Exact-final-head canonical CI/package evidence remains an external release gate; staging/live evidence remains separate."
-          if s.count(old)!=1: raise SystemExit(f'README current-cycle anchor mismatch: {s.count(old)}')
-          p.write_text(s.replace(old,new,1))
-
-          # STATUS: current classification becomes T16-aware; retain old cycles as history.
-          p=Path('STATUS.md'); s=p.read_text()
-          old="| Coded | **Corrected candidate** — all fifteenth-cycle R1-R20 main reviews are complete; no new product-code defect was found in R19 or R20. |\n| Fresh post-final-code reviews | **Main R19/R20 closure reviews complete** — post-correction verification was restarted after Sweep B found and corrected this status-document contradiction. |"
-          new="| Coded | **Corrected T16 candidate** — all sixteenth-cycle R1-R20 sequential reviews are complete; R20 found closure/release-evidence defects but no new functional PHP/JavaScript defect. |\n| Fresh post-final-code reviews | **R20 correction verification required on the corrected tree** — two fresh read-only verification sweeps plus exact-final-head canonical CI/package evidence are release gates. |"
-          if s.count(old)!=1: raise SystemExit(f'STATUS classification anchor mismatch: {s.count(old)}')
-          s=s.replace(old,new,1)
-          marker="## Thirteenth fresh 20-round corrected-state closure"
-          section="""## Sixteenth fresh 20-round sequential audit — repository closure checkpoint
-
-- Governing sequence: each round was reviewed to completion before any correction; the closed round's supported findings were corrected together and fully retested before the next round.
-- Defect rounds: **R1, R4, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20**.
-- Clean rounds: **R2, R3, R5**.
-- R20 classification: repository/release-evidence closure defects only; the final R20 review proved full source QA green and deterministic packaging before cleanup, with no new functional PHP/JavaScript defect.
-- Runtime: **1.2.15**; core schema **3.2.0**; continuity **1.1.0**; Future24 **1.0.0**.
-- Temporary T16 correction workflows/scripts/diagnostic evidence are removed by the R20 correction batch and guarded by a permanent closure-hygiene regression.
-- Exact-final-head canonical CI, candidate manifest/artifact/SHA-256 and PR evidence are external gates and must identify the same final commit.
-- Staging-Accepted: **not claimed**; Live-Deployed: **unverified/not claimed**; Operational: **not claimed**.
-
-"""
-          if s.count(marker)!=1: raise SystemExit(f'STATUS historical insertion anchor mismatch: {s.count(marker)}')
-          p.write_text(s.replace(marker,section+marker,1))
-
-          # CHANGELOG: prepend T16 completion record within the existing 1.2.15 release.
-          p=Path('CHANGELOG.md'); s=p.read_text()
-          marker="## 1.2.15 — 2026-08-13\n\n"
-          addition="""- Sixteenth fresh sequential 20-round audit completed with strict review-then-batch-fix sequencing. Defect rounds: R1, R4 and R6-R20; clean rounds: R2, R3 and R5. R14-R19 closed payment snapshot/status, calendar webhook/busy-state, complaint lifecycle, guardian/consent degraded-state, migration/rollback/purge integrity, and frontend localization/race defects. R20 closed repository/release-evidence hygiene without finding a new functional PHP/JavaScript defect.
-- R20 removes one-shot T16 correction workflows/scripts/diagnostic residue, adds permanent closure-hygiene regression coverage, and makes the canonical quality workflow emit the exact candidate SHA-256. Exact-final-head CI/package evidence remains distinct from staging/live evidence.
-"""
-          if s.count(marker)!=1: raise SystemExit(f'CHANGELOG 1.2.15 anchor mismatch: {s.count(marker)}')
-          p.write_text(s.replace(marker,marker+addition,1))
-
-          # Canonical workflow: exact candidate checksum becomes first-class run evidence.
-          p=Path('.github/workflows/file08-complete-quality.yml'); s=p.read_text()
-          old="      - name: Independent verification\n        run: php tools/verify-candidate.php --artifact=build/a --commit='${{ steps.source.outputs.sha }}'"
-          new="      - name: Independent verification\n        run: |\n          php tools/verify-candidate.php --artifact=build/a --commit='${{ steps.source.outputs.sha }}'\n          cat build/a/*-candidate.sha256"
-          if s.count(old)!=1: raise SystemExit(f'canonical checksum-evidence anchor mismatch: {s.count(old)}')
-          p.write_text(s.replace(old,new,1))
-
-          # Permanent closure hygiene test. It intentionally lives under tests/, not a temporary T16 path.
-          Path('tests/sixteenth-cycle-closure-hygiene.php').write_text(r'''<?php
-$root = dirname( __DIR__ );
-$fail = array();
-$patterns = array(
-    $root . '/tools/t16-*',
-    $root . '/.github/workflows/t16-*',
-    $root . '/review-evidence/t16-*',
-);
-foreach ( $patterns as $pattern ) {
-    foreach ( glob( $pattern ) ?: array() as $path ) {
-        $fail[] = str_replace( $root . '/', '', $path );
-    }
-}
-$readme = file_get_contents( $root . '/README.md' );
-$status = file_get_contents( $root . '/STATUS.md' );
-if ( false === strpos( (string) $readme, 'Current sixteenth-cycle runtime alignment' ) ) {
-    $fail[] = 'README missing current sixteenth-cycle evidence label';
-}
-if ( false === strpos( (string) $status, 'Sixteenth fresh 20-round sequential audit' ) ) {
-    $fail[] = 'STATUS missing current sixteenth-cycle closure section';
-}
-if ( $fail ) {
-    fwrite( STDERR, "Sixteenth-cycle closure hygiene failed:\n- " . implode( "\n- ", $fail ) . "\n" );
-    exit( 1 );
-}
-echo "Sixteenth-cycle closure hygiene: PASS\n";
-''')
-
-          p=Path('tests/run-all.php'); s=p.read_text()
-          old="'sixteenth-twenty-review-regressions.php' );"
-          new="'sixteenth-twenty-review-regressions.php', 'sixteenth-cycle-closure-hygiene.php' );"
-          if s.count(old)!=1: raise SystemExit(f'run-all closure-test anchor mismatch: {s.count(old)}')
-          p.write_text(s.replace(old,new,1))
-          PY
-      - name: Closed R20 hygiene invariants
+          python3 tools/r20-closure-correct.py
+      - name: Verify repository closure hygiene
         run: |
           set -euo pipefail
           test -z "$(find tools -maxdepth 1 -type f -name 't16-*' -print -quit)"
           test -z "$(find .github/workflows -maxdepth 1 -type f -name 't16-*' -print -quit)"
           test -z "$(find review-evidence -maxdepth 1 -type f -name 't16-*' -print -quit 2>/dev/null || true)"
           php tests/sixteenth-cycle-closure-hygiene.php
-      - name: Full warning-free QA on corrected R20 tree
+      - name: Full warning-free corrected-tree QA
         run: |
           set -euo pipefail
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-corrected-lint.txt
-          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/r20-corrected-tests.txt 2>&1
-          cat /tmp/r20-corrected-tests.txt
-          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r20-corrected-tests.txt; then exit 1; fi
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/r20-tests.txt 2>&1
+          cat /tmp/r20-tests.txt
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r20-tests.txt; then exit 1; fi
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
-      - name: Corrected-tree deterministic package verification
+      - name: Deterministic corrected-tree package verification
         run: |
           set -euo pipefail
-          rm -rf build/r20-corrected-a build/r20-corrected-b
+          rm -rf build/r20-a build/r20-b
           sha=$(git rev-parse HEAD)
           epoch=$(git show -s --format=%ct HEAD)
-          php tools/build-candidate.php --output-dir=build/r20-corrected-a --commit="$sha" --source-date-epoch="$epoch"
-          php tools/build-candidate.php --output-dir=build/r20-corrected-b --commit="$sha" --source-date-epoch="$epoch"
-          cmp build/r20-corrected-a/*-candidate.zip build/r20-corrected-b/*-candidate.zip
-          cmp build/r20-corrected-a/*-candidate-manifest.json build/r20-corrected-b/*-candidate-manifest.json
-          cmp build/r20-corrected-a/*-candidate.sha256 build/r20-corrected-b/*-candidate.sha256
-          php tools/verify-candidate.php --artifact=build/r20-corrected-a --commit="$sha"
-      - name: Fresh post-correction verification sweep A
+          php tools/build-candidate.php --output-dir=build/r20-a --commit="$sha" --source-date-epoch="$epoch"
+          php tools/build-candidate.php --output-dir=build/r20-b --commit="$sha" --source-date-epoch="$epoch"
+          cmp build/r20-a/*-candidate.zip build/r20-b/*-candidate.zip
+          cmp build/r20-a/*-candidate-manifest.json build/r20-b/*-candidate-manifest.json
+          cmp build/r20-a/*-candidate.sha256 build/r20-b/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/r20-a --commit="$sha"
+      - name: Fresh post-correction sweep A
         run: |
           set -euo pipefail
-          php tests/run-all.php >/tmp/r20-sweep-a.txt 2>&1
-          cat /tmp/r20-sweep-a.txt
-          test -z "$(find tools .github/workflows review-evidence -type f -name 't16-*' -print -quit 2>/dev/null || true)"
+          php tests/run-all.php
           git diff --check
-      - name: Fresh post-correction verification sweep B
+          test -z "$(find tools .github/workflows review-evidence -type f -name 't16-*' -print -quit 2>/dev/null || true)"
+      - name: Fresh post-correction sweep B
         run: |
           set -euo pipefail
           php tests/sixteenth-cycle-closure-hygiene.php
           grep -q 'Current sixteenth-cycle runtime alignment' README.md
-          grep -q 'Defect rounds:.*R19, R20' STATUS.md
+          grep -q 'R19, R20' STATUS.md
           grep -q 'Sixteenth fresh sequential 20-round audit completed' CHANGELOG.md
           grep -q 'cat build/a/.*candidate.sha256' .github/workflows/file08-complete-quality.yml
           test "$(grep -c 'register_activation_hook' worldwide-clinic.php)" -eq 1
-      - name: Commit R20 correction batch only after all corrected-tree gates pass
+      - name: Commit R20 correction batch after all gates pass
         run: |
           set -euo pipefail
-          rm -rf build/r20-corrected-a build/r20-corrected-b
+          rm -rf build/r20-a build/r20-b
+          rm -f tools/r20-closure-correct.py
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add -A
