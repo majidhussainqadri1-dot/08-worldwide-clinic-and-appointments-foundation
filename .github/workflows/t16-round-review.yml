@@ -16,48 +16,42 @@ jobs:
         with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
         run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Round 6 complete review - outbox idempotency recovery dead letter
+      - name: Round 7 complete review - transactions CAS locks rollback
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          targets=[Path('includes/class-wca-outbox.php'),Path('includes/class-wca-repository.php'),Path('includes/class-wca-ten-review-hardening.php'),Path('includes/class-wca-observability.php')]
-          names=('process','maintenance','recover_stale_outbox','claim_outbox','complete_outbox','fail_outbox','enqueue','claim_idempotency','idempotency_status','release_idempotency','complete_idempotency','pre_dispatch','post_dispatch')
-          for p in targets:
+          files=list(Path('includes').rglob('*.php'))
+          text='\n'.join(p.read_text(errors='replace') for p in files)
+          print('START_TRANSACTION=',text.count('START TRANSACTION'))
+          print('COMMIT=',text.count('COMMIT'))
+          print('ROLLBACK=',text.count('ROLLBACK'))
+          print('FOR_UPDATE=',text.count('FOR UPDATE'))
+          print('GET_LOCK=',text.count('GET_LOCK'))
+          print('RELEASE_LOCK=',text.count('RELEASE_LOCK'))
+          print('EXPECTED_VERSION=',text.count('expected_version'))
+          print('VERSION_CAS=',len(re.findall(r'version[^\n]{0,120}(?:WHERE|where)|(?:WHERE|where)[^\n]{0,120}version',text)))
+          # Dump transaction helper and all methods with multiple writes or version-sensitive updates.
+          for p in files:
             s=p.read_text(errors='replace')
-            print(f'\n===== {p} =====')
-            for fname in names:
-              for m in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+fname+r'\s*\([^)]*\)\s*\{',s):
-                nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),12000)); body=s[m.start():end]
-                print(f'\n## {p}:{fname}\n{body[:9000]}')
-          alltext='\n'.join(p.read_text(errors='replace') for p in targets)
-          checks={
-            'advisory_lock': 'GET_LOCK' in alltext,
-            'release_lock': 'RELEASE_LOCK' in alltext,
-            'stable_message_id': 'message_id' in alltext,
-            'dead_letter': 'dead_letter' in alltext,
-            'retry_backoff': 'pow( 2' in alltext or 'next_attempt_at' in alltext,
-            'worker_fencing': 'locked_by' in alltext,
-            'stale_recovery': 'recover_stale_outbox' in alltext,
-            'idempotency_request_hash': 'request_hash' in alltext,
-            'stale_reconciliation': 'reconciliation_required' in alltext,
-            'mutation_status': 'mutation-status' in alltext or 'idempotency_status' in alltext,
-          }
-          print('\nCONTRACT_CHECKS=',checks)
-          # Flag DB reads/writes in critical functions when error/result semantics are not visible nearby.
-          for p in targets:
+            for m in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{',s):
+              nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),10000)); body=s[m.start():end]
+              writes=len(re.findall(r'\$wpdb->(?:insert|update|delete|query)\s*\(',body))
+              concurrency=any(x in body for x in ('expected_version','FOR UPDATE','GET_LOCK','version=version+1',"'version' =>"))
+              if writes>=2 or concurrency or m.group(1)=='transaction':
+                print(f'\n## METHOD {p}:{m.group(1)} writes={writes} concurrency={concurrency}\n{body[:5000]}')
+                if writes>=2 and not any(x in body for x in ('WCA_Repository::transaction','START TRANSACTION','GET_LOCK','with_appointment_lock','transaction( function')):
+                  print('!! MULTI_WRITE_NO_VISIBLE_FENCE')
+          # DB mutation calls with a version-bearing row but no obvious CAS condition nearby.
+          for p in files:
             lines=p.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
-              if re.search(r'\$wpdb->get_(?:results|row|var|col)\s*\(',line):
-                ctx='\n'.join(lines[max(0,i-3):min(len(lines),i+12)])
-                if any(k in ctx.lower() for k in ('outbox','idempotenc','get_lock','release_lock')) and not any(x in ctx for x in ('last_error','WP_Error','RuntimeException','1 !==','null ===')):
-                  print(f'\n!! CRITICAL_READ_REVIEW {p}:{i+1}\n{ctx}')
-              if re.search(r'\$wpdb->(?:insert|update|delete|query)\s*\(',line):
-                ctx='\n'.join(lines[max(0,i-3):min(len(lines),i+14)])
-                if any(k in ctx.lower() for k in ('outbox','idempotenc')) and not any(x in ctx for x in ('false ===','1 ===','1 !==','return ','WP_Error','RuntimeException')):
-                  print(f'\n?? CRITICAL_WRITE_REVIEW {p}:{i+1}\n{ctx}')
+              if '$wpdb->update' in line or re.search(r'UPDATE\s+\{\$table\}',line):
+                ctx='\n'.join(lines[max(0,i-8):min(len(lines),i+16)])
+                if 'version' in ctx and not any(x in ctx for x in ("'version' => absint( $row['version'] )",'AND version=%d','expected_version','record_version','version=version+1')):
+                  print(f'\n?? VERSION_WRITE_REVIEW {p}:{i+1}\n{ctx}')
           PY
-      - name: Round 6 full regression confirmation
+      - name: Round 7 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
