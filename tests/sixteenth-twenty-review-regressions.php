@@ -76,11 +76,11 @@ t16h('R14 appointment captures fee amount snapshot','includes/class-wca-service.
 t16h('R14 appointment captures policy snapshots','includes/class-wca-service.php',"'cancellation_policy_snapshot'");
 t16h('R14 payment uses appointment-owned fee snapshot','includes/class-wca-service.php','appointment_fee_snapshot( $appointment_id )');
 t16h('R14 payment provider must be approved by CF03 boundary','includes/class-wca-service.php','wca_cf03_approved_payment_providers');
-t16h('R14 outbound payment intent carries provider','includes/class-wca-service.php',"'provider' => $provider");
+t16h('R14 outbound payment intent carries provider','includes/class-wca-service.php',"'provider' => " . '$' . "provider");
 t16h('R14 cancellation/no-show emits fee policy review','includes/class-wca-service.php','CF03.AppointmentFeePolicyReviewRequested.v1');
 t16h('R14 unverified payment status is ignored','includes/class-wca-service.php','unverified_payment_status_ignored');
 t16h('R14 verified CF03 status event is idempotent','includes/class-wca-service.php',"'payment_status_event'");
 t16h('R14 payment status projection is durable','includes/class-wca-repository.php','public static function project_payment_status');
 t16h('R14 unknown payment projection status rejected','includes/class-wca-repository.php','wca_payment_status_untrusted');
-t16h('R14 authorized appointment includes safe payment projection','includes/class-wca-rest.php',"'payment'           => $payment_projection");
+t16h('R14 authorized appointment includes safe payment projection','includes/class-wca-rest.php',"'payment'           => " . '$' . "payment_projection");
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";
