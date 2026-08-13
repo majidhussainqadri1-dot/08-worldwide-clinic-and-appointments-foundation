@@ -1,0 +1,192 @@
+name: File 08 T16 R17 Closed-Ledger Correction
+on:
+  push:
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/t16-r17-correction.yml]
+permissions:
+  contents: write
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none}
+      - name: Apply only the closed R17 defect ledger
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path); s=p.read_text()
+              if s.count(old)!=1:
+                  raise SystemExit(f'{path}: expected exactly one anchor, found {s.count(old)}')
+              p.write_text(s.replace(old,new,1))
+
+          p=Path('includes/class-wca-central-governance.php')
+          s=p.read_text()
+          old="\t\t$minor = array_key_exists( 'is_minor', $raw ) && null !== $raw['is_minor'] ? (bool) $raw['is_minor'] : null;"
+          new="""\t\t$minor = null;
+\t\tif ( array_key_exists( 'is_minor', $raw ) && null !== $raw['is_minor'] ) {
+\t\t\t$minor_raw = $raw['is_minor'];
+\t\t\tif ( ! in_array( $minor_raw, array( true, false, 1, 0, '1', '0' ), true ) ) {
+\t\t\t\treturn new WP_Error( 'wca_age_claim_invalid_provider_response', __( 'Current minor eligibility returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+\t\t\t}
+\t\t\t$minor = true === $minor_raw || 1 === $minor_raw || '1' === $minor_raw;
+\t\t}"""
+          if s.count(old)!=1: raise SystemExit('central governance minor coercion anchor mismatch')
+          s=s.replace(old,new,1)
+          start=s.index("\t/** @return true|WP_Error */\n\tpublic static function validate_patient_guardian")
+          end=s.index("\n\tprivate static function normalize_gender", start)
+          block="""\t/** @return bool|WP_Error */
+\tprivate static function strict_guardian_verified( $guardian_user_id ) {
+\t\t$guardian_user_id = absint( $guardian_user_id );
+\t\tif ( function_exists( 'smc_user_is_verified_guardian' ) ) {
+\t\t\ttry { $raw = smc_user_is_verified_guardian( $guardian_user_id ); } catch ( Throwable $e ) {
+\t\t\t\treturn new WP_Error( 'wca_guardian_verification_provider_failure', __( 'Current guardian verification could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+\t\t\t}
+\t\t\tif ( is_wp_error( $raw ) || ! in_array( $raw, array( true, false, 1, 0, '1', '0' ), true ) ) {
+\t\t\t\treturn new WP_Error( 'wca_guardian_verification_provider_invalid', __( 'Current guardian verification returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+\t\t\t}
+\t\t\treturn true === $raw || 1 === $raw || '1' === $raw;
+\t\t}
+\t\treturn true === apply_filters( 'wca_user_is_verified_guardian', false, $guardian_user_id );
+\t}
+
+\t/** @return bool|WP_Error */
+\tprivate static function strict_guardian_relationship( $guardian_user_id, $patient_user_id ) {
+\t\t$guardian_user_id = absint( $guardian_user_id );
+\t\t$patient_user_id  = absint( $patient_user_id );
+\t\tif ( function_exists( 'smc_guardian_may_act_for' ) ) {
+\t\t\ttry { $raw = smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); } catch ( Throwable $e ) {
+\t\t\t\treturn new WP_Error( 'wca_guardian_relationship_provider_failure', __( 'Current guardian relationship could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+\t\t\t}
+\t\t\tif ( is_wp_error( $raw ) || ! in_array( $raw, array( true, false, 1, 0, '1', '0' ), true ) ) {
+\t\t\t\treturn new WP_Error( 'wca_guardian_relationship_provider_invalid', __( 'Current guardian relationship returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+\t\t\t}
+\t\t\treturn true === $raw || 1 === $raw || '1' === $raw;
+\t\t}
+\t\treturn true === apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
+\t}
+
+\t/** @return true|WP_Error */
+\tpublic static function validate_patient_guardian( $patient_user_id, $guardian_user_id, $actor_user_id ) {
+\t\t$patient_user_id  = absint( $patient_user_id );
+\t\t$guardian_user_id = absint( $guardian_user_id );
+\t\t$actor_user_id    = absint( $actor_user_id );
+\t\t$claim = self::age_guardian_claim( $patient_user_id );
+\t\tif ( is_wp_error( $claim ) ) { return $claim; }
+\t\tif ( ! empty( $claim['guardian_required'] ) ) {
+\t\t\tif ( ! $guardian_user_id || $guardian_user_id !== $actor_user_id ) {
+\t\t\t\treturn new WP_Error( 'wca_guardian_required', __( 'A current verified guardian must act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+\t\t\t}
+\t\t\t$verified = self::strict_guardian_verified( $guardian_user_id );
+\t\t\tif ( is_wp_error( $verified ) ) { return $verified; }
+\t\t\tif ( ! $verified ) { return new WP_Error( 'wca_guardian_required', __( 'A current verified guardian must act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
+\t\t\t$allowed = self::strict_guardian_relationship( $guardian_user_id, $patient_user_id );
+\t\t\tif ( is_wp_error( $allowed ) ) { return $allowed; }
+\t\t\treturn $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+\t\t}
+\t\tif ( $patient_user_id === $actor_user_id && ! $guardian_user_id ) { return true; }
+\t\tif ( $guardian_user_id && $guardian_user_id === $actor_user_id ) {
+\t\t\t$verified = self::strict_guardian_verified( $guardian_user_id );
+\t\t\tif ( is_wp_error( $verified ) ) { return $verified; }
+\t\t\tif ( ! $verified ) { return new WP_Error( 'wca_guardian_unverified', __( 'The current actor is not a verified guardian.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
+\t\t\t$allowed = self::strict_guardian_relationship( $guardian_user_id, $patient_user_id );
+\t\t\tif ( is_wp_error( $allowed ) ) { return $allowed; }
+\t\t\treturn $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+\t\t}
+\t\treturn new WP_Error( 'wca_patient_actor_mismatch', __( 'The current actor may not act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+\t}
+"""
+          s=s[:start]+block+s[end:]
+          p.write_text(s)
+
+          p=Path('includes/class-wca-continuity-secure.php')
+          s=p.read_text()
+          old="\tprivate static function active_consent( $appointment_id, $scope ) { global $wpdb; $table=WCA_Schema::tables()['consents']; $count=$wpdb->get_var($wpdb->prepare(\"SELECT COUNT(*) FROM {$table} WHERE appointment_id=%d AND scope=%s AND status='granted' AND revoked_at IS NULL\",absint($appointment_id),sanitize_key($scope))); return absint($count)>0; } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared"
+          new="""\t/** @return bool|WP_Error */
+\tprivate static function active_consent( $appointment_id, $scope ) {
+\t\tglobal $wpdb;
+\t\t$table = WCA_Schema::tables()['consents'];
+\t\t$count = $wpdb->get_var( $wpdb->prepare( \"SELECT COUNT(*) FROM {$table} WHERE appointment_id=%d AND scope=%s AND status='granted' AND revoked_at IS NULL\", absint( $appointment_id ), sanitize_key( $scope ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+\t\tif ( '' !== (string) $wpdb->last_error ) {
+\t\t\treturn new WP_Error( 'wca_active_consent_read_failed', __( 'Current consent state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+\t\t}
+\t\treturn absint( $count ) > 0;
+\t}"""
+          if s.count(old)!=1: raise SystemExit('continuity active_consent anchor mismatch')
+          s=s.replace(old,new,1)
+          old="""\t\tif ( $submit && ! self::active_consent( $appointment_id, 'appointment_processing' ) ) {
+\t\t\treturn new WP_Error( 'wca_intake_consent', __( 'Current appointment-processing consent is required before intake submission.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+\t\t}"""
+          new="""\t\tif ( $submit ) {
+\t\t\t$active_consent = self::active_consent( $appointment_id, 'appointment_processing' );
+\t\t\tif ( is_wp_error( $active_consent ) ) { return $active_consent; }
+\t\t\tif ( ! $active_consent ) { return new WP_Error( 'wca_intake_consent', __( 'Current appointment-processing consent is required before intake submission.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+\t\t}"""
+          if s.count(old)!=1: raise SystemExit('intake consent anchor mismatch')
+          s=s.replace(old,new,1)
+          old="""\t\t$patient_id = self::patient_id( $appointment_id );
+\t\t$doctor_id  = absint( SWC_Helpers::meta( $appointment_id, 'doctor_id', 0 ) );
+\t\treturn array("""
+          new="""\t\t$patient_id = self::patient_id( $appointment_id );
+\t\t$doctor_id  = absint( SWC_Helpers::meta( $appointment_id, 'doctor_id', 0 ) );
+\t\t$messaging_consent = self::active_consent( $appointment_id, 'messaging' );
+\t\t$call_consent      = self::active_consent( $appointment_id, 'teleconsult' );
+\t\t$recording_consent = self::active_consent( $appointment_id, 'recording' );
+\t\tforeach ( array( $messaging_consent, $call_consent, $recording_consent ) as $consent_state ) { if ( is_wp_error( $consent_state ) ) { return $consent_state; } }
+\t\treturn array("""
+          if s.count(old)!=1: raise SystemExit('file17 context consent pre-read anchor mismatch')
+          s=s.replace(old,new,1)
+          s=s.replace("'messaging_allowed'      => $active && self::active_consent( $appointment_id, 'messaging' ),", "'messaging_allowed'      => $active && $messaging_consent,",1)
+          s=s.replace("'call_allowed'           => $active && self::active_consent( $appointment_id, 'teleconsult' ),", "'call_allowed'           => $active && $call_consent,",1)
+          s=s.replace("'recording_allowed'      => $active && self::active_consent( $appointment_id, 'recording' ),", "'recording_allowed'      => $active && $recording_consent,",1)
+          old="\t\tif ( ! self::active_consent( $appointment_id, 'followup' ) ) { return new WP_Error( 'wca_followup_consent', __( 'Current follow-up consent is required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }"
+          new="""\t\t$followup_consent = self::active_consent( $appointment_id, 'followup' );
+\t\tif ( is_wp_error( $followup_consent ) ) { return $followup_consent; }
+\t\tif ( ! $followup_consent ) { return new WP_Error( 'wca_followup_consent', __( 'Current follow-up consent is required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }"""
+          if s.count(old)!=1: raise SystemExit('followup consent anchor mismatch')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('tests/sixteenth-twenty-review-regressions.php')
+          s=p.read_text()
+          marker='if($fail){fwrite(STDERR,"T16 regression gate failed:\\n- ".implode("\\n- ",$fail)."\\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\\n";'
+          if s.count(marker)!=1: raise SystemExit('T16 final marker mismatch')
+          additions="""t16h('R17 canonical minor assertion rejects non-boolean provider values','includes/class-wca-central-governance.php','in_array( $minor_raw, array( true, false, 1, 0, \\'1\\', \\'0\\' ), true )');
+t16h('R17 guardian verification provider failure is degraded','includes/class-wca-central-governance.php','wca_guardian_verification_provider_failure');
+t16h('R17 guardian relationship provider failure is degraded','includes/class-wca-central-governance.php','wca_guardian_relationship_provider_failure');
+t16h('R17 active consent DB failure is explicit','includes/class-wca-continuity-secure.php','wca_active_consent_read_failed');
+t16h('R17 intake propagates consent read failure','includes/class-wca-continuity-secure.php','$active_consent = self::active_consent');
+t16h('R17 File17 context pre-reads consent strictly','includes/class-wca-continuity-secure.php','$messaging_consent = self::active_consent');
+t16h('R17 follow-up propagates consent read failure','includes/class-wca-continuity-secure.php','$followup_consent = self::active_consent');
+"""
+          p.write_text(s.replace(marker,additions+marker,1))
+          PY
+      - name: Full warning-free File 08 QA after R17 correction
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+          set +e
+          output=$(php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$status" -eq 0
+          if printf '%s\n' "$output" | grep -E 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:'; then exit 1; fi
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit corrected R17 product state only after QA green
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/t16-r17-correction.yml
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add includes/class-wca-central-governance.php includes/class-wca-continuity-secure.php tests/sixteenth-twenty-review-regressions.php .github/workflows/t16-r17-correction.yml
+          git diff --cached --check
+          git commit -m 'fix(file08): close T16 R17 consent and guardian degraded-state defects'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
