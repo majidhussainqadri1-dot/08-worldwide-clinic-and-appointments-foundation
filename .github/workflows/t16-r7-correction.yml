@@ -20,6 +20,18 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
+      - name: Repair correction-script selector
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/t16-r7-correct.py')
+          s=p.read_text()
+          old='direct_release = "$wpdb->get_var( $wpdb->prepare( \'SELECT RELEASE_LOCK(%s)\', $lock ) );"'
+          new='direct_release = "\\t\\t\\t$wpdb->get_var( $wpdb->prepare( \'SELECT RELEASE_LOCK(%s)\', $lock ) );"'
+          if s.count(old) != 1:
+              raise SystemExit(f'correction selector expected 1 match, found {s.count(old)}')
+          p.write_text(s.replace(old,new,1))
+          PY
       - name: Apply closed R7 defect ledger
         run: python3 tools/t16-r7-correct.py
       - name: Full corrected-state QA
@@ -35,7 +47,7 @@ jobs:
           set -euo pipefail
           git config user.name majidhussainqadri1-dot
           git config user.email majidhussainqadri1@gmail.com
-          git add includes/class-wca-repository.php includes/class-wca-future24.php includes/class-wca-plan-guard.php includes/class-swc-helpers.php tests/sixteenth-twenty-review-regressions.php
+          git add includes/class-wca-repository.php includes/class-wca-future24.php includes/class-wca-plan-guard.php includes/class-swc-helpers.php tests/sixteenth-twenty-review-regressions.php tools/t16-r7-correct.py
           git diff --cached --check
           git commit -m 'T16 R7: fix concurrency lock and rollback defects'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
