@@ -1,0 +1,35 @@
+name: File 08 T16 R6 Post-Review Correction
+on:
+  push:
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/t16-r6-fix.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none}
+      - name: Apply all R6 findings after completed review
+        run: python3 tools/t16-r6-fix.py
+      - name: Full corrected-state retest
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+          php tests/run-all.php
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit corrected R6 state
+        run: |
+          set -euo pipefail
+          rm -f tools/t16-r6-fix.py .github/workflows/t16-r6-fix.yml
+          git config user.name 'File 08 T16 Corrective Auditor'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'File 08 T16 R6: harden outbox claim and ambiguous mutation reconciliation'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
