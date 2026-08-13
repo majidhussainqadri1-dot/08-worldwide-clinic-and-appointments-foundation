@@ -16,32 +16,26 @@ jobs:
         with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
         run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Round 9 complete review - schema migrations upgrades rollback uninstall
+      - name: Round 10 complete review - public private projection cache deep links opaque refs
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          targets=[p for p in Path('.').rglob('*.php') if 'vendor' not in p.parts]
-          pats=['dbDelta','CREATE TABLE','ALTER TABLE','DROP TABLE','SCHEMA_VERSION','DB_VERSION','db_version','maybe_upgrade','activate','deactivate','uninstall','purge','migration','cursor','snapshot','rollback','update_option','delete_option']
-          for pat in pats:
-            print(pat, sum(p.read_text(errors='replace').count(pat) for p in targets))
-          for p in targets:
-            s=p.read_text(errors='replace')
-            if any(x in s for x in ('dbDelta','CREATE TABLE','maybe_upgrade','migration','purge_all_data','DROP TABLE')):
-              print(f'\n===== {p} =====\n{s[:30000]}')
-          # Flag schema/version writes not visibly preceded by verification and destructive operations.
-          for p in targets:
-            lines=p.read_text(errors='replace').splitlines()
+          files=list(Path('includes').rglob('*.php'))+[Path('worldwide-clinic.php')]
+          pats={'register_rest_route':'register_rest_route','public_ref':'public_ref','numeric_route':r'/appointments/\\d|clinics/\\d','no_store':r'no-store|DONOTCACHE|nocache_headers','noindex':r'noindex|wp_robots|X-Robots-Tag','private_fields':r'address_private|doctor_private_note|patient_user_id|guardian_user_id|ciphertext|auth_tag|evidence_refs','public_projection':r'public_.*projection|hydrate_.*public|public_only'}
+          for k,p in pats.items(): print(k,sum(len(re.findall(p,x.read_text(errors='replace'),re.I)) for x in files))
+          sensitive=('address_private','doctor_private_note','patient_user_id','guardian_user_id','ciphertext','auth_tag','evidence_refs_json','actor_user_id')
+          for f in files:
+            lines=f.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
-              low=line.lower()
-              if ('update_option' in low or 'update_option_strict' in low) and ('version' in low or 'migration' in low):
-                print(f'\n## VERSION_STATE_WRITE {p}:{i+1}\n'+'\n'.join(lines[max(0,i-15):min(len(lines),i+8)]))
-              if any(x in low for x in ('drop table','delete from','wp_delete_post','delete_option')):
-                print(f'\n## DESTRUCTIVE {p}:{i+1}\n'+'\n'.join(lines[max(0,i-8):min(len(lines),i+10)]))
-              if 'dbdelta' in low:
-                print(f'\n## DBDELTA {p}:{i+1}\n'+'\n'.join(lines[max(0,i-12):min(len(lines),i+18)]))
+              if any(x in line for x in sensitive) and any(x in '\n'.join(lines[max(0,i-8):min(len(lines),i+8)]) for x in ('return array','wp_send_json','rest_ensure_response','public_record','projection')):
+                print(f'\n## SENSITIVE_PROJECTION {f}:{i+1}\n'+'\n'.join(lines[max(0,i-10):min(len(lines),i+12)]))
+              if 'register_rest_route' in line:
+                print(f'\n## ROUTE {f}:{i+1}\n'+'\n'.join(lines[max(0,i-2):min(len(lines),i+8)]))
+              if re.search(r'(?<!public_)\b(?:appointment|clinic)_id\b',line) and ('return' in line or "'id'" in line):
+                print(f'\n?? NUMERIC_ID_RETURN {f}:{i+1}\n'+'\n'.join(lines[max(0,i-5):min(len(lines),i+7)]))
           PY
-      - name: Round 9 full regression confirmation
+      - name: Round 10 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
