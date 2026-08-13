@@ -15,6 +15,7 @@ final class WCA_Service {
 		add_action( 'wca_doctor_suspended', array( __CLASS__, 'handle_doctor_suspended' ), 10, 2 );
 		add_action( 'wca_payment_status_changed', array( __CLASS__, 'handle_payment_status_changed' ), 10, 2 );
 		add_action( 'cf03_payment_status_changed', array( __CLASS__, 'handle_payment_status_changed_event' ), 10, 1 );
+		add_action( 'cf02_case_status_changed', array( __CLASS__, 'handle_cf02_case_status_changed' ), 10, 1 );
 	}
 
 	public static function valid_timezone( $timezone ) {
@@ -866,7 +867,11 @@ final class WCA_Service {
 			$access = WCA_Authorization::can_view_appointment( $appointment_id, $actor_user_id );
 			if ( is_wp_error( $access ) ) { return $access; }
 			$data['clinic_id'] = absint( SWC_Helpers::meta( $appointment_id, 'clinic_id' ) );
+		} else {
+			$clinic_id=absint($data['clinic_id'] ?? 0); if(!$clinic_id){return new WP_Error('wca_complaint_scope',__('A complaint must reference an appointment or clinic.','worldwide-clinic-appointments'),array('status'=>400));}
+			WCA_Repository::clear_read_error(); $clinic=WCA_Repository::get_clinic($clinic_id,false); $read_error=WCA_Repository::consume_read_error(); if(is_wp_error($read_error)){return $read_error;} if(!$clinic){return new WP_Error('wca_complaint_clinic_missing',__('Complaint clinic was not found.','worldwide-clinic-appointments'),array('status'=>404));}
 		}
+		$data['purpose_limit']='case_resolution_only';
 		$data['complainant_user_id'] = $actor_user_id;
 		return WCA_Repository::transaction( function () use ( $data, $actor_user_id, $appointment_id ) {
 			$result = WCA_Repository::create_complaint( $data );
@@ -883,6 +888,31 @@ final class WCA_Service {
 			}
 			return $result;
 		}, 'wca_complaint_transaction' );
+	}
+
+
+	/** @return array<string,mixed>|WP_Error */
+	public static function complaint_projection( $ref, $actor_user_id=0 ) {
+		$actor_user_id=absint($actor_user_id?:get_current_user_id()); $row=WCA_Repository::get_complaint_by_ref($ref,false); if(is_wp_error($row)){return $row;} if(!$row){return new WP_Error('wca_complaint_not_found',__('Complaint was not found.','worldwide-clinic-appointments'),array('status'=>404));}
+		$allowed=$actor_user_id===absint($row['complainant_user_id']) || current_user_can('manage_worldwide_clinic') || current_user_can('manage_options');
+		if(!$allowed){return new WP_Error('wca_complaint_forbidden',__('You cannot view this complaint.','worldwide-clinic-appointments'),array('status'=>403));}
+		return array('public_ref'=>(string)$row['public_ref'],'appointment_ref'=>$row['appointment_id']?(string)SWC_Helpers::meta(absint($row['appointment_id']),'public_ref'):'','category'=>(string)$row['category'],'summary'=>(string)$row['summary'],'evidence_refs'=>WCA_Repository::decode_json($row['evidence_refs_json'],array()),'purpose_limit'=>'case_resolution_only','status'=>(string)$row['status'],'version'=>absint($row['version']),'created_at'=>(string)$row['created_at'],'updated_at'=>(string)$row['updated_at']);
+	}
+
+	/** @return array<string,mixed>|WP_Error */
+	public static function appeal_complaint( $ref, $expected_version, $actor_user_id=0 ) {
+		$actor_user_id=absint($actor_user_id?:get_current_user_id()); $row=WCA_Repository::get_complaint_by_ref($ref,false); if(is_wp_error($row)){return $row;} if(!$row){return new WP_Error('wca_complaint_not_found',__('Complaint was not found.','worldwide-clinic-appointments'),array('status'=>404));} if($actor_user_id!==absint($row['complainant_user_id'])){return new WP_Error('wca_complaint_appeal_forbidden',__('Only the complainant may appeal this complaint.','worldwide-clinic-appointments'),array('status'=>403));}
+		return WCA_Repository::transaction(function() use($ref,$expected_version,$actor_user_id){$updated=WCA_Repository::transition_complaint($ref,'appealed',$expected_version,0,array()); if(is_wp_error($updated)){return $updated;} $trace=WCA_Observability::trace_id(); $audit=WCA_Repository::append_event('AppointmentComplaintAppealed.v1','complaint',$ref,array('complaint_ref'=>$ref,'status'=>'appealed','trace_id'=>$trace),$actor_user_id,$trace); if(is_wp_error($audit)){return $audit;} $queued=WCA_Repository::enqueue('CF02.CaseAppealRequested.v1',$ref,array('case_type'=>'appointment_complaint','complaint_ref'=>$ref,'purpose_limit'=>'case_resolution_only'),$trace); return is_wp_error($queued)?$queued:$updated;},'wca_complaint_appeal_transaction');
+	}
+
+	public static function handle_cf02_case_status_changed( $event ) { $result=self::consume_cf02_case_status_event($event); if(is_wp_error($result)){WCA_Observability::log('error','cf02_complaint_projection_failed',array('code'=>$result->get_error_code()));} return $result; }
+
+	/** @return array<string,mixed>|WP_Error */
+	public static function consume_cf02_case_status_event( $event ) {
+		if(!is_array($event)||true!==($event['verified']??false)||'CF02'!==(string)($event['source']??'')){return new WP_Error('wca_cf02_case_unverified',__('Only a verified CF02 case fact may update File 08 complaint state.','worldwide-clinic-appointments'),array('status'=>403));}
+		$event_id=sanitize_text_field($event['event_id']??''); $ref=strtolower(sanitize_text_field($event['complaint_ref']??'')); $next=sanitize_key($event['status']??''); $expected=absint($event['expected_version']??0); if(!preg_match('/^[A-Za-z0-9._:-]{8,191}$/',$event_id)||!preg_match('/^[0-9a-f-]{36}$/',$ref)||!isset(WCA_Contracts::complaint_transition_matrix()[$next])||!$expected){return new WP_Error('wca_cf02_case_event_invalid',__('Verified CF02 complaint event is malformed.','worldwide-clinic-appointments'),array('status'=>400));}
+		$claim=WCA_Repository::claim_idempotency('cf02_complaint_status',$event_id,0,array('complaint_ref'=>$ref,'status'=>$next,'expected_version'=>$expected)); if(is_wp_error($claim)){return $claim;} if('completed'===(string)($claim['status']??'')){return $claim['response'];} if(empty($claim['claimed_new'])){return new WP_Error('wca_cf02_case_event_in_progress',__('This complaint case fact is already being reconciled.','worldwide-clinic-appointments'),array('status'=>409));}
+		$result=WCA_Repository::transaction(function() use($event,$ref,$next,$expected,$claim,$event_id){$updated=WCA_Repository::transition_complaint($ref,$next,$expected,absint($event['assigned_user_id']??0),(array)($event['outcome']??array())); if(is_wp_error($updated)){return $updated;} $trace=WCA_Observability::trace_id(); $audit=WCA_Repository::append_event('ComplaintCaseStatusProjected.v1','complaint',$ref,array('event_id'=>WCA_Repository::uuid(),'source_event_id'=>$event_id,'complaint_ref'=>$ref,'status'=>$next,'trace_id'=>$trace),0,$trace); if(is_wp_error($audit)){return $audit;} $response=array('public_ref'=>$ref,'status'=>$next,'version'=>absint($updated['version']),'updated_at'=>(string)$updated['updated_at']); if(!WCA_Repository::complete_idempotency($claim['id'],200,$response)){return new WP_Error('wca_cf02_case_finalize',__('Complaint case projection could not be finalized safely.','worldwide-clinic-appointments'),array('status'=>500));} return $response;},'wca_cf02_complaint_projection_transaction'); if(is_wp_error($result)){WCA_Repository::release_idempotency($claim['id']);} return $result;
 	}
 
 	private static function approved_payment_provider( $provider ) {

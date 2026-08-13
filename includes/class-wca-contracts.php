@@ -149,6 +149,25 @@ final class WCA_Contracts {
 		return array( 'pending','created','pending_provider','authorized','captured','settled','failed','cancelled','expired','refunded','disputed','uncertain' );
 	}
 
+	/** @return array<string,array<int,string>> */
+	public static function complaint_transition_matrix() {
+		return array(
+			'submitted' => array( 'triaged' ),
+			'triaged' => array( 'under_review', 'dismissed' ),
+			'under_review' => array( 'awaiting_evidence', 'resolved', 'dismissed' ),
+			'awaiting_evidence' => array( 'under_review', 'resolved', 'dismissed' ),
+			'resolved' => array( 'appealed', 'closed' ),
+			'dismissed' => array( 'appealed', 'closed' ),
+			'appealed' => array( 'under_review', 'resolved', 'dismissed', 'closed' ),
+			'closed' => array(),
+		);
+	}
+
+	public static function can_transition_complaint( $from, $to ) {
+		$from=sanitize_key((string)$from); $to=sanitize_key((string)$to); $m=self::complaint_transition_matrix();
+		return isset($m[$from]) && in_array($to,$m[$from],true);
+	}
+
 	public static function consumed_events() { return array( 'DoctorVerified.v1', 'DoctorSuspended.v1', 'PaymentStatusChanged.v1', 'MessageReported.v1' ); }
 
 	/** @return array<string,array<string,string>> */

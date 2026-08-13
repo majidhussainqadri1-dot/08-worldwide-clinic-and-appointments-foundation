@@ -95,6 +95,16 @@ final class WCA_REST {
 			'callback' => array( __CLASS__, 'complaint' ),
 			'permission_callback' => array( __CLASS__, 'authenticated' ),
 		) );
+		register_rest_route( self::NAMESPACE, '/complaints/(?P<ref>[0-9a-fA-F-]{36})', array(
+			'methods' => WP_REST_Server::READABLE,
+			'callback' => array( __CLASS__, 'complaint_detail' ),
+			'permission_callback' => array( __CLASS__, 'authenticated' ),
+		) );
+		register_rest_route( self::NAMESPACE, '/complaints/(?P<ref>[0-9a-fA-F-]{36})/appeal', array(
+			'methods' => WP_REST_Server::CREATABLE,
+			'callback' => array( __CLASS__, 'complaint_appeal' ),
+			'permission_callback' => array( __CLASS__, 'authenticated' ),
+		) );
 		register_rest_route( self::NAMESPACE, '/health', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( __CLASS__, 'health' ),
@@ -350,6 +360,11 @@ final class WCA_REST {
 		if ( is_wp_error( $rate ) ) { return $rate; }
 		return self::respond( self::protected_mutation_projection( WCA_Service::create_complaint( self::data( $request ) ), 'complaint' ), 201 );
 	}
+
+
+	public static function complaint_detail( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_read',60,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} return self::respond(WCA_Service::complaint_projection($request['ref'],get_current_user_id())); }
+
+	public static function complaint_appeal( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_appeal',10,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} $data=self::data($request); return self::respond(self::protected_mutation_projection(WCA_Service::appeal_complaint($request['ref'],absint($data['expected_version']??0),get_current_user_id()),'complaint')); }
 
 	public static function health() {
 		return self::respond( WCA_Observability::health() );

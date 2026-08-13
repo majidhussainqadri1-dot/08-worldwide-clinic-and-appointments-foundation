@@ -95,4 +95,15 @@ t16h('R15 strict external busy DB failure explicit','includes/class-wca-future24
 t16h('R15 standard slot response filters external busy','includes/class-wca-future24.php',"'external_calendar_filter_applied'");
 t16h('R15 slot hold rejects external busy','includes/class-wca-future24.php','wca_external_calendar_busy');
 t16h('R15 core hold cannot bypass external calendar','includes/class-wca-service.php','WCA_Future24::external_busy_conflict');
+t16h('R16 complaint lifecycle has explicit transition law','includes/class-wca-contracts.php','complaint_transition_matrix');
+t16h('R16 complaint purpose limit is server-owned','includes/class-wca-repository.php',"'purpose_limit'      => 'case_resolution_only'");
+t16h('R16 evidence references are opaque and bounded','includes/class-wca-repository.php','wca_complaint_evidence_limit');
+t16h('R16 complaint storage read failure explicit','includes/class-wca-repository.php','wca_complaint_read_failed');
+t16h('R16 complaint state update uses CAS','includes/class-wca-repository.php','wca_complaint_version_conflict');
+t16h('R16 complaint detail is protected opaque route','includes/class-wca-rest.php','complaints/(?P<ref>[0-9a-fA-F-]{36})');
+t16h('R16 complainant appeal route exists','includes/class-wca-rest.php','/appeal');
+t16h('R16 appeal is atomic with CF02 handoff','includes/class-wca-service.php','wca_complaint_appeal_transaction');
+t16h('R16 CF02 status projection requires verified source','includes/class-wca-service.php','wca_cf02_case_unverified');
+t16h('R16 CF02 status projection is idempotent','includes/class-wca-service.php',"'cf02_complaint_status'");
+t16h('R16 complaint projection exposes fixed purpose limit','includes/class-wca-service.php',"'purpose_limit'=>'case_resolution_only'");
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

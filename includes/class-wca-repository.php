@@ -825,15 +825,19 @@ final class WCA_Repository {
 	public static function create_complaint( $data ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['complaints'];
+		$category=sanitize_key($data['category'] ?? 'service');
+		if(!in_array($category,array('service','appointment','conduct','billing','access','privacy','other'),true)){return new WP_Error('wca_complaint_category',__('Complaint category is unsupported.','worldwide-clinic-appointments'),array('status'=>400));}
+		$summary=sanitize_textarea_field($data['summary'] ?? ''); if(strlen($summary)>2000){return new WP_Error('wca_complaint_summary_length',__('Complaint summary is too long.','worldwide-clinic-appointments'),array('status'=>400));}
+		$evidence=array(); foreach((array)($data['evidence_refs'] ?? array()) as $ref){$ref=sanitize_text_field((string)$ref); if(!preg_match('/^[A-Za-z0-9._:-]{8,191}$/',$ref)){return new WP_Error('wca_complaint_evidence_ref',__('Complaint evidence references must be opaque identifiers, not narrative content.','worldwide-clinic-appointments'),array('status'=>400));} $evidence[$ref]=true; if(count($evidence)>20){return new WP_Error('wca_complaint_evidence_limit',__('Too many complaint evidence references were supplied.','worldwide-clinic-appointments'),array('status'=>400));}}
 		$row = array(
 			'public_ref'         => self::uuid(),
 			'appointment_id'     => absint( $data['appointment_id'] ?? 0 ),
 			'clinic_id'          => absint( $data['clinic_id'] ?? 0 ),
 			'complainant_user_id'=> absint( $data['complainant_user_id'] ?? 0 ),
-			'category'           => sanitize_key( $data['category'] ?? 'service' ),
-			'summary'            => sanitize_textarea_field( $data['summary'] ?? '' ),
-			'evidence_refs_json' => self::json( array_values( array_filter( array_map( 'sanitize_text_field', (array) ( $data['evidence_refs'] ?? array() ) ) ) ) ),
-			'purpose_limit'      => sanitize_text_field( $data['purpose_limit'] ?? 'case_resolution_only' ),
+			'category'           => $category,
+			'summary'            => $summary,
+			'evidence_refs_json' => self::json( array_keys($evidence) ),
+			'purpose_limit'      => 'case_resolution_only',
 			'status'             => 'submitted',
 			'assigned_user_id'   => 0,
 			'outcome_json'       => '{}',
@@ -844,6 +848,28 @@ final class WCA_Repository {
 		if ( ! $row['complainant_user_id'] || ! $row['summary'] ) { return new WP_Error( 'wca_complaint_required', __( 'Complaint summary is required.', 'worldwide-clinic-appointments' ) ); }
 		if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_complaint_insert', __( 'Complaint could not be submitted.', 'worldwide-clinic-appointments' ) ); }
 		return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
+	}
+
+
+	/** @return array<string,mixed>|null|WP_Error */
+	public static function get_complaint_by_ref( $ref, $for_update=false ) {
+		global $wpdb; $table=WCA_Schema::tables()['complaints']; $ref=strtolower(sanitize_text_field((string)$ref));
+		if(!preg_match('/^[0-9a-f-]{36}$/',$ref)){return null;}
+		$sql="SELECT * FROM {$table} WHERE public_ref=%s LIMIT 1" . ($for_update?' FOR UPDATE':'');
+		$row=$wpdb->get_row($wpdb->prepare($sql,$ref),ARRAY_A);
+		if(null===$row && ''!==(string)$wpdb->last_error){return new WP_Error('wca_complaint_read_failed',__('Complaint state could not be read safely.','worldwide-clinic-appointments'),array('status'=>503));}
+		return $row?:null;
+	}
+
+	/** @return array<string,mixed>|WP_Error */
+	public static function transition_complaint( $ref, $next, $expected_version, $assigned_user_id=0, $outcome=array() ) {
+		global $wpdb; $table=WCA_Schema::tables()['complaints']; $row=self::get_complaint_by_ref($ref,true); if(is_wp_error($row)){return $row;} if(!$row){return new WP_Error('wca_complaint_not_found',__('Complaint was not found.','worldwide-clinic-appointments'),array('status'=>404));}
+		$next=sanitize_key((string)$next); $expected_version=absint($expected_version); if(!$expected_version || $expected_version!==absint($row['version'])){return new WP_Error('wca_complaint_version_conflict',__('Complaint state changed. Refresh before retrying.','worldwide-clinic-appointments'),array('status'=>409));}
+		if(!WCA_Contracts::can_transition_complaint((string)$row['status'],$next)){return new WP_Error('wca_complaint_transition',__('That complaint transition is not permitted.','worldwide-clinic-appointments'),array('status'=>409));}
+		$clean_outcome=array(); foreach((array)$outcome as $k=>$v){$k=sanitize_key((string)$k); if(!in_array($k,array('code','resolution_ref','appeal_ref'),true)||!is_scalar($v)){continue;} $clean_outcome[$k]=substr(sanitize_text_field((string)$v),0,191);}
+		$update=array('status'=>$next,'assigned_user_id'=>absint($assigned_user_id),'outcome_json'=>self::json($clean_outcome),'version'=>$expected_version+1,'updated_at'=>self::now());
+		$changed=$wpdb->update($table,$update,array('id'=>absint($row['id']),'version'=>$expected_version)); if(false===$changed){return new WP_Error('wca_complaint_write_failed',__('Complaint state could not be persisted safely.','worldwide-clinic-appointments'),array('status'=>503));} if(1!==(int)$changed){return new WP_Error('wca_complaint_version_conflict',__('Complaint state changed concurrently.','worldwide-clinic-appointments'),array('status'=>409));}
+		$updated=self::get_complaint_by_ref($ref,false); return $updated?:new WP_Error('wca_complaint_readback_missing',__('Updated complaint state could not be verified.','worldwide-clinic-appointments'),array('status'=>503));
 	}
 
 	/** @return array<string,mixed>|WP_Error */
