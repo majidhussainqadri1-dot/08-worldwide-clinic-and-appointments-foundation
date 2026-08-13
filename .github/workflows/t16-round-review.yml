@@ -22,18 +22,25 @@ jobs:
           python3 tools/t16-r18-fix-health.py
           python3 tools/t16-r18-fix-cli.py
           target=$(find tools -maxdepth 1 -name 't16-r18-fix-p*.py' -print -quit)
-          test -n "$target"
           python3 "$target"
-      - name: Full File 08 QA
+      - name: Full File 08 QA with explicit diagnostics
         run: |
-          set -euo pipefail
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.txt
+          set +e
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/lint.txt 2>&1
+          lint_status=$?
           php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/tests.txt 2>&1
+          tests_status=$?
+          node --check assets/js/clinic.js >/tmp/js1.txt 2>&1; js1=$?
+          node --check assets/js/continuity.js >/tmp/js2.txt 2>&1; js2=$?
+          node --check assets/js/future24.js >/tmp/js3.txt 2>&1; js3=$?
+          set -e
+          cat /tmp/lint.txt
           cat /tmp/tests.txt
-          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt; then exit 1; fi
-          node --check assets/js/clinic.js
-          node --check assets/js/continuity.js
-          node --check assets/js/future24.js
+          cat /tmp/js1.txt /tmp/js2.txt /tmp/js3.txt
+          if [ "$lint_status" -ne 0 ]; then msg=$(tail -n 8 /tmp/lint.txt | tr '\n' ';'); echo "::error title=R18 PHP lint::$msg"; exit 1; fi
+          if [ "$tests_status" -ne 0 ]; then msg=$(grep -E 'FAIL|failed|Fatal|Warning|Notice|Deprecated|error' /tmp/tests.txt | tail -n 20 | tr '\n' ';'); echo "::error title=R18 regression::$msg"; exit 1; fi
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt; then msg=$(grep -E 'Warning|Notice|Deprecated|Fatal|Parse' /tmp/tests.txt | tail -n 20 | tr '\n' ';'); echo "::error title=R18 warning-free gate::$msg"; exit 1; fi
+          if [ "$js1" -ne 0 ] || [ "$js2" -ne 0 ] || [ "$js3" -ne 0 ]; then echo "::error title=R18 JS syntax::clinic=$js1 continuity=$js2 future24=$js3"; exit 1; fi
       - name: Commit corrected state after green QA
         run: |
           set -euo pipefail
