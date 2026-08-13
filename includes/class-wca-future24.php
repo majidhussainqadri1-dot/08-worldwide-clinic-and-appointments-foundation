@@ -443,7 +443,8 @@ final class WCA_Future24 {
 
 	public static function observe_outbox_event( $envelope ) {
 		if ( ! is_array( $envelope ) || 'AppointmentCancelled.v1' !== (string) ( isset( $envelope['topic'] ) ? $envelope['topic'] : '' ) ) { return; }
-		self::offer_waitlist_for_cancelled_appointment( sanitize_text_field( isset( $envelope['aggregate_ref'] ) ? $envelope['aggregate_ref'] : '' ) );
+		$outcome = self::offer_waitlist_for_cancelled_appointment( sanitize_text_field( isset( $envelope['aggregate_ref'] ) ? $envelope['aggregate_ref'] : '' ) );
+		if ( is_wp_error( $outcome ) ) { throw new RuntimeException( 'wca_waitlist_offer_delivery_failed: ' . $outcome->get_error_message() ); }
 	}
 
 
@@ -454,10 +455,12 @@ final class WCA_Future24 {
 		$cursor = 0;
 		$batch = 100;
 		do {
-			$rows = (array) $wpdb->get_results( $wpdb->prepare(
+			$rows_raw = $wpdb->get_results( $wpdb->prepare(
 				"SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) AND id>%d ORDER BY id ASC LIMIT %d",
 				absint( $clinic_id ), WCA_Repository::now(), $cursor, $batch
 			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'wca_waitlist_candidate_read_failed' ); }
+			$rows = (array) $rows_raw;
 			foreach ( $rows as $row ) {
 				$cursor = max( $cursor, absint( $row['id'] ?? 0 ) );
 				yield $row;
@@ -475,6 +478,8 @@ final class WCA_Future24 {
 		$end = self::utc( SWC_Helpers::meta( $appointment_id, 'appointment_end_utc', '' ) );
 		if ( ! $clinic_id || ! $start || ! $end ) { return 0; }
 		$service = $service_id ? WCA_Repository::get_service( $service_id, false ) : null;
+		if ( $service_id && ! $service && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_waitlist_service_read_failed', __( 'The cancelled appointment service could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		if ( $service_id && ! $service ) { return 0; }
 		$service_ref = $service && ! empty( $service['public_ref'] ) ? strtolower( (string) $service['public_ref'] ) : '';
 		$table = self::tables()['records'];
 		$offered = 0;
@@ -483,7 +488,7 @@ final class WCA_Future24 {
 			$payload = json_decode( (string) $wait['payload_json'], true );
 			$payload = is_array( $payload ) ? $payload : array();
 			$wanted_service = strtolower( sanitize_text_field( isset( $payload['service_ref'] ) ? $payload['service_ref'] : '' ) );
-			if ( $wanted_service && $service_ref && ! hash_equals( $wanted_service, $service_ref ) ) { continue; }
+			if ( $wanted_service && ( ! $service_ref || ! hash_equals( $wanted_service, $service_ref ) ) ) { continue; }
 			$date_from = sanitize_text_field( isset( $payload['date_from'] ) ? $payload['date_from'] : '' );
 			$date_to = sanitize_text_field( isset( $payload['date_to'] ) ? $payload['date_to'] : '' );
 			if ( $date_from && $slot_date < $date_from ) { continue; }
@@ -527,6 +532,7 @@ final class WCA_Future24 {
 					), WCA_Observability::trace_id() );
 					return is_wp_error( $queued ) ? $queued : true;
 				}, 'wca_waitlist_offer_transaction' );
+				if ( is_wp_error( $outcome ) ) { return $outcome; }
 				if ( true === $outcome ) { $offered++; }
 			} finally {
 				self::release_semantic_lock( $offer_lock );
@@ -565,6 +571,8 @@ final class WCA_Future24 {
 	}
 
 	private static function public_record( $row ) {
+		if ( is_wp_error( $row ) ) { return $row; }
+		if ( ! is_array( $row ) ) { return new WP_Error( 'wca_future24_record_unavailable', __( 'The Future24 record could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$payload = json_decode( isset( $row['payload_json'] ) ? (string) $row['payload_json'] : '{}', true );
 		return array(
 			'public_ref' => (string) $row['public_ref'],
@@ -587,9 +595,12 @@ final class WCA_Future24 {
 		$ref = strtolower( sanitize_text_field( $ref ) );
 		if ( ! preg_match( '/^[0-9a-f-]{36}$/', $ref ) ) { return null; }
 		if ( $feature_id ) {
-			return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s AND feature_id=%s LIMIT 1", $ref, $feature_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s AND feature_id=%s LIMIT 1", $ref, $feature_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		} else {
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s LIMIT 1", $ref ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
-		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s LIMIT 1", $ref ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_future24_record_read_failed', __( 'The Future24 record could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		return $row;
 	}
 
 	private static function appointment_id( $ref ) {
@@ -818,6 +829,7 @@ final class WCA_Future24 {
 	public static function reserve_resource( $resource_ref, $data, $actor = 0 ) {
 		global $wpdb;
 		$resource = self::get_record( $resource_ref, 'F08-FUT-04' );
+		if ( is_wp_error( $resource ) ) { return $resource; }
 		if ( ! $resource || 'resource_active' !== $resource['status'] ) { return new WP_Error( 'wca_resource_missing', __( 'Scheduling resource is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$clinic = self::require_clinic_manager( $resource['clinic_id'], $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
@@ -896,6 +908,7 @@ final class WCA_Future24 {
 		$context = self::patient_context( is_array( $data ) ? $data : array(), $actor );
 		if ( is_wp_error( $context ) ) { return $context; }
 		$session = self::get_record( $session_ref, 'F08-FUT-05' );
+		if ( is_wp_error( $session ) ) { return $session; }
 		if ( ! $session || 'group_open' !== $session['status'] || ( ! empty( $session['expires_at'] ) && strtotime( $session['expires_at'] . ' UTC' ) <= time() ) ) {
 			return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 		}
@@ -903,7 +916,7 @@ final class WCA_Future24 {
 		$session_payload = json_decode( (string) $session['payload_json'], true );
 		$service_ref = is_array( $session_payload ) ? sanitize_text_field( $session_payload['service_ref'] ?? '' ) : '';
 		$service = $service_ref ? self::service_for_clinic( absint( $session['clinic_id'] ), $service_ref ) : null;
-		if ( ! $clinic || is_wp_error( $service ) || ! $service ) { return new WP_Error( 'wca_group_scope_stale', __( 'This group appointment is no longer bookable because its clinic or service is not active.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( ! $clinic || is_wp_error( $service ) || ( $service_ref && ! $service ) ) { return new WP_Error( 'wca_group_scope_stale', __( 'This group appointment is no longer bookable because its clinic or service is not active.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		if ( ! empty( $session['starts_at'] ) && strtotime( $session['starts_at'] . ' UTC' ) <= time() ) { return new WP_Error( 'wca_group_started', __( 'This group appointment has already started and is closed to new joins.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$table = self::tables()['records'];
 		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
@@ -938,6 +951,7 @@ final class WCA_Future24 {
 		$context = self::patient_context( is_array( $data ) ? $data : array(), $actor );
 		if ( is_wp_error( $context ) ) { return $context; }
 		$session = self::get_record( $session_ref, 'F08-FUT-05' );
+		if ( is_wp_error( $session ) ) { return $session; }
 		if ( ! $session || ! in_array( (string) $session['status'], array( 'group_open', 'group_cancelled' ), true ) ) {
 			return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 		}
@@ -967,6 +981,7 @@ final class WCA_Future24 {
 		global $wpdb;
 		$actor = absint( $actor ?: get_current_user_id() );
 		$session = self::get_record( $session_ref, 'F08-FUT-05' );
+		if ( is_wp_error( $session ) ) { return $session; }
 		if ( ! $session ) { return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$clinic = self::require_clinic_manager( absint( $session['clinic_id'] ), $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
@@ -979,6 +994,7 @@ final class WCA_Future24 {
 			$result = WCA_Repository::transaction( function () use ( $table, $session_ref, $data, $actor ) {
 				global $wpdb;
 				$session = self::get_record( $session_ref, 'F08-FUT-05' );
+				if ( is_wp_error( $session ) ) { return $session; }
 				if ( ! $session || 'group_open' !== (string) $session['status'] ) { return new WP_Error( 'wca_group_cancel_conflict', __( 'Group session changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 				$now = WCA_Repository::now();
 				$ok = $wpdb->update( $table, array( 'status' => 'group_cancelled', 'version' => absint( $session['version'] ) + 1, 'updated_at' => $now ), array( 'id' => absint( $session['id'] ), 'status' => 'group_open', 'version' => absint( $session['version'] ) ) );
@@ -1010,7 +1026,8 @@ final class WCA_Future24 {
 			self::audit( 'F08-FUT-06', 'reschedule_confirmation_pending', $appointment_ref, array( 'old_slot_preserved' => true ), $actor, false );
 			return $confirm;
 		}
-		self::audit( 'F08-FUT-06', 'safe_reschedule_completed', $appointment_ref, array( 'compensation_safe' => true ), $actor, false );
+		$audit = self::audit( 'F08-FUT-06', 'safe_reschedule_completed', $appointment_ref, array( 'compensation_safe' => true ), $actor, false );
+		if ( is_wp_error( $audit ) ) { return new WP_Error( 'wca_safe_reschedule_audit_failed', __( 'The appointment was rescheduled, but Future24 governance evidence could not be finalized. Reconciliation is required.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'reconciliation_required' => true, 'appointment_changed' => true ) ); }
 		return $confirm;
 	}
 
@@ -1320,10 +1337,12 @@ final class WCA_Future24 {
 		$cursor = 0;
 		$batch = 100;
 		do {
-			$rows = (array) $wpdb->get_results( $wpdb->prepare(
+			$rows_raw = $wpdb->get_results( $wpdb->prepare(
 				"SELECT {$columns} FROM {$table} WHERE feature_id=%s AND clinic_id=%d AND status=%s AND id>%d ORDER BY id ASC LIMIT %d",
 				$feature_id, absint( $clinic_id ), $status, $cursor, $batch
 			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$rows = (array) $rows_raw;
 			foreach ( $rows as $row ) { $cursor = max( $cursor, absint( $row['id'] ?? 0 ) ); $out[] = $row; }
 		} while ( count( $rows ) === $batch );
 		return $out;
@@ -1336,14 +1355,17 @@ final class WCA_Future24 {
 		$clinic_id = absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) );
 		$service_id = absint( SWC_Helpers::meta( $id, 'service_id', 0 ) );
 		$service = $service_id ? WCA_Repository::get_service( $service_id, false ) : null;
+		if ( $service_id && ! $service && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_questionnaire_service_read_failed', __( 'The appointment service could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$service_ref = $service && ! empty( $service['public_ref'] ) ? strtolower( (string) $service['public_ref'] ) : '';
 		$table = self::tables()['records'];
-		$rows = array_reverse( self::feature_rows_for_clinic( 'F08-FUT-11', $clinic_id, 'template_active', 'questionnaire' ) );
+		$rows = self::feature_rows_for_clinic( 'F08-FUT-11', $clinic_id, 'template_active', 'questionnaire' );
+		if ( is_wp_error( $rows ) ) { return $rows; }
+		$rows = array_reverse( $rows );
 		foreach ( $rows as $row ) {
 			$payload = json_decode( (string) $row['payload_json'], true );
 			if ( ! is_array( $payload ) ) { continue; }
 			$template_service = strtolower( sanitize_text_field( isset( $payload['service_ref'] ) ? $payload['service_ref'] : '' ) );
-			if ( $template_service && $service_ref && ! hash_equals( $template_service, $service_ref ) ) { continue; }
+			if ( $template_service && ( ! $service_ref || ! hash_equals( $template_service, $service_ref ) ) ) { continue; }
 			return array(
 				'contract' => 'wca.dynamic-previsit-questionnaire',
 				'version' => self::CONTRACT_VERSION,
@@ -1367,8 +1389,11 @@ final class WCA_Future24 {
 		if ( is_wp_error( $id ) ) { return $id; }
 		$consent = class_exists( 'WCA_Continuity_Guards' ) ? WCA_Continuity_Guards::consent_state( $appointment_ref, $actor_id ) : array();
 		$intake = WCA_Continuity::tables()['intake'];
-		$intake_status = (string) $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$intake} WHERE appointment_id=%d LIMIT 1", $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$intake_status_raw = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$intake} WHERE appointment_id=%d LIMIT 1", $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $intake_status_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_readiness_intake_read_failed', __( 'Current pre-visit readiness state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$intake_status = (string) $intake_status_raw;
 		$prereq = self::prerequisite_state( $id );
+		if ( is_wp_error( $prereq ) ) { return $prereq; }
 		$patient_id = absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) );
 		$guardian_id = absint( SWC_Helpers::meta( $id, 'guardian_user_id', 0 ) );
 		$guardian_check = self::current_guardian_state( $patient_id, $guardian_id );
@@ -1421,8 +1446,11 @@ final class WCA_Future24 {
 		$clinic_id = absint( SWC_Helpers::meta( $appointment_id, 'clinic_id', 0 ) );
 		$service_id = absint( SWC_Helpers::meta( $appointment_id, 'service_id', 0 ) );
 		$service = $service_id ? WCA_Repository::get_service( $service_id, false ) : null;
+		if ( $service_id && ! $service && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_prerequisite_service_read_failed', __( 'The appointment service could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$service_ref = $service && ! empty( $service['public_ref'] ) ? strtolower( (string) $service['public_ref'] ) : '';
-		$rules = array_reverse( self::feature_rows_for_clinic( 'F08-FUT-13', $clinic_id, 'rule_active', 'payload' ) );
+		$rules = self::feature_rows_for_clinic( 'F08-FUT-13', $clinic_id, 'rule_active', 'payload' );
+		if ( is_wp_error( $rules ) ) { return $rules; }
+		$rules = array_reverse( $rules );
 		$requirements = array();
 		foreach ( $rules as $row ) {
 			$p = json_decode( (string) $row['payload_json'], true );
@@ -1505,11 +1533,11 @@ final class WCA_Future24 {
 		if ( $now < strtotime( $start . ' UTC' ) - 4 * HOUR_IN_SECONDS || $now > strtotime( $end . ' UTC' ) + 6 * HOUR_IN_SECONDS ) {
 			return new WP_Error( 'wca_arrival_window', __( 'Arrival may only be announced near the scheduled appointment time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
-		$lock = self::semantic_lock( 'arrival', $id . '|' . $actor_id );
+		$lock = self::semantic_lock( 'arrival', $id );
 		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$table = self::tables()['records'];
-			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND subject_user_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $actor_id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_arrival_dedupe_read_failed', __( 'Current arrival state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( $existing ) { return self::public_record( $existing ); }
 			return self::put_record( 'F08-FUT-15', array(
@@ -1537,7 +1565,7 @@ final class WCA_Future24 {
 		$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $now ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $current && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_read_failed', __( 'Current queue state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $current ) { return new WP_Error( 'wca_queue_not_arrived', __( 'Arrival has not been registered or has expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		$ahead_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-15' AND clinic_id=%d AND status='arrived' AND created_at<%s AND (expires_at IS NULL OR expires_at>%s)", $clinic_id, $current['created_at'], $now ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$ahead_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(DISTINCT appointment_id) FROM {$table} WHERE feature_id='F08-FUT-15' AND clinic_id=%d AND status='arrived' AND created_at<%s AND (expires_at IS NULL OR expires_at>%s)", $clinic_id, $current['created_at'], $now ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $ahead_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_position_read_failed', __( 'Current queue position could not be calculated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$ahead = (int) $ahead_raw;
 		return array( 'contract' => 'wca.private-queue-position', 'version' => self::CONTRACT_VERSION, 'appointment_ref' => strtolower( $appointment_ref ), 'appointments_ahead' => $ahead, 'estimated_delay_minutes' => $ahead * 15, 'other_patient_identity_exposed' => false, 'estimate_only' => true );
@@ -1633,6 +1661,7 @@ final class WCA_Future24 {
 			return WCA_Repository::transaction( function () use ( $participant_ref, $id, $appointment_ref, $actor_id ) {
 				global $wpdb;
 				$row = self::get_record( $participant_ref, 'F08-FUT-18' );
+				if ( is_wp_error( $row ) ) { return $row; }
 				if ( ! $row || absint( $row['appointment_id'] ) !== $id || 'participant_active' !== $row['status'] ) { return new WP_Error( 'wca_support_participant_missing', __( 'The active support participant was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 				$table = self::tables()['records'];
 				$now = WCA_Repository::now();
@@ -1681,8 +1710,9 @@ final class WCA_Future24 {
 	private static function subject_user_id( $subject ) {
 		$subject = strtolower( sanitize_text_field( $subject ) );
 		if ( function_exists( 'smc_get_user_id_by_subject_uuid' ) ) {
-			$id = absint( smc_get_user_id_by_subject_uuid( $subject ) );
-			if ( $id ) { return $id; }
+			try { $raw = smc_get_user_id_by_subject_uuid( $subject ); } catch ( Throwable $error ) { return 0; }
+			if ( is_wp_error( $raw ) || ! is_scalar( $raw ) ) { return 0; }
+			return absint( $raw );
 		}
 		$users = get_users( array( 'fields' => 'ids', 'number' => 2, 'meta_key' => '_smc_subject_uuid', 'meta_value' => $subject ) );
 		return 1 === count( $users ) ? absint( $users[0] ) : 0;

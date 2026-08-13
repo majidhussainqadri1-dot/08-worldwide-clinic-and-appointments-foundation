@@ -58,8 +58,22 @@ t15h('R7 File09 verified result strict','includes/class-swc-doctor-authority.php
 t15h('R8 opaque payment preserves idempotency header','includes/class-wca-opaque-api.php',"set_header( 'Idempotency-Key'");
 t15h('R8 stale idempotency precheck read failure','includes/class-wca-second-ten-review-hardening.php','wca_stale_idempotency_read_failed');
 
-t15h('R10 canonical migration from-version captured before install','includes/class-wca-schema.php',"$from_version = (string) get_option( self::OPTION_DB_VERSION");
-t15h('R10 migration state uses canonical from-version','includes/class-wca-schema.php',"'from_version' => $from_version");
+t15h('R10 canonical migration from-version captured before install','includes/class-wca-schema.php',"\$from_version = (string) get_option( self::OPTION_DB_VERSION");
+t15h('R10 migration state uses canonical from-version','includes/class-wca-schema.php',"'from_version' => \$from_version");
 t15h('R10 schema snapshot refreshes on real upgrade','includes/class-wca-schema.php','capture_snapshot( $from_version !== WCA_Contracts::SCHEMA_VERSION )');
 t15h('R10 activation snapshot refreshed per attempt','includes/class-swc-activator.php','Every activation/deployment attempt gets a fresh immediate pre-change snapshot');
+
+t15h('R11 nested transactions join outer transaction','includes/class-wca-repository.php','private static $transaction_depth = 0');
+t15h('R11 nested transaction guard','includes/class-wca-repository.php','if ( self::$transaction_depth > 0 )');
+t15h('R11 waitlist candidate read failure','includes/class-wca-future24.php','wca_waitlist_candidate_read_failed');
+t15h('R11 waitlist delivery failure propagates','includes/class-wca-future24.php','wca_waitlist_offer_delivery_failed');
+t15h('R11 Future24 record read failure explicit','includes/class-wca-future24.php','wca_future24_record_read_failed');
+t15h('R11 policy traversal read failure explicit','includes/class-wca-future24.php','wca_future24_policy_read_failed');
+t15h('R11 readiness intake read failure explicit','includes/class-wca-future24.php','wca_readiness_intake_read_failed');
+t15h('R11 service-specific questionnaire fails closed','includes/class-wca-future24.php',"\$template_service && ( ! \$service_ref || ! hash_equals");
+t15h('R11 optional group service remains joinable','includes/class-wca-future24.php','( $service_ref && ! $service )');
+t15h('R11 arrival serialized by appointment','includes/class-wca-future24.php',"semantic_lock( 'arrival', \$id )");
+t15h('R11 queue counts distinct appointments','includes/class-wca-future24.php','COUNT(DISTINCT appointment_id)');
+t15h('R11 subject resolver helper is authoritative','includes/class-wca-future24.php',"if ( is_wp_error( \$raw ) || ! is_scalar( \$raw ) )");
+t15h('R11 completed reschedule audit failure explicit','includes/class-wca-future24.php','wca_safe_reschedule_audit_failed');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

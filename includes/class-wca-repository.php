@@ -8,6 +8,8 @@
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Repository {
+	private static $transaction_depth = 0;
+
 	public static function uuid() {
 		if ( function_exists( 'wp_generate_uuid4' ) ) { return strtolower( wp_generate_uuid4() ); }
 		try {
@@ -35,13 +37,24 @@ final class WCA_Repository {
 		return is_array( $data ) ? $data : $default;
 	}
 
-	/** Execute one owner mutation and its required evidence/outbox writes atomically. */
+	/** Execute one owner mutation and its required evidence/outbox writes atomically. Nested calls join the outer owner transaction. */
 	public static function transaction( $callback, $error_code = 'wca_transaction_failed' ) {
 		global $wpdb;
+		if ( self::$transaction_depth > 0 ) {
+			self::$transaction_depth++;
+			try {
+				return call_user_func( $callback );
+			} catch ( Throwable $error ) {
+				return new WP_Error( sanitize_key( $error_code ), __( 'The nested mutation could not be completed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+			} finally {
+				self::$transaction_depth--;
+			}
+		}
 		$started = $wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		if ( false === $started ) {
 			return new WP_Error( sanitize_key( $error_code . '_start' ), __( 'The mutation transaction could not be started safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 		}
+		self::$transaction_depth = 1;
 		try {
 			$result = call_user_func( $callback );
 			if ( is_wp_error( $result ) ) {
@@ -57,6 +70,8 @@ final class WCA_Repository {
 		} catch ( Throwable $error ) {
 			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			return new WP_Error( sanitize_key( $error_code ), __( 'The mutation could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		} finally {
+			self::$transaction_depth = 0;
 		}
 	}
 

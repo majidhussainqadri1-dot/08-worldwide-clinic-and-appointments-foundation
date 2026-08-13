@@ -72,3 +72,10 @@ R9 result: **CLEAN — no correction required.**
 R10 completed before correction. The canonical migration state recorded the legacy SWC schema as its `from_version` instead of the actual prior WCA schema version. In addition, schema and activation snapshots could remain from an older deployment rather than the immediate pre-change state required by the rollback runbook. The R10 batch captures the true WCA from-version, refreshes the schema snapshot for a real schema transition, and refreshes the activation snapshot for every activation/deployment attempt.
 
 R10 result: **SUPPORTED DEFECTS FOUND — full retest required before R11.**
+
+
+## R11 — complete Future24 F08-FUT-01…24 functional / safety review
+
+R11 was completed against the R10-corrected state before any R11 source change. Supported findings covered: nested Future24 owner transactions that could issue a second START TRANSACTION inside an outer atomic mutation; cancellation-waitlist traversal/delivery failures that could be acknowledged silently; SQL failure collapsed into Future24 record-not-found; policy/template traversal false-empty behavior; readiness intake false-state behavior; service-scoped waitlist/questionnaire mismatch when service truth was unavailable; optional group-session creation versus mandatory-service join inconsistency; cross-actor duplicate arrival rows and queue inflation; non-strict external subject resolution; and successful safe-reschedule returning success despite missing Future24 governance evidence. The correction batch joins nested transactions to the outer transaction, makes read/retry state authoritative, repairs scope semantics, deduplicates arrival per appointment and makes audit-finalization ambiguity explicit.
+
+R11 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R12.**
