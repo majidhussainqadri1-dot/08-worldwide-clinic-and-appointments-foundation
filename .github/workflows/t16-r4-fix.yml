@@ -1,4 +1,4 @@
-# retry-2: superseded regression expectation aligned
+# retry-3: literal-safe permanent T16 gate
 name: File 08 T16 R4 Post-Review Correction
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
       - name: Apply all R4 findings after completed review
-        run: python3 tools/t16-r4-fix.py
+        run: python3 tools/t16-r4-fix-v2.py
       - name: Full corrected-state retest
         run: |
           set -euo pipefail
@@ -28,7 +28,7 @@ jobs:
       - name: Commit corrected R4 state
         run: |
           set -euo pipefail
-          rm -f tools/t16-r4-fix.py .github/workflows/t16-r4-fix.yml
+          rm -f tools/t16-r4-fix.py tools/t16-r4-fix-v2.py .github/workflows/t16-r4-fix.yml
           git config user.name 'File 08 T16 Corrective Auditor'
           git config user.email 'actions@users.noreply.github.com'
           git add -A
