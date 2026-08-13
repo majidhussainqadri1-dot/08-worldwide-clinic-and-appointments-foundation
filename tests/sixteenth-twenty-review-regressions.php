@@ -35,4 +35,14 @@ t16h('R8 slot hold TTL rejects out-of-range intent','includes/class-wca-reposito
 t16h('R8 slot hold TTL persists validated value','includes/class-wca-repository.php','time() + $ttl');
 t16h('R8 clinical context TTL rejects out-of-range intent','includes/class-wca-repository.php','wca_context_ttl_range');
 t16h('R8 payment amount uses strict integer range','includes/class-wca-repository.php','WCA_Service::strict_int( $amount_raw, 0, PHP_INT_MAX )');
+t16h('R9 canonical dbDelta definitions receive column-index verification','includes/class-wca-schema.php','verify_definition_sql( $sql )');
+t16h('R9 schema verifier checks columns','includes/class-wca-schema.php','wca_schema_columns_missing');
+t16h('R9 schema verifier checks indexes','includes/class-wca-schema.php','wca_schema_indexes_missing');
+t16h('R9 continuity schema uses full verifier','includes/class-wca-continuity-secure.php','WCA_Schema::verify_definition_sql( $sql )');
+t16h('R9 Future24 schema uses full verifier','includes/class-wca-future24.php','WCA_Schema::verify_definition_sql( $sql )');
+t16h('R9 runtime migration failures are contained','worldwide-clinic.php','runtime_migration_failed');
+t16h('R9 runtime failure state is durable','worldwide-clinic.php','wca_runtime_migration_failure');
+t16h('R9 legacy migration rollback uncertainty explicit','includes/class-swc-activator.php','rollback could not be verified; storage state is uncertain');
+t16h('R9 uninstall removes primitive edit capability','uninstall.php','edit_swc_appointment');
+t16h('R9 uninstall removes private delete capability','uninstall.php','delete_private_swc_appointments');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

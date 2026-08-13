@@ -362,6 +362,8 @@ final class WCA_Schema {
 
 		foreach ( $definitions as $sql ) {
 			dbDelta( $sql );
+			$verified = self::verify_definition_sql( $sql );
+			if ( is_wp_error( $verified ) ) { throw new RuntimeException( $verified->get_error_message() ); }
 		}
 
 		$missing = array();
@@ -384,6 +386,40 @@ final class WCA_Schema {
 		);
 		$written = SWC_Helpers::update_option_strict( self::OPTION_MIGRATION_STATE, $migration_state, 'wca_migration_state_write' );
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical migration state could not be persisted.' ); }
+	}
+
+
+	/** Verify a dbDelta CREATE TABLE definition before any schema-version marker is advanced. @return true|WP_Error */
+	public static function verify_definition_sql( $sql ) {
+		global $wpdb;
+		if ( ! preg_match( '/CREATE\s+TABLE\s+([^\s(]+)\s*\((.*)\)\s*[^;]*;?$/is', trim( (string) $sql ), $match ) ) {
+			return new WP_Error( 'wca_schema_definition_invalid', __( 'A File 08 schema definition could not be parsed for verification.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
+		$table = trim( $match[1], "` \t\r\n" );
+		$body  = (string) $match[2];
+		$wpdb->last_error = '';
+		$columns_raw = $wpdb->get_col( 'SHOW COLUMNS FROM `' . esc_sql( $table ) . '`', 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $columns_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_schema_columns_read_failed', __( 'File 08 schema columns could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'table' => sanitize_text_field( $table ) ) ); }
+		$columns = array_map( 'strtolower', array_map( 'strval', (array) $columns_raw ) );
+		$expected_columns = array(); $expected_indexes = array();
+		foreach ( preg_split( '/\r?\n/', $body ) as $line ) {
+			$line = trim( rtrim( trim( $line ), ',' ) );
+			if ( preg_match( '/^(PRIMARY|UNIQUE\s+KEY|KEY)\b/i', $line ) ) {
+				if ( preg_match( '/^PRIMARY\s+KEY/i', $line ) ) { $expected_indexes[] = 'primary'; }
+				elseif ( preg_match( '/^(?:UNIQUE\s+KEY|KEY)\s+`?([A-Za-z0-9_]+)`?/i', $line, $idx ) ) { $expected_indexes[] = strtolower( $idx[1] ); }
+				continue;
+			}
+			if ( preg_match( '/^`?([A-Za-z0-9_]+)`?\s+[A-Za-z]/', $line, $col ) ) { $expected_columns[] = strtolower( $col[1] ); }
+		}
+		$missing_columns = array_values( array_diff( array_unique( $expected_columns ), $columns ) );
+		if ( $missing_columns ) { return new WP_Error( 'wca_schema_columns_missing', __( 'File 08 schema verification found missing columns.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'columns' => $missing_columns ) ); }
+		$wpdb->last_error = '';
+		$indexes_raw = $wpdb->get_results( 'SHOW INDEX FROM `' . esc_sql( $table ) . '`', ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $indexes_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_schema_indexes_read_failed', __( 'File 08 schema indexes could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'table' => sanitize_text_field( $table ) ) ); }
+		$indexes = array(); foreach ( (array) $indexes_raw as $row ) { if ( isset( $row['Key_name'] ) ) { $indexes[] = strtolower( (string) $row['Key_name'] ); } }
+		$missing_indexes = array_values( array_diff( array_unique( $expected_indexes ), array_unique( $indexes ) ) );
+		if ( $missing_indexes ) { return new WP_Error( 'wca_schema_indexes_missing', __( 'File 08 schema verification found missing indexes.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'indexes' => $missing_indexes ) ); }
+		return true;
 	}
 
 	public static function maybe_upgrade() {

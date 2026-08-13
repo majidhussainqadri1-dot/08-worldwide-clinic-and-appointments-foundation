@@ -111,6 +111,8 @@ final class WCA_Future24 {
 			KEY subject_feature (subject_user_id,feature_id,status)
 		) {$collate};";
 		dbDelta( $sql );
+		$verified = WCA_Schema::verify_definition_sql( $sql );
+		if ( is_wp_error( $verified ) ) { throw new RuntimeException( $verified->get_error_message() ); }
 		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 		if ( $exists !== $table ) { throw new RuntimeException( 'File 08 Future24 operational table could not be created.' ); }
 		$written = SWC_Helpers::update_option_strict( self::SCHEMA_OPTION, self::SCHEMA_VERSION, 'wca_future24_schema_version_write' );

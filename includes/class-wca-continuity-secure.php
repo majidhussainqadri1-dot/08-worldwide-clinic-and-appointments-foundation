@@ -107,7 +107,7 @@ final class WCA_Continuity {
 				KEY created_by_user_id (created_by_user_id)
 			) {$collate};",
 		);
-		foreach ( $definitions as $sql ) { dbDelta( $sql ); }
+		foreach ( $definitions as $sql ) { dbDelta( $sql ); $verified = WCA_Schema::verify_definition_sql( $sql ); if ( is_wp_error( $verified ) ) { throw new RuntimeException( $verified->get_error_message() ); } }
 		foreach ( $tables as $name => $table ) {
 			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 			if ( $exists !== $table ) { throw new RuntimeException( 'File 08 continuity table could not be created: ' . sanitize_key( $name ) ); }

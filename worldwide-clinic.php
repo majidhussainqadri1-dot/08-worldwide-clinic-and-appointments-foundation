@@ -85,7 +85,19 @@ function wca_start_plugin() {
 		} );
 		return;
 	}
-	SWC_Activator::maybe_upgrade();
+	try {
+		$legacy_upgrade = SWC_Activator::maybe_upgrade();
+		if ( is_wp_error( $legacy_upgrade ) ) { throw new RuntimeException( $legacy_upgrade->get_error_message() ); }
+		WCA_Continuity::maybe_upgrade();
+		WCA_Future24::maybe_upgrade();
+	} catch ( Throwable $wca_migration_error ) {
+		WCA_Observability::log( 'error', 'runtime_migration_failed', array( 'message' => sanitize_text_field( $wca_migration_error->getMessage() ) ) );
+		$failure = array( 'status' => 'failed', 'failed_at' => current_time( 'mysql', true ), 'message' => sanitize_text_field( $wca_migration_error->getMessage() ), 'runtime_version' => WCA_VERSION );
+		SWC_Helpers::update_option_strict( 'wca_runtime_migration_failure', $failure, 'wca_runtime_migration_failure_write' );
+		add_action( 'admin_notices', static function () use ( $wca_migration_error ) { if ( current_user_can( 'activate_plugins' ) ) { echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic migration paused:', 'worldwide-clinic-appointments' ) . '</strong> ' . esc_html( $wca_migration_error->getMessage() ) . '</p></div>'; } } );
+		return;
+	}
+	SWC_Helpers::delete_option_strict( 'wca_runtime_migration_failure', 'wca_runtime_migration_failure_clear' );
 	WCA_Plugin::boot();
 	WCA_Central_Governance::boot();
 	WCA_Continuity::boot();

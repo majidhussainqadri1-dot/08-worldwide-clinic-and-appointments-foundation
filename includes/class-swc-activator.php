@@ -285,8 +285,9 @@ final class SWC_Activator {
 			}
 			if ( false === $wpdb->query( 'COMMIT' ) ) { throw new RuntimeException( 'File 08 legacy record migration transaction could not commit.' ); } // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		} catch ( Throwable $e ) {
-			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			wp_cache_delete( absint( $id ), 'post_meta' );
+			if ( false === $rolled_back ) { throw new RuntimeException( 'File 08 legacy migration failed and rollback could not be verified; storage state is uncertain.', 0, $e ); }
 			throw $e;
 		}
 	}
