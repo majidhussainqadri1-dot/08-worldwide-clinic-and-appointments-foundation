@@ -18,53 +18,33 @@ jobs:
         run: |
           echo "REVIEW_TOOL_HEAD=$(git rev-parse HEAD)"
           git log --format='%H %s' -8
-      - name: Round 12 focused lifecycle invariant review
+      - name: Round 13 timezone DST slot projection review
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          files=list(Path('includes').rglob('*.php'))+[Path('worldwide-clinic.php')]
-          targets=re.compile(r'(transition_appointment|reschedul|check.?in|complete|no.?show|cancel|declin|confirm|grant_review|consume_review|review_eligib|release_appointment_slot|book_slot|slot_hold)',re.I)
-          def extract(lines,start):
-              depth=0; opened=False; out=[]
-              for j in range(start,len(lines)):
-                  line=lines[j]; out.append(line)
-                  # sufficient for these PHP methods; strings do not materially affect review print boundary
-                  for ch in line:
-                      if ch=='{': depth+=1; opened=True
-                      elif ch=='}' and opened: depth-=1
-                  if opened and depth<=0: break
-              return out
-          print('## TARGET METHODS')
+          files=list(Path('includes').rglob('*.php'))
+          pat=re.compile(r'(timezone|to_utc|strict_utc|project_rule_slot|availability|slot|buffer|DST|ambiguous|effective_from|effective_until|SLOT_HORIZON)',re.I)
+          print('## TIME/SLOT TARGETS')
           for f in files:
-              lines=f.read_text(errors='replace').splitlines()
-              for i,line in enumerate(lines):
-                  if re.search(r'function\s+\w+',line) and targets.search(line):
-                      print(f'\n### {f}:{i+1} {line.strip()}')
-                      print('\n'.join(extract(lines,i)))
-          print('\n## DIRECT APPOINTMENT STATUS WRITE CONTEXTS')
+            lines=f.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if re.search(r'function\s+\w+',line) and pat.search(line):
+                print(f'{f}:{i+1}: {line.strip()}')
+          print('## TIME CONVERSION / RANGE CONTEXTS')
           for f in files:
-              lines=f.read_text(errors='replace').splitlines()
-              for i,line in enumerate(lines):
-                  low=line.lower()
-                  if ('status' in low and any(x in low for x in ('$wpdb->update','$wpdb->query','update_post_meta','set_status'))) or re.search(r"['\"]status['\"]\s*=>",line):
-                      ctx='\n'.join(lines[max(0,i-7):min(len(lines),i+10)])
-                      if 'appointment' in ctx.lower():
-                          print(f'\n### {f}:{i+1}\n{ctx}')
-          print('\n## REVIEW ELIGIBILITY SQL/WRITE CONTEXTS')
+            lines=f.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if pat.search(line) and any(k in line for k in ('DateTime','strtotime','gmdate','timezone','effective_','start_utc','end_utc','SLOT_HORIZON')):
+                print(f'{f}:{i+1}: {line.strip()}')
+          print('## CONFLICT/OVERLAP CONTEXTS')
           for f in files:
-              lines=f.read_text(errors='replace').splitlines()
-              for i,line in enumerate(lines):
-                  if 'review_eligib' in line.lower():
-                      print(f'{f}:{i+1}: {line.strip()}')
-          print('\n## SLOT BOOK/RELEASE CALL SITES')
-          for f in files:
-              lines=f.read_text(errors='replace').splitlines()
-              for i,line in enumerate(lines):
-                  if re.search(r'\b(book_slot|release_appointment_slot)\s*\(',line):
-                      print(f'\n### {f}:{i+1}\n'+'\n'.join(lines[max(0,i-12):min(len(lines),i+16)]))
+            lines=f.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if re.search(r'(has_conflict|start_utc<|end_utc>|status IN.*held.*booked)',line,re.I):
+                print(f'{f}:{i+1}: {line.strip()}')
           PY
-      - name: Round 12 full regression confirmation
+      - name: Round 13 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
