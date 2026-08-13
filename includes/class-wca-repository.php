@@ -251,7 +251,8 @@ final class WCA_Repository {
 	public static function save_service( $data, $service_id = 0, $expected_version = 0 ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['services'];
-		$currency = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) ( $data['currency'] ?? '' ) ) );
+		$currency_raw = trim( (string) ( $data['currency'] ?? '' ) );
+		$currency = strtoupper( $currency_raw );
 		$consultation_type = sanitize_key( $data['consultation_type'] ?? '' );
 		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) ) {
 			return new WP_Error( 'wca_repository_service_currency', __( 'Service persistence requires a valid three-letter currency code.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
@@ -553,20 +554,21 @@ final class WCA_Repository {
 		};
 
 		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE idempotency_key=%s LIMIT 1", $idempotency_key ), ARRAY_A );
-				if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_read_failed', __( 'Current slot-hold state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_read_failed', __( 'Current slot-hold state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_read_failed', __( 'Current slot-hold state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$existing = $replay( $existing );
 		if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 
 		$lock_name = 'wca-slot-' . substr( hash( 'sha256', $doctor_id . '|' . substr( $start, 0, 10 ) ), 0, 48 );
-		$locked = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,5)', $lock_name ) );
+		$locked_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,5)', $lock_name ) );
+		if ( null === $locked_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_lock_read_failed', __( 'The scheduling lock could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$locked = (int) $locked_raw;
 		if ( 1 !== $locked ) {
 			return new WP_Error( 'wca_slot_lock', __( 'The scheduling resource is busy. Please try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		try {
 			/* Recheck inside the lock so concurrent retries replay the winner instead of failing or duplicating. */
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE idempotency_key=%s LIMIT 1", $idempotency_key ), ARRAY_A );
+			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_locked_read_failed', __( 'Current slot-hold state could not be verified inside the scheduling lock.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			$existing = $replay( $existing );
 			if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 			$conflict = $wpdb->get_var( $wpdb->prepare(
@@ -597,6 +599,7 @@ final class WCA_Repository {
 			);
 			if ( false === $wpdb->insert( $table, $row ) ) {
 				$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE idempotency_key=%s LIMIT 1", $idempotency_key ), ARRAY_A );
+				if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_race_read_failed', __( 'Concurrent slot-hold state could not be reconciled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 				$existing = $replay( $existing );
 				if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 				return new WP_Error( 'wca_slot_hold', __( 'The slot could not be held.', 'worldwide-clinic-appointments' ) );

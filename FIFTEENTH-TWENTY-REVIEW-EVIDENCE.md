@@ -25,3 +25,16 @@ R2 result: **SUPPORTED DEFECTS FOUND — corrected together after review complet
 R3 was completed against the R2-corrected state before any R3 correction. It found failure-visibility gaps in advisory lock acquisition, abandoned-outbox recovery, pending-claim/readback, payment/idempotency replay reads, and the authoritative reconciliation query. Database errors could be flattened into contention, no work, or not-found states. The post-review batch makes those reads and recovery operations explicit fail-closed errors and propagates outbox processing failures into maintenance.
 
 R3 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R4.**
+
+
+## R4 — strict temporal / timezone / DST review
+
+R4 completed against the R3-corrected state without source modification during review. Canonical UTC slot evidence, public date ranges, IANA timezone identifiers, DST local-time round trips and DOB round trips were re-traced. No new supported temporal product defect was proven.
+
+R4 result: **CLEAN — no correction required.**
+
+## R5 — numeric / money / bounds / code-integrity review
+
+R5 completed before correction. It found that service currency silently stripped non-letters before validating; the R1 slot-hold read checks had been mechanically concentrated at one location instead of covering all three authoritative reads; and a DB failure acquiring the slot advisory lock was indistinguishable from normal contention. All R5 findings are corrected together after review completion.
+
+R5 result: **SUPPORTED DEFECTS FOUND — full retest required before R6.**

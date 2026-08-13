@@ -38,4 +38,9 @@ t15h('R3 idempotency initial read failure','includes/class-wca-repository.php','
 t15h('R3 idempotency race read failure','includes/class-wca-repository.php','wca_idempotency_race_read_failed');
 t15h('R3 idempotency status read failure','includes/class-wca-repository.php','wca_idempotency_status_read_failed');
 t15h('R3 payment replay read failure','includes/class-wca-repository.php','wca_payment_replay_read_failed');
+
+t15h('R5 exact currency validation','includes/class-wca-repository.php','$currency_raw = trim');
+t15h('R5 slot lock read failure','includes/class-wca-repository.php','wca_slot_lock_read_failed');
+t15h('R5 inside-lock hold read failure','includes/class-wca-repository.php','wca_slot_hold_locked_read_failed');
+t15h('R5 insert-race hold read failure','includes/class-wca-repository.php','wca_slot_hold_race_read_failed');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";
