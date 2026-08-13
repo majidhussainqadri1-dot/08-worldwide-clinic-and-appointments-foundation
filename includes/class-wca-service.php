@@ -321,11 +321,17 @@ final class WCA_Service {
 		if ( $to_date < $from_date || $to_date->diff( $from_date )->days > self::SLOT_HORIZON_DAYS ) {
 			return new WP_Error( 'wca_slot_range', __( 'Slot search range is invalid or too large.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
+		WCA_Repository::clear_read_error();
 		$service = $service_id ? WCA_Repository::get_service( $service_id, true ) : null;
+		$read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( $service_id && ( ! $service || ( $clinic_id && absint( $service['clinic_id'] ) !== $clinic_id ) ) ) {
 			return new WP_Error( 'wca_slot_service_scope', __( 'The requested service is not active for this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
+		WCA_Repository::clear_read_error();
 		$rules = WCA_Repository::list_availability_rules( $doctor_id, $service_id, $clinic_id );
+		$read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $rules ) {
 			return array( 'slots' => array(), 'freshness_version' => hash( 'sha256', 'none|' . $doctor_id . '|' . $clinic_id . '|' . $service_id ), 'generated_at_utc' => gmdate( 'c' ) );
 		}
@@ -764,11 +770,17 @@ final class WCA_Service {
 
 	/** @return array<string,mixed> */
 	public static function public_clinic_projection( $id_or_slug ) {
+		WCA_Repository::clear_read_error();
 		$private = WCA_Repository::get_clinic( $id_or_slug, false );
+		$read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $private || 'active' !== (string) $private['status'] ) { return array(); }
 		$owner_id = absint( $private['owner_user_id'] ?? 0 );
 		if ( ! $owner_id || ! SWC_Doctor_Authority::is_eligible( $owner_id ) ) { return array(); }
+		WCA_Repository::clear_read_error();
 		$clinic = WCA_Repository::get_clinic( $private['id'], true );
+		$read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) { return array(); }
 		$projection = array(
 			'contract'       => 'wca.public-clinic',

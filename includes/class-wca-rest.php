@@ -171,9 +171,16 @@ final class WCA_REST {
 			$args['cursor_updated_at'] = $state['updated_at'];
 			$args['cursor_id'] = $state['id'];
 		}
+		WCA_Repository::clear_read_error();
 		$rows = WCA_Repository::list_clinics( $args );
+		$read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		$items = array();
-		foreach ( $rows as $row ) { $projection = WCA_Service::public_clinic_projection( $row['public_ref'] ); if ( $projection ) { $items[] = $projection; } }
+		foreach ( $rows as $row ) {
+			$projection = WCA_Service::public_clinic_projection( $row['public_ref'] );
+			if ( is_wp_error( $projection ) ) { return $projection; }
+			if ( $projection ) { $items[] = $projection; }
+		}
 		$next_cursor = '';
 		if ( count( $rows ) === $args['per_page'] ) {
 			$last = end( $rows );
@@ -197,6 +204,7 @@ final class WCA_REST {
 		$identifier = sanitize_text_field( $request['id'] );
 		if ( ctype_digit( $identifier ) ) { return new WP_Error( 'wca_public_numeric_id_disabled', __( 'Numeric internal clinic identifiers are not public API identities.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$projection = WCA_Service::public_clinic_projection( $identifier );
+		if ( is_wp_error( $projection ) ) { return $projection; }
 		return $projection ? self::respond( $projection ) : new WP_Error( 'wca_clinic_not_found', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 	}
 

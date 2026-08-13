@@ -92,4 +92,11 @@ t15h('R14 secure browser UUID fallback','assets/js/clinic.js','crypto.getRandomV
 t15h('R14 stable slot-hold replay key','assets/js/clinic.js','idempotency_key: holdRequestKey');
 t15h('R14 stable appointment replay key','assets/js/clinic.js','idempotency_key: appointmentRequestKey');
 t15h('R14 calendar same-origin validation','assets/js/future24.js','target.origin !== window.location.origin');
+
+t15h('R15 repository captures clinic discovery read failure','includes/class-wca-repository.php','wca_clinic_list_read_failed');
+t15h('R15 repository captures branch read failure','includes/class-wca-repository.php','wca_branch_list_read_failed');
+t15h('R15 repository captures service read failure','includes/class-wca-repository.php','wca_service_list_read_failed');
+t15h('R15 repository captures availability read failure','includes/class-wca-repository.php','wca_availability_list_read_failed');
+t15h('R15 public collection propagates repository read errors','includes/class-wca-rest.php','WCA_Repository::consume_read_error');
+t15h('R15 public projection propagates nested read errors','includes/class-wca-service.php','WCA_Repository::consume_read_error');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

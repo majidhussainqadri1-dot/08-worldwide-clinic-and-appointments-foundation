@@ -100,3 +100,10 @@ R13 result: **SUPPORTED DEFECTS FOUND — corrected together after review comple
 R14 completed before correction. Browser replay keys used an insecure Math.random fallback; hold and appointment retries did not preserve the original semantic replay key across ambiguous retry; and signed calendar navigation did not enforce same-origin at the browser edge. The post-review batch uses Web Crypto only, gives each displayed slot and appointment intent a stable retry key until success/context change, and validates signed calendar destinations against the current origin.
 
 R14 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R15.**
+
+
+## R15 — public clinic discovery / cursor / cache / slot-search review
+
+R15 completed before correction. Guest rate limiting was verified as per-user/per-IP and the signed keyset cursor matches `updated_at DESC, id DESC`. The supported defect was a repository-read failure family: clinic collection, clinic/branch/service projection and availability-rule reads could flatten SQL failure into empty/null state. Public discovery could therefore cache a false empty 200, return a false 404/partial projection, or slot search could advertise no availability after a database failure. The post-review batch records repository read failures across nested hydration and makes public discovery/projection and slot search propagate them explicitly rather than cache or project false absence.
+
+R15 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R16.**

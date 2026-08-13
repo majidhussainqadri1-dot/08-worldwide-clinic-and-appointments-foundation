@@ -9,6 +9,11 @@ defined( 'ABSPATH' ) || exit;
 
 final class WCA_Repository {
 	private static $transaction_depth = 0;
+	private static $read_error = null;
+
+	public static function clear_read_error() { self::$read_error = null; }
+	public static function consume_read_error() { $error = self::$read_error; self::$read_error = null; return $error; }
+	private static function note_read_error( $code, $message ) { if ( ! self::$read_error ) { self::$read_error = new WP_Error( sanitize_key( $code ), $message, array( 'status' => 503 ) ); } }
 
 	public static function uuid() {
 		if ( function_exists( 'wp_generate_uuid4' ) ) { return strtolower( wp_generate_uuid4() ); }
@@ -119,6 +124,7 @@ final class WCA_Repository {
 			$sql = $wpdb->prepare( "SELECT * FROM {$table} WHERE slug=%s LIMIT 1", sanitize_title( $id_or_ref ) );
 		}
 		$row = $wpdb->get_row( $sql, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_clinic_read_failed', __( 'Clinic data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		if ( ! $row || ( $public_only && 'active' !== $row['status'] ) ) {
 			return null;
 		}
@@ -154,7 +160,9 @@ final class WCA_Repository {
 		$sql = "SELECT DISTINCT c.* FROM {$table} c{$join} WHERE " . implode( ' AND ', $where ) . ' ORDER BY c.updated_at DESC,c.id DESC LIMIT %d OFFSET %d';
 		$params[] = $per_page; $params[] = $offset;
 		$prepared = $wpdb->prepare( $sql, $params ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$rows = (array) $wpdb->get_results( $prepared, ARRAY_A );
+		$rows_raw = $wpdb->get_results( $prepared, ARRAY_A );
+		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_clinic_list_read_failed', __( 'Clinic discovery data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
+		$rows = (array) $rows_raw;
 		return array_map( static function ( $row ) use ( $status ) { return self::hydrate_clinic( $row, 'active' === $status ); }, $rows );
 	}
 
@@ -242,7 +250,9 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['branches'];
 		$sql = "SELECT * FROM {$table} WHERE clinic_id=%d" . ( $public_only ? " AND status='active' AND visibility='public'" : '' ) . ' ORDER BY name ASC,id ASC';
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, absint( $clinic_id ) ), ARRAY_A );
+		$rows_raw = $wpdb->get_results( $wpdb->prepare( $sql, absint( $clinic_id ) ), ARRAY_A );
+		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_branch_list_read_failed', __( 'Clinic branch data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
+		$rows = (array) $rows_raw;
 		return array_map( static function ( $row ) use ( $public_only ) {
 			$row['contacts'] = self::decode( $row['contacts_json'] );
 			unset( $row['contacts_json'] );
@@ -331,6 +341,7 @@ final class WCA_Repository {
 		$table = WCA_Schema::tables()['services'];
 		$sql = "SELECT * FROM {$table} WHERE id=%d" . ( $public_only ? " AND status='active'" : '' ) . ' LIMIT 1';
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, absint( $id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_service_read_failed', __( 'Service data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		return $row ?: null;
 	}
 
@@ -343,7 +354,9 @@ final class WCA_Repository {
 		if ( $public_only ) { $where[] = "status='active'"; }
 		if ( $doctor_user_id ) { $where[] = '(doctor_user_id=0 OR doctor_user_id=%d)'; $params[] = absint( $doctor_user_id ); }
 		$sql = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY name ASC,id ASC';
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows_raw = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_service_list_read_failed', __( 'Clinic service data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
+		$rows = (array) $rows_raw;
 		if ( ! $public_only ) { return $rows; }
 		$clinic = self::get_clinic( $clinic_id, false );
 		return array_values( array_filter( array_map( static function ( $row ) use ( $clinic ) {
@@ -493,7 +506,9 @@ final class WCA_Repository {
 		$params = array( absint( $doctor_user_id ), 'active' );
 		if ( $service_id ) { $where .= ' AND (service_id=0 OR service_id=%d)'; $params[] = absint( $service_id ); }
 		if ( $clinic_id ) { $where .= ' AND clinic_id=%d'; $params[] = absint( $clinic_id ); }
-		$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY id ASC", $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows_raw = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY id ASC", $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_availability_list_read_failed', __( 'Availability data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
+		$rows = (array) $rows_raw;
 		return array_map( static function ( $row ) {
 			foreach ( array( 'rrule', 'breaks', 'exceptions' ) as $key ) { $row[ $key ] = self::decode( $row[ $key . '_json' ] ); unset( $row[ $key . '_json' ] ); }
 			return $row;
