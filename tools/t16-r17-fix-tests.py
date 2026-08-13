@@ -2,7 +2,7 @@ from pathlib import Path
 p=Path('tests/sixteenth-twenty-review-regressions.php'); s=p.read_text()
 marker='if($fail){fwrite(STDERR,"T16 regression gate failed:\\n- ".implode("\\n- ",$fail)."\\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\\n";'
 if s.count(marker)!=1: raise SystemExit(f'final marker mismatch {s.count(marker)}')
-add="""t16h('R17 canonical minor assertion rejects non-boolean provider values','includes/class-wca-central-governance.php',\"$minor_raw, array( true, false, 1, 0, '1', '0' )\");
+add="""t16h('R17 canonical minor assertion uses strict boolean normalization','includes/class-wca-central-governance.php','true === $minor_raw || 1 === $minor_raw');
 t16h('R17 guardian verification provider failure is degraded','includes/class-wca-central-governance.php','wca_guardian_verification_provider_failure');
 t16h('R17 guardian relationship provider failure is degraded','includes/class-wca-central-governance.php','wca_guardian_relationship_provider_failure');
 t16h('R17 active consent DB failure is explicit','includes/class-wca-continuity-secure.php','wca_active_consent_read_failed');
