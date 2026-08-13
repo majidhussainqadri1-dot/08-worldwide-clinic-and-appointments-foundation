@@ -1,4 +1,4 @@
-name: File 08 T16 R18 Correction
+name: File 08 T16 R18 Final Correction Gate
 on:
   push:
     branches: [codex/file08-new-governing-plans-completion-2026]
@@ -23,7 +23,37 @@ jobs:
           python3 tools/t16-r18-fix-cli.py
           target=$(find tools -maxdepth 1 -name 't16-r18-fix-p*.py' -print -quit)
           python3 "$target"
-      - name: Full File 08 QA with exact tail diagnostic
+      - name: Align superseded static contracts and add R18 regression gates
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/central-plan-2026.php')
+          s=p.read_text()
+          old="register_activation_hook( WCA_FILE, array( 'WCA_Continuity', 'activate' ) )"
+          new="register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) )"
+          if s.count(old)!=1: raise SystemExit(f'activation parity anchor mismatch: {s.count(old)}')
+          p.write_text(s.replace(old,new,1))
+          p=Path('tools/t16-r18-fix-tests.py')
+          s=p.read_text()
+          s=s.replace('self::OPTION_MIGRATION_STATE, $migration_state', 'self::OPTION_MIGRATION_STATE, \\$migration_state')
+          s=s.replace("'WCA_Privacy::assert_purge_allowed','do {'", "'WCA_Privacy::assert_purge_allowed','swc_purge_post_query'")
+          p.write_text(s)
+          PY
+          python3 tools/t16-r18-fix-tests.py
+      - name: R18 structural ordering checks
+        run: |
+          set -euo pipefail
+          test "$(grep -c 'register_activation_hook' worldwide-clinic.php)" -eq 1
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('includes/class-wca-schema.php').read_text()
+          assert s.index("self::OPTION_MIGRATION_STATE, $migration_state") < s.index("self::OPTION_DB_VERSION, WCA_Contracts::SCHEMA_VERSION")
+          s=Path('includes/class-swc-activator.php').read_text()
+          a=s.index('WCA_Privacy::assert_purge_allowed')
+          assert a < s.index('swc_purge_post_query',a)
+          PY
+      - name: Full warning-free File 08 QA
         run: |
           set +e
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/lint.txt 2>&1
@@ -36,15 +66,15 @@ jobs:
           set -e
           cat /tmp/tests.txt
           if [ "$lint_status" -ne 0 ]; then msg=$(tail -n 15 /tmp/lint.txt | tr '\n' ';' | head -c 5000); echo "::error title=R18 PHP lint::$msg"; exit 1; fi
-          if [ "$tests_status" -ne 0 ]; then msg=$(tail -n 45 /tmp/tests.txt | tr '\n' ';' | head -c 6000); echo "::error title=R18 regression tail::$msg"; exit 1; fi
+          if [ "$tests_status" -ne 0 ]; then msg=$(tail -n 50 /tmp/tests.txt | tr '\n' ';' | head -c 6000); echo "::error title=R18 regression::$msg"; exit 1; fi
           if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt; then msg=$(grep -E 'Warning|Notice|Deprecated|Fatal|Parse' /tmp/tests.txt | tail -n 20 | tr '\n' ';' | head -c 5000); echo "::error title=R18 warning-free gate::$msg"; exit 1; fi
           if [ "$js1" -ne 0 ] || [ "$js2" -ne 0 ] || [ "$js3" -ne 0 ]; then echo "::error title=R18 JS syntax::clinic=$js1 continuity=$js2 future24=$js3"; exit 1; fi
-      - name: Commit corrected state after green QA
+      - name: Commit R18 corrected state only after green QA
         run: |
           set -euo pipefail
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add worldwide-clinic.php includes/class-swc-activator.php includes/class-wca-schema.php includes/class-wca-continuity-secure.php includes/class-wca-future24.php includes/class-wca-observability.php includes/class-wca-cli.php includes/class-wca-privacy.php
+          git add worldwide-clinic.php includes/class-swc-activator.php includes/class-wca-schema.php includes/class-wca-continuity-secure.php includes/class-wca-future24.php includes/class-wca-observability.php includes/class-wca-cli.php includes/class-wca-privacy.php tests/central-plan-2026.php tests/sixteenth-twenty-review-regressions.php
           git diff --cached --check
-          git commit -m 'fix(file08): close T16 R18 migration and lifecycle integrity defects'
+          git commit -m 'fix(file08): close T16 R18 migration lifecycle integrity defects'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
