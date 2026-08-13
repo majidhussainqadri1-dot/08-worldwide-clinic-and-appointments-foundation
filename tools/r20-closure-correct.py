@@ -85,3 +85,13 @@ new = "'sixteenth-twenty-review-regressions.php', 'sixteenth-cycle-closure-hygie
 if s.count(old) != 1:
     raise SystemExit(f'run-all closure-test anchor mismatch: {s.count(old)}')
 p.write_text(s.replace(old, new, 1))
+
+# Fifteenth-cycle permanent regression must preserve historical evidence without
+# forcing the current README to lie about which cycle is current.
+p = Path('tests/fifteenth-twenty-review-regressions.php')
+s = p.read_text()
+old = "t15h('R20 repository README records all main rounds complete','README.md','All 20 main reviews are complete');"
+new = "t15h('R20 repository history preserves fifteenth closure','CHANGELOG.md','Fifteenth fresh 20-round corrective audit');"
+if s.count(old) != 1:
+    raise SystemExit(f'T15 historical-evidence assertion anchor mismatch: {s.count(old)}')
+p.write_text(s.replace(old, new, 1))
