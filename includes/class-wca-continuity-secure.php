@@ -161,8 +161,10 @@ final class WCA_Continuity {
 			WCA_Observability::metric( 'previsit_emergency_diversion_total', 1, array( 'category' => $red_flag['category'] ) );
 			return new WP_Error( 'wca_emergency_diversion', $red_flag['message'], array( 'status' => 422, 'emergency' => true, 'category' => $red_flag['category'] ) );
 		}
-		if ( $submit && ! self::active_consent( $appointment_id, 'appointment_processing' ) ) {
-			return new WP_Error( 'wca_intake_consent', __( 'Current appointment-processing consent is required before intake submission.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		if ( $submit ) {
+			$active_consent = self::active_consent( $appointment_id, 'appointment_processing' );
+			if ( is_wp_error( $active_consent ) ) { return $active_consent; }
+			if ( ! $active_consent ) { return new WP_Error( 'wca_intake_consent', __( 'Current appointment-processing consent is required before intake submission.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		}
 		$sealed = self::seal( $sanitized );
 		if ( is_wp_error( $sealed ) ) { return $sealed; }
@@ -319,6 +321,10 @@ final class WCA_Continuity {
 		$active = in_array( $status, array( 'confirmed', 'reschedule_pending', 'checked_in', 'completed' ), true );
 		$patient_id = self::patient_id( $appointment_id );
 		$doctor_id  = absint( SWC_Helpers::meta( $appointment_id, 'doctor_id', 0 ) );
+		$messaging_consent = self::active_consent( $appointment_id, 'messaging' );
+		$call_consent      = self::active_consent( $appointment_id, 'teleconsult' );
+		$recording_consent = self::active_consent( $appointment_id, 'recording' );
+		foreach ( array( $messaging_consent, $call_consent, $recording_consent ) as $consent_state ) { if ( is_wp_error( $consent_state ) ) { return $consent_state; } }
 		return array(
 			'contract'               => 'wca.file17-clinic-context',
 			'version'                => self::CONTRACT_VERSION,
@@ -327,9 +333,9 @@ final class WCA_Continuity {
 			'doctor_subject_uuid'    => WCA_Authorization::subject_uuid( $doctor_id ),
 			'appointment_status'     => $status,
 			'relationship_active'    => $active,
-			'messaging_allowed'      => $active && self::active_consent( $appointment_id, 'messaging' ),
-			'call_allowed'           => $active && self::active_consent( $appointment_id, 'teleconsult' ),
-			'recording_allowed'      => $active && self::active_consent( $appointment_id, 'recording' ),
+			'messaging_allowed'      => $active && $messaging_consent,
+			'call_allowed'           => $active && $call_consent,
+			'recording_allowed'      => $active && $recording_consent,
 			'clinical_record_access' => false,
 			'public_social_context'  => false,
 			'checked_at_utc'         => gmdate( 'c' ),
@@ -346,7 +352,9 @@ final class WCA_Continuity {
 		if ( is_wp_error( $access ) ) { return $access; }
 		if ( ! self::followup_actor_allowed( $appointment_id, $actor_user_id ) ) { return new WP_Error( 'wca_followup_actor', __( 'Only an authorized treating professional or explicitly delegated clinical staff member may create a follow-up plan.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
 		if ( 'completed' !== SWC_Helpers::status( $appointment_id ) ) { return new WP_Error( 'wca_followup_state', __( 'Follow-up planning requires a completed appointment.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		if ( ! self::active_consent( $appointment_id, 'followup' ) ) { return new WP_Error( 'wca_followup_consent', __( 'Current follow-up consent is required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$followup_consent = self::active_consent( $appointment_id, 'followup' );
+		if ( is_wp_error( $followup_consent ) ) { return $followup_consent; }
+		if ( ! $followup_consent ) { return new WP_Error( 'wca_followup_consent', __( 'Current follow-up consent is required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$due = WCA_Plan_Guard::strict_utc( isset( $data['due_at_utc'] ) ? $data['due_at_utc'] : '' );
 		if ( ! $due || strtotime( $due . ' UTC' ) <= time() ) { return new WP_Error( 'wca_followup_due', __( 'A future UTC follow-up time is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$payload = self::sanitize_followup( is_array( $data ) ? $data : array() );
@@ -842,7 +850,14 @@ final class WCA_Continuity {
 	private static function request_data( WP_REST_Request $request ) { $data=$request->get_json_params(); return is_array($data)?$data:$request->get_params(); }
 	private static function rate_limit( $scope, $limit=30, $window=300 ) { return SWC_Helpers::rate_limit_hit('continuity_'.sanitize_key($scope),absint(get_current_user_id()),$limit,$window)?new WP_Error('wca_rate_limit',__('Too many requests. Please try again later.','worldwide-clinic-appointments'),array('status'=>429,'retry_after'=>$window)):true; }
 	private static function no_store( $result, $status=200 ) { if(is_wp_error($result)){return $result;} $response=rest_ensure_response($result); $response->set_status($status); $response->header('Cache-Control','private, no-store, max-age=0'); $response->header('X-Robots-Tag','noindex, noarchive, nofollow'); $response->header('X-Request-ID',WCA_Observability::trace_id()); return $response; }
-	private static function active_consent( $appointment_id, $scope ) { global $wpdb; $table=WCA_Schema::tables()['consents']; $count=$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE appointment_id=%d AND scope=%s AND status='granted' AND revoked_at IS NULL",absint($appointment_id),sanitize_key($scope))); return absint($count)>0; } // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	/** @return bool|WP_Error */
+	private static function active_consent( $appointment_id, $scope ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['consents'];
+		$count = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE appointment_id=%d AND scope=%s AND status='granted' AND revoked_at IS NULL", absint( $appointment_id ), sanitize_key( $scope ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_active_consent_read_failed', __( 'Current consent state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		return absint( $count ) > 0;
+	}
 	private static function patient_id( $appointment_id ) { return absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ); }
 	private static function appointment_ref( $appointment_id ) { $ref=(string)SWC_Helpers::meta(absint($appointment_id),'public_ref',''); return preg_match('/^[0-9a-f-]{36}$/i',$ref)?strtolower($ref):''; }
 	private static function appointment_id( $ref ) { $ref=sanitize_text_field($ref); if(!preg_match('/^[0-9a-f-]{36}$/i',$ref)){return 0;} $ids=get_posts(array('post_type'=>SWC_Helpers::TYPE,'post_status'=>'any','fields'=>'ids','posts_per_page'=>2,'no_found_rows'=>true,'meta_key'=>'_swc_public_ref','meta_value'=>$ref)); if(1!==count($ids)){$ids=get_posts(array('post_type'=>SWC_Helpers::TYPE,'post_status'=>'any','fields'=>'ids','posts_per_page'=>2,'no_found_rows'=>true,'meta_key'=>'public_ref','meta_value'=>$ref));} return 1===count($ids)?absint($ids[0]):0; }

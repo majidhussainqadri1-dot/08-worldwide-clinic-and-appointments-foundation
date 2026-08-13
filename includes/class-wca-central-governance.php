@@ -148,7 +148,12 @@ final class WCA_Central_Governance {
 
 		$gender = self::normalize_gender( isset( $raw['gender'] ) ? $raw['gender'] : '' );
 		$age = self::age_from_birth_date( isset( $raw['birth_date'] ) ? $raw['birth_date'] : '' );
-		$minor = array_key_exists( 'is_minor', $raw ) && null !== $raw['is_minor'] ? (bool) $raw['is_minor'] : null;
+		$minor = null;
+		if ( array_key_exists( 'is_minor', $raw ) && null !== $raw['is_minor'] ) {
+			$minor_raw = $raw['is_minor'];
+			if ( ! in_array( $minor_raw, array( true, false, 1, 0, '1', '0' ), true ) ) { return new WP_Error( 'wca_age_claim_invalid_provider_response', __( 'Current minor eligibility returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$minor = true === $minor_raw || 1 === $minor_raw || '1' === $minor_raw;
+		}
 		$threshold = 'female' === $gender ? 12 : 15;
 		$threshold = max( $threshold, absint( apply_filters( 'wca_guardian_age_threshold', $threshold, $gender, $patient_user_id ) ) );
 		if ( null !== $age && $age < $threshold && false === $minor ) {
@@ -171,6 +176,26 @@ final class WCA_Central_Governance {
 		);
 	}
 
+	/** @return bool|WP_Error */
+	private static function strict_guardian_verified( $guardian_user_id ) {
+		if ( function_exists( 'smc_user_is_verified_guardian' ) ) {
+			try { $raw = smc_user_is_verified_guardian( absint( $guardian_user_id ) ); } catch ( Throwable $e ) { return new WP_Error( 'wca_guardian_verification_provider_failure', __( 'Current guardian verification could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			if ( is_wp_error( $raw ) || ! in_array( $raw, array( true, false, 1, 0, '1', '0' ), true ) ) { return new WP_Error( 'wca_guardian_verification_provider_invalid', __( 'Current guardian verification returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			return true === $raw || 1 === $raw || '1' === $raw;
+		}
+		return true === apply_filters( 'wca_user_is_verified_guardian', false, absint( $guardian_user_id ) );
+	}
+
+	/** @return bool|WP_Error */
+	private static function strict_guardian_relationship( $guardian_user_id, $patient_user_id ) {
+		if ( function_exists( 'smc_guardian_may_act_for' ) ) {
+			try { $raw = smc_guardian_may_act_for( absint( $guardian_user_id ), absint( $patient_user_id ) ); } catch ( Throwable $e ) { return new WP_Error( 'wca_guardian_relationship_provider_failure', __( 'Current guardian relationship could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			if ( is_wp_error( $raw ) || ! in_array( $raw, array( true, false, 1, 0, '1', '0' ), true ) ) { return new WP_Error( 'wca_guardian_relationship_provider_invalid', __( 'Current guardian relationship returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			return true === $raw || 1 === $raw || '1' === $raw;
+		}
+		return true === apply_filters( 'wca_guardian_may_act_for_patient', false, absint( $guardian_user_id ), absint( $patient_user_id ) );
+	}
+
 	/** @return true|WP_Error */
 	public static function validate_patient_guardian( $patient_user_id, $guardian_user_id, $actor_user_id ) {
 		$patient_user_id  = absint( $patient_user_id );
@@ -178,18 +203,20 @@ final class WCA_Central_Governance {
 		$actor_user_id    = absint( $actor_user_id );
 		$claim = self::age_guardian_claim( $patient_user_id );
 		if ( is_wp_error( $claim ) ) { return $claim; }
+		$guardian_verified = false;
+		if ( $guardian_user_id ) { $guardian_verified = self::strict_guardian_verified( $guardian_user_id ); if ( is_wp_error( $guardian_verified ) ) { return $guardian_verified; } }
 		if ( ! empty( $claim['guardian_required'] ) ) {
-			if ( ! $guardian_user_id || $guardian_user_id !== $actor_user_id || ! WCA_Authorization::is_guardian( $guardian_user_id ) ) {
+			if ( ! $guardian_user_id || $guardian_user_id !== $actor_user_id || ! $guardian_verified ) {
 				return new WP_Error( 'wca_guardian_required', __( 'A current verified guardian must act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 			}
 			$allowed = true === apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
-			if ( function_exists( 'smc_guardian_may_act_for' ) ) { try { $rel = smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); $allowed = true === $rel || 1 === $rel || '1' === $rel; } catch ( Throwable $e ) { $allowed = false; } }
+			if ( function_exists( 'smc_guardian_may_act_for' ) ) { $allowed = self::strict_guardian_relationship( $guardian_user_id, $patient_user_id ); if ( is_wp_error( $allowed ) ) { return $allowed; } }
 			return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		if ( $patient_user_id === $actor_user_id && ! $guardian_user_id ) { return true; }
-		if ( $guardian_user_id && $guardian_user_id === $actor_user_id && WCA_Authorization::is_guardian( $guardian_user_id ) ) {
+		if ( $guardian_user_id && $guardian_user_id === $actor_user_id && $guardian_verified ) {
 			$allowed = true === apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
-			if ( function_exists( 'smc_guardian_may_act_for' ) ) { try { $rel = smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); $allowed = true === $rel || 1 === $rel || '1' === $rel; } catch ( Throwable $e ) { $allowed = false; } }
+			if ( function_exists( 'smc_guardian_may_act_for' ) ) { $allowed = self::strict_guardian_relationship( $guardian_user_id, $patient_user_id ); if ( is_wp_error( $allowed ) ) { return $allowed; } }
 			return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		return new WP_Error( 'wca_patient_actor_mismatch', __( 'The current actor may not act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );

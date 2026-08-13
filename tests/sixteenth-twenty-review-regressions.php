@@ -106,4 +106,11 @@ t16h('R16 appeal is atomic with CF02 handoff','includes/class-wca-service.php','
 t16h('R16 CF02 status projection requires verified source','includes/class-wca-service.php','wca_cf02_case_unverified');
 t16h('R16 CF02 status projection is idempotent','includes/class-wca-service.php',"'cf02_complaint_status'");
 t16h('R16 complaint projection exposes fixed purpose limit','includes/class-wca-service.php',"'purpose_limit'=>'case_resolution_only'");
+t16h('R17 canonical minor assertion uses strict boolean normalization','includes/class-wca-central-governance.php','true === $minor_raw || 1 === $minor_raw');
+t16h('R17 guardian verification provider failure is degraded','includes/class-wca-central-governance.php','wca_guardian_verification_provider_failure');
+t16h('R17 guardian relationship provider failure is degraded','includes/class-wca-central-governance.php','wca_guardian_relationship_provider_failure');
+t16h('R17 active consent DB failure is explicit','includes/class-wca-continuity-secure.php','wca_active_consent_read_failed');
+t16h('R17 intake propagates consent read failure','includes/class-wca-continuity-secure.php','$active_consent = self::active_consent');
+t16h('R17 File17 context pre-reads consent strictly','includes/class-wca-continuity-secure.php','$messaging_consent = self::active_consent');
+t16h('R17 follow-up propagates consent read failure','includes/class-wca-continuity-secure.php','$followup_consent = self::active_consent');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";
