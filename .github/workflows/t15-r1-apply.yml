@@ -22,7 +22,28 @@ jobs:
           coverage: none
           extensions: zip
       - name: Apply all R1 findings after completed review
-        run: python3 tools/t15-r1-fix.py
+        run: |
+          set -euo pipefail
+          python3 tools/t15-r1-fix.py
+          # The first R1 retest exposed only a test-harness PHP interpolation error.
+          # Escape dollar signs in the four literal source needles before rerunning QA;
+          # this changes no product finding or product code.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/fifteenth-twenty-review-regressions.php')
+          s = p.read_text()
+          replacements = {
+              '"null === $rows || \'\' !== (string) $wpdb->last_error"': '"null === \\$rows || \'\' !== (string) \\$wpdb->last_error"',
+              '"null === $hits_raw || \'\' !== (string) $wpdb->last_error"': '"null === \\$hits_raw || \'\' !== (string) \\$wpdb->last_error"',
+              '"return (bool) $hold_id;"': '"return (bool) \\$hold_id;"',
+              '"return (bool) $busy;"': '"return (bool) \\$busy;"',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit('T15 test-harness literal not found: ' + old)
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
       - name: Full corrected-state retest
         run: |
           set -euo pipefail
