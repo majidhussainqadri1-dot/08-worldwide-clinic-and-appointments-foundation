@@ -67,7 +67,9 @@ jobs:
           cmp build/a/*-candidate-manifest.json build/b/*-candidate-manifest.json
           cmp build/a/*-candidate.sha256 build/b/*-candidate.sha256
       - name: Independent verification
-        run: php tools/verify-candidate.php --artifact=build/a --commit='${{ steps.source.outputs.sha }}'
+        run: |
+          php tools/verify-candidate.php --artifact=build/a --commit='${{ steps.source.outputs.sha }}'
+          cat build/a/*-candidate.sha256
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: file-08-${{ steps.source.outputs.version }}-candidate-${{ steps.source.outputs.sha }}
