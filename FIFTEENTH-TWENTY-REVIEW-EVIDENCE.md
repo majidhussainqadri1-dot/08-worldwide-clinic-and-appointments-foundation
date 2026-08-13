@@ -128,3 +128,23 @@ R17 result: **SUPPORTED RELEASE/EVIDENCE DEFECT FOUND — corrected together aft
 R18 completed against the R17-corrected state before any R18 correction. FR-001…018, NFR-001…010 and FUT-01…24 traceability remained present; deterministic candidate building is allow-listed to runtime content and binds exact commit/runtime in its generated manifest. Three repository/evidence defects remained: the temporary `t15-probe.yml` was still an active branch workflow, the old `CORRECTIVE-STATUS.md` described v0.2.1 under a misleading current-state heading without an explicit historical banner, and the master-plan gate checked 1.2.15 while reporting a stale 1.2.13 success label. The post-review batch removes temporary probe tooling, marks historical evidence unmistakably and makes the test label truthful.
 
 R18 result: **SUPPORTED REPOSITORY/EVIDENCE DEFECTS FOUND — corrected together after review completion; full retest required before R19.**
+
+
+## R19 — first fresh corrected-state closure review
+
+R19 completed on exact R18-corrected HEAD `7894adbd9d19b58956342f66bd7f00e8226413ce` before any R19 change. Source/security/concurrency/privacy/integration/release hygiene were freshly re-traced; only the canonical quality workflow remained, the historical 0.2.1 status was clearly labeled historical, current version traceability was 1.2.15, and no new supported product/repository defect was proven. No correction was required and the exact source state was preserved for R20.
+
+R19 result: **CLEAN — no correction required.**
+
+## R20 — second fresh closure review
+
+R20 completed against the same exact corrected product/source state before any R20 correction. No new product-code, authorization, privacy, security, concurrency or package-builder defect was proven. The review did find closure/release evidence lag: `readme.txt`, `README.md` and `STATUS.md` still described already-completed closure rounds as pending, and PR #7 still advertised v1.2.13 / the thirteenth cycle / obsolete HEAD and artifact evidence. The repository-document findings are corrected together after R20 closure; PR metadata is aligned separately after the corrected commit because PR metadata is not repository source.
+
+R20 result: **CLOSURE-EVIDENCE DEFECTS FOUND; NO NEW PRODUCT DEFECT — repository evidence corrected together after review completion; full retest required.**
+
+## Main 20-round result
+
+- Defect/gap rounds: **R1, R2, R3, R5, R6, R7, R8, R10, R11, R12, R13, R14, R15, R16, R17, R18, R20**.
+- Clean rounds: **R4, R9, R19**.
+- Runtime after main cycle: **1.2.15**; schemas unchanged at core **3.2.0**, continuity **1.1.0**, Future24 **1.0.0**.
+- Two extra post-correction verification sweeps are required because R20 changes closure evidence; they are not counted as additional main rounds.
