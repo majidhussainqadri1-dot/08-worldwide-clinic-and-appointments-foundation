@@ -18,10 +18,11 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
+          extensions: zip
       - name: Freeze R20 review state
         run: |
           echo "R20_REVIEW_HEAD=$(git rev-parse HEAD)"
-          echo "R20_PRODUCT_PARENT=$(git rev-parse HEAD^)"
+          echo "R20_PRODUCT_BASE=$(git rev-parse 5ed4598319ec6f27f7d2012d517f8da40ce01a06)"
           git status --short
       - name: Full warning-free source QA
         run: |
@@ -33,20 +34,19 @@ jobs:
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
-      - name: Deterministic double build and verification
+      - name: Deterministic double build and independent verification
         run: |
           set -euo pipefail
-          rm -rf /tmp/r20-a /tmp/r20-b
-          mkdir -p /tmp/r20-a /tmp/r20-b
+          rm -rf build/r20-a build/r20-b
           sha=$(git rev-parse HEAD)
           epoch=$(git show -s --format=%ct HEAD)
-          php tools/build-development-candidate.php --source-sha="$sha" --source-epoch="$epoch" --output-dir=/tmp/r20-a
-          php tools/build-development-candidate.php --source-sha="$sha" --source-epoch="$epoch" --output-dir=/tmp/r20-b
-          cmp /tmp/r20-a/*.zip /tmp/r20-b/*.zip
-          cmp /tmp/r20-a/*.manifest.json /tmp/r20-b/*.manifest.json
-          cmp /tmp/r20-a/*.sha256 /tmp/r20-b/*.sha256
-          php tools/verify-development-candidate.php /tmp/r20-a/*.zip /tmp/r20-a/*.manifest.json /tmp/r20-a/*.sha256 "$sha"
-          sha256sum /tmp/r20-a/*.zip
+          php tools/build-candidate.php --output-dir=build/r20-a --commit="$sha" --source-date-epoch="$epoch"
+          php tools/build-candidate.php --output-dir=build/r20-b --commit="$sha" --source-date-epoch="$epoch"
+          cmp build/r20-a/*-candidate.zip build/r20-b/*-candidate.zip
+          cmp build/r20-a/*-candidate-manifest.json build/r20-b/*-candidate-manifest.json
+          cmp build/r20-a/*-candidate.sha256 build/r20-b/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/r20-a --commit="$sha"
+          cat build/r20-a/*-candidate.sha256
       - name: Inventory closure evidence without changing it
         run: |
           echo 'T16 tools:'
