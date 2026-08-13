@@ -16,44 +16,45 @@ jobs:
         with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
         run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Round 3 complete review - authorization IDOR and ownership
+      - name: Round 4 complete review - REST nonce replay idempotency and rate limits
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
           files=list(Path('includes').rglob('*.php'))
-          routes=[]
+          alltext='\n'.join(p.read_text(errors='replace') for p in files)
+          print('NONCE_CHECKS=',len(re.findall(r'(?:wp_verify_nonce|X-WP-Nonce|wp_rest)',alltext,re.I)))
+          print('IDEMPOTENCY_REFERENCES=',len(re.findall(r'idempotenc',alltext,re.I)))
+          print('RATE_LIMIT_REFERENCES=',len(re.findall(r'rate_limit|rate\s*\(',alltext,re.I)))
+          # Registered mutating routes: inventory callbacks and inspect callback bodies for rate/idempotency.
           for p in files:
             s=p.read_text(errors='replace')
             for m in re.finditer(r'register_rest_route\s*\(',s):
-              chunk=s[m.start():m.start()+2800]
-              route=re.search(r"['\"](/[^'\"]+)['\"]",chunk)
-              methods=re.search(r"'methods'\s*=>\s*([^,\n]+)",chunk)
-              perm=re.search(r"'permission_callback'\s*=>\s*([^,\n]+(?:,[^\n]+)?)",chunk)
-              routes.append((str(p),route.group(1) if route else '?',methods.group(1).strip() if methods else '?',perm.group(1).strip() if perm else 'MISSING',chunk[:1300]))
-          print(f'T16-R3 REST_ROUTE_COUNT={len(routes)}')
-          for r in routes:
-            print('\n@@ ROUTE',r[0],r[1],'methods=',r[2],'permission=',r[3])
-            if r[3]=='MISSING' or '__return_true' in r[3]: print('!! REVIEW_PERMISSION')
-          # Publicly callable REST methods that accept refs/ids: require visible authorization or explicit public projection semantics.
+              chunk=s[m.start():m.start()+3000]
+              mut=bool(re.search(r"(?:CREATABLE|EDITABLE|DELETABLE|'POST'|'PUT'|'PATCH'|'DELETE')",chunk))
+              if not mut: continue
+              cb=re.search(r"'callback'\s*=>\s*(?:array\(\s*__CLASS__\s*,\s*'([^']+)'|'([^']+)')",chunk)
+              name=(cb.group(1) or cb.group(2)) if cb else '?'
+              print(f'\n@@ MUTATING_ROUTE {p} callback={name}')
+              if name!='?':
+                fm=re.search(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+re.escape(name)+r'\s*\([^)]*\)\s*\{',s)
+                if fm:
+                  nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[fm.end():]); end=fm.end()+(nxt.start() if nxt else min(len(s)-fm.end(),6000)); body=s[fm.start():end]
+                  flags={
+                    'rate': bool(re.search(r'rate_limit|self::rate\s*\(',body)),
+                    'idem': bool(re.search(r'idempotenc|self::mutate\s*\(',body,re.I)),
+                    'auth_context': bool(re.search(r'get_current_user_id|can_|authorize|claims|guardian|actor',body)),
+                  }
+                  print(flags); print(body[:1600])
+          # Cookie-auth permission callback must verify REST nonce for browser sessions.
           for p in files:
             s=p.read_text(errors='replace')
-            for m in re.finditer(r'public\s+(?:static\s+)?function\s+(rest_[A-Za-z0-9_]+)\s*\(([^)]*)\)\s*\{',s):
-              start=m.start(); nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),7000)); body=s[start:end]
-              auth_tokens=('can_view_appointment','can_manage_clinic','authorize_','appointment_actor','current_user_can','get_current_user_id','permission','public_','authenticated','claims','owner_user_id','doctor_user_id')
-              if not any(t in body for t in auth_tokens):
-                print(f'\n!! REST_METHOD_NO_VISIBLE_AUTH {p}:{m.group(1)} args={m.group(2)}\n{body[:1800]}')
-          # Direct object fetches from request parameters without nearby authorization are candidates for IDOR review.
-          patterns=(r'\$request\[[^\]]+\]',r'get_param\s*\(')
-          for p in files:
-            lines=p.read_text(errors='replace').splitlines()
-            for i,line in enumerate(lines):
-              if any(re.search(pt,line) for pt in patterns) and any(x in line.lower() for x in ('ref','id','clinic','appointment','doctor','service','branch')):
-                ctx='\n'.join(lines[max(0,i-5):min(len(lines),i+14)])
-                if not any(t in ctx for t in ('can_view_appointment','can_manage_clinic','authorize_','permission_callback','appointment_actor','current_user_can','public_','opaque')):
-                  print(f'\n?? REQUEST_OBJECT_AUTH_CANDIDATE {p}:{i+1}\n{ctx}')
+            for fname in ('authenticated','authorize_rest_request'):
+              for fm in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+fname+r'\s*\([^)]*\)\s*\{',s):
+                nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[fm.end():]); end=fm.end()+(nxt.start() if nxt else min(len(s)-fm.end(),3500)); body=s[fm.start():end]
+                print(f'\n## AUTH_CALLBACK {p}:{fname}\n{body[:2500]}')
           PY
-      - name: Round 3 full regression confirmation
+      - name: Round 4 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
