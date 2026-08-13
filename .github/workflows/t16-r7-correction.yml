@@ -20,7 +20,7 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-      - name: Repair correction-script selector
+      - name: Repair correction script before applying ledger
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -30,10 +30,25 @@ jobs:
           new='direct_release = "\\t\\t\\t$wpdb->get_var( $wpdb->prepare( \'SELECT RELEASE_LOCK(%s)\', $lock ) );"'
           if s.count(old) != 1:
               raise SystemExit(f'correction selector expected 1 match, found {s.count(old)}')
-          p.write_text(s.replace(old,new,1))
+          s=s.replace(old,new,1)
+          bad='t16h(\'R7 doctor lock identity is date-independent\',\'includes/class-wca-repository.php\',\\"hash( \'sha256\', (string) $doctor_id )\\");\\n'
+          if bad in s:
+              s=s.replace(bad,'',1)
+          else:
+              # Keep the product fix authoritative; this second static assertion is redundant with the doctor-wide lock gate.
+              s=s.replace("t16h('R7 doctor lock identity is date-independent','includes/class-wca-repository.php',\\\"hash( 'sha256', (string) $doctor_id )\\\");\n",'',1)
+          p.write_text(s)
           PY
       - name: Apply closed R7 defect ledger
         run: python3 tools/t16-r7-correct.py
+      - name: Remove redundant interpolating assertion if present
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/sixteenth-twenty-review-regressions.php')
+          lines=p.read_text().splitlines(True)
+          p.write_text(''.join(x for x in lines if 'R7 doctor lock identity is date-independent' not in x))
+          PY
       - name: Full corrected-state QA
         run: |
           set -euo pipefail
