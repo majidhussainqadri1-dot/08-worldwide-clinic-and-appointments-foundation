@@ -59,3 +59,16 @@ R7 result: **SUPPORTED DEFECTS FOUND — full retest required before R8.**
 R8 completed before correction. Numeric legacy protected endpoints remain disabled by default and external payload stripping/no-store layers were re-traced. Two supported defects remained: the canonical opaque payment-intent adapter did not copy the caller's Idempotency-Key into its internal proxy request, and the stale-idempotency precheck did not distinguish an SQL read failure from no existing replay row. Both are corrected together after R8 closure.
 
 R8 result: **SUPPORTED DEFECTS FOUND — full retest required before R9.**
+
+
+## R9 — transaction / CAS / projection atomicity review
+
+R9 completed against the R8-corrected state without source modification. Owner transactions, optimistic version predicates, required event/outbox evidence and Future24 semantic serialization were re-traced. No new supported atomicity defect was proven.
+
+R9 result: **CLEAN — no correction required.**
+
+## R10 — migration / upgrade / rollback review
+
+R10 completed before correction. The canonical migration state recorded the legacy SWC schema as its `from_version` instead of the actual prior WCA schema version. In addition, schema and activation snapshots could remain from an older deployment rather than the immediate pre-change state required by the rollback runbook. The R10 batch captures the true WCA from-version, refreshes the schema snapshot for a real schema transition, and refreshes the activation snapshot for every activation/deployment attempt.
+
+R10 result: **SUPPORTED DEFECTS FOUND — full retest required before R11.**

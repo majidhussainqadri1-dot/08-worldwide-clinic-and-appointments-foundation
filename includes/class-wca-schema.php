@@ -39,8 +39,9 @@ final class WCA_Schema {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		$tables  = self::tables();
 		$collate = $wpdb->get_charset_collate();
+		$from_version = (string) get_option( self::OPTION_DB_VERSION, '' );
 
-		self::capture_snapshot();
+		self::capture_snapshot( $from_version !== WCA_Contracts::SCHEMA_VERSION );
 
 		$definitions = array(
 			"CREATE TABLE {$tables['clinics']} (
@@ -377,7 +378,7 @@ final class WCA_Schema {
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 canonical schema version could not be persisted.' ); }
 		$migration_state = array(
 			'status'       => 'installed',
-			'from_version' => (string) get_option( 'swc_db_version', '' ),
+			'from_version' => $from_version,
 			'to_version'   => WCA_Contracts::SCHEMA_VERSION,
 			'completed_at' => current_time( 'mysql', true ),
 		);
@@ -396,8 +397,8 @@ final class WCA_Schema {
 		return $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 	}
 
-	private static function capture_snapshot() {
-		if ( get_option( self::OPTION_SCHEMA_SNAPSHOT, false ) ) {
+	private static function capture_snapshot( $refresh = false ) {
+		if ( ! $refresh && get_option( self::OPTION_SCHEMA_SNAPSHOT, false ) ) {
 			return;
 		}
 		$snapshot = array(

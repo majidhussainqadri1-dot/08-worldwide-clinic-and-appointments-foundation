@@ -368,9 +368,7 @@ final class SWC_Activator {
 	}
 
 	private static function create_activation_snapshot() {
-		if ( get_option( 'swc_activation_snapshot', false ) ) {
-			return;
-		}
+		// Every activation/deployment attempt gets a fresh immediate pre-change snapshot.
 		$snapshot = array(
 			'created_at' => current_time( 'mysql', true ),
 			'swc_map'    => (array) get_option( 'swc_page_map', array() ),
