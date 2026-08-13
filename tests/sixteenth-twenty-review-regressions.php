@@ -58,4 +58,11 @@ t16h('R11 delegation scope filter cannot create a native scope','includes/class-
 t16h('R11 canonical File00 age claim cannot be overwritten by local filter','includes/class-wca-central-governance.php','if ( ! $versioned_attempted ) {');
 t16h('R11 legacy minor helper invalid response fails closed','includes/class-wca-central-governance.php','wca_age_claim_invalid_provider_response');
 t16h('R11 File26 projection propagates upstream repository errors','includes/class-wca-central-governance.php','if ( is_wp_error( $projection ) ) { return $projection; }');
+t16h('R12 malformed expected status is rejected before normalization','includes/class-wca-service.php','wca_transition_expected_status_invalid');
+t16h('R12 persisted appointment state has strict validator','includes/class-swc-helpers.php','public static function status_strict');
+t16h('R12 corrupt persisted appointment state fails closed','includes/class-swc-helpers.php','swc_appointment_state_corrupt');
+t16h('R12 strict expected-state check rejects malformed status','includes/class-swc-helpers.php','swc_invalid_expected_status');
+t16h('R12 slot-hold read DB failure is explicit','includes/class-wca-repository.php','wca_slot_hold_read_failed');
+t16h('R12 slot booking DB write failure is explicit','includes/class-wca-repository.php','wca_hold_book_failed');
+t16h('R12 appointment request propagates slot-hold read errors','includes/class-wca-service.php','if ( is_wp_error( $hold ) ) { return $hold; }');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

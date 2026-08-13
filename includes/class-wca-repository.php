@@ -649,11 +649,14 @@ final class WCA_Repository {
 		}
 	}
 
-	/** @return array<string,mixed>|null */
+	/** @return array<string,mixed>|null|WP_Error */
 	public static function get_slot_hold( $token ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['slot_holds'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE hold_token=%s LIMIT 1", sanitize_text_field( $token ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_slot_hold_read_failed', __( 'Current slot-hold state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		return $row ?: null;
 	}
 
@@ -665,6 +668,9 @@ final class WCA_Repository {
 			"UPDATE {$table} SET status='booked',appointment_id=%d,updated_at=%s,expires_at=%s WHERE hold_token=%s AND status='held' AND appointment_id=0 AND expires_at>%s",
 			absint( $appointment_id ), self::now(), gmdate( 'Y-m-d H:i:s', time() + YEAR_IN_SECONDS ), sanitize_text_field( $token ), self::now()
 		) );
+		if ( false === $updated ) {
+			return new WP_Error( 'wca_hold_book_failed', __( 'The slot hold could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		return 1 === (int) $updated ? true : new WP_Error( 'wca_hold_stale', __( 'The slot hold changed or expired before booking.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 	}
 

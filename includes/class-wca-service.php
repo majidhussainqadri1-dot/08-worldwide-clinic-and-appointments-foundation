@@ -517,6 +517,7 @@ final class WCA_Service {
 		$idempotency_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
 		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $idempotency_key ) ) { return new WP_Error( 'wca_idempotency_required', __( 'A valid 8-128 character idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$hold = WCA_Repository::get_slot_hold( (string) ( $data['hold_token'] ?? '' ) );
+		if ( is_wp_error( $hold ) ) { return $hold; }
 		$hold_check = WCA_Plan_Guard::validate_bookable_hold( $hold, $patient_user_id );
 		if ( is_wp_error( $hold_check ) ) { return $hold_check; }
 		$doctor_id = absint( $hold['doctor_user_id'] );
@@ -660,7 +661,11 @@ final class WCA_Service {
 		if ( empty( $data['expected_status'] ) || ! isset( $data['expected_version'] ) || absint( $data['expected_version'] ) < 1 ) {
 			return new WP_Error( 'wca_transition_precondition_required', __( 'Current appointment status and positive record version are required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
-		$expected_status  = WCA_Contracts::normalize_appointment_status( $data['expected_status'] );
+		$raw_expected_status = strtolower( trim( (string) $data['expected_status'] ) );
+		if ( ! WCA_Contracts::is_appointment_status( $raw_expected_status, true ) ) {
+			return new WP_Error( 'wca_transition_expected_status_invalid', __( 'A recognized current appointment status is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$expected_status  = WCA_Contracts::normalize_appointment_status( $raw_expected_status );
 		$expected_version = absint( $data['expected_version'] );
 		return SWC_Helpers::with_lock( $appointment_id, function () use ( $appointment_id, $next, $data, $actor_user_id, $expected_status, $expected_version ) {
 			$check = SWC_Helpers::assert_expected( $appointment_id, $expected_status, $expected_version );
@@ -673,6 +678,7 @@ final class WCA_Service {
 			if ( 'reschedule_pending' === $next ) {
 				$hold_token = sanitize_text_field( $data['hold_token'] ?? '' );
 				$hold = WCA_Repository::get_slot_hold( $hold_token );
+				if ( is_wp_error( $hold ) ) { return $hold; }
 				$hold_check = WCA_Plan_Guard::validate_reschedule_hold( $hold, $appointment_id, $actor_user_id );
 				if ( is_wp_error( $hold_check ) ) { return $hold_check; }
 				foreach ( array(
@@ -690,6 +696,7 @@ final class WCA_Service {
 			if ( 'confirmed' === $next && 'reschedule_pending' === $current ) {
 				$token = (string) SWC_Helpers::meta( $appointment_id, 'proposed_hold_token' );
 				$hold = WCA_Repository::get_slot_hold( $token );
+				if ( is_wp_error( $hold ) ) { return $hold; }
 				if ( ! $hold || 'held' !== $hold['status'] || strtotime( $hold['expires_at'] . ' UTC' ) <= time() ) { return new WP_Error( 'wca_reschedule_expired', __( 'The proposed time has expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 				$booked = WCA_Repository::book_slot( $token, $appointment_id );
 				if ( is_wp_error( $booked ) ) { return $booked; }

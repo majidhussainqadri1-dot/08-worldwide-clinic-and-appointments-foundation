@@ -594,8 +594,23 @@ final class SWC_Helpers {
 		}
 	}
 
+	/** Return the persisted appointment state only when it is a recognized canonical/legacy state. */
+	public static function status_strict( $id ) {
+		$raw = strtolower( trim( (string) get_post_meta( absint( $id ), '_swc_status', true ) ) );
+		if ( ! WCA_Contracts::is_appointment_status( $raw, true ) ) {
+			return new WP_Error( 'swc_appointment_state_corrupt', __( 'The persisted appointment state is invalid and cannot be mutated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
+		}
+		return WCA_Contracts::normalize_appointment_status( $raw );
+	}
+
 	public static function assert_expected( $id, $expected_status, $expected_version ) {
-		if ( self::status( $id ) !== $expected_status || self::record_version( $id ) !== absint( $expected_version ) ) {
+		$raw_expected = strtolower( trim( (string) $expected_status ) );
+		if ( ! WCA_Contracts::is_appointment_status( $raw_expected, true ) ) {
+			return new WP_Error( 'swc_invalid_expected_status', __( 'A recognized current appointment status is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$current = self::status_strict( $id );
+		if ( is_wp_error( $current ) ) { return $current; }
+		if ( $current !== WCA_Contracts::normalize_appointment_status( $raw_expected ) || self::record_version( $id ) !== absint( $expected_version ) ) {
 			return new WP_Error( 'swc_stale', __( 'This appointment changed after the form was opened. Refresh before saving.', 'worldwide-clinic-appointments' ) );
 		}
 		return true;
