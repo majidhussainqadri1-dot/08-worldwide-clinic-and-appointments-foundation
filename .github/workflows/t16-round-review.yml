@@ -17,39 +17,51 @@ jobs:
       - name: Freeze reviewed product identity
         run: |
           echo "REVIEW_TOOL_HEAD=$(git rev-parse HEAD)"
-          git log --format='%H %s' -8
-      - name: Round 15 calendar integration review
+          git log --format='%H %s' -10
+      - name: Round 16 complaint dispute escalation review
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
           files=list(Path('includes').rglob('*.php'))+[Path('worldwide-clinic.php')]
-          pat=re.compile(r'(calendar|\.ics|ics_|provider_event|external_busy|calendar_mapping|signed|signature|webhook|reconcil|busy|conflict)',re.I)
-          print('## CALENDAR TARGET METHODS')
+          pat=re.compile(r'(complaint|dispute|appeal|evidence|triage|escalat|CF02|moderation|support.case|case_ref)',re.I)
+          print('## COMPLAINT/DISPUTE TARGET METHODS')
           for f in files:
             lines=f.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
               if re.search(r'function\s+\w+',line) and pat.search(line):
                 print(f'\n### {f}:{i+1}: {line.strip()}')
-                print('\n'.join(lines[max(0,i-10):min(len(lines),i+100)]))
-          print('\n## CALENDAR ROUTES / LINKS / EVENTS')
+                print('\n'.join(lines[max(0,i-12):min(len(lines),i+120)]))
+          print('\n## COMPLAINT WRITE / EVENT / ROUTE CONTEXTS')
           for f in files:
             lines=f.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
-              if pat.search(line) and any(x in line for x in ('register_rest_route','add_rewrite','wp_nonce','hash_hmac','hash_equals','enqueue(','add_action','add_filter','$wpdb->')):
-                print(f'\n### {f}:{i+1}\n'+'\n'.join(lines[max(0,i-12):min(len(lines),i+25)]))
-          print('\n## EXTERNAL CALENDAR AUTHORITY CONTEXTS')
+              if pat.search(line) and any(x in line for x in ('$wpdb->insert','$wpdb->update','register_rest_route','enqueue(','append_event','update_post_meta','apply_meta_mutations')):
+                print(f'\n### {f}:{i+1}\n'+'\n'.join(lines[max(0,i-12):min(len(lines),i+35)]))
+          print('\n## NARRATIVE / EVIDENCE EXPOSURE CONTEXTS')
           for f in files:
-            for i,line in enumerate(f.read_text(errors='replace').splitlines()):
-              if re.search(r'(external.*calendar|calendar.*external|busy.*calendar|calendar.*busy|source.of.truth|canonical.*truth)',line,re.I):
+            lines=f.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if re.search(r'(description|details|narrative|evidence|reason|message)',line,re.I):
+                ctx='\n'.join(lines[max(0,i-4):min(len(lines),i+7)])
+                if pat.search(ctx): print(f'\n### {f}:{i+1}\n{ctx}')
+          print('\n## VERSION/CAS/AUTH CONTEXTS')
+          for f in files:
+            lines=f.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if pat.search(line) and re.search(r'(expected_version|version|can_view|can_manage|appointment_actor|current_user_can|idempot)',line,re.I):
                 print(f'{f}:{i+1}: {line.strip()}')
           PY
-      - name: Round 15 full regression confirmation
+      - name: Round 16 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+          set +e
           output=$(php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1)
+          status=$?
+          set -e
           printf '%s\n' "$output"
+          test "$status" -eq 0
           if printf '%s\n' "$output" | grep -E 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:'; then exit 1; fi
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
