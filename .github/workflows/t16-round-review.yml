@@ -1,4 +1,4 @@
-name: File 08 T16 R20 Correction Gate
+name: File 08 T16 R20 Correction Gate v2
 on:
   push:
     branches:
@@ -37,14 +37,22 @@ jobs:
           php tests/sixteenth-cycle-closure-hygiene.php
       - name: Full warning-free corrected-tree QA
         run: |
-          set -euo pipefail
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt
+          set +e
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt 2>&1
+          lint_status=$?
           php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/r20-tests.txt 2>&1
+          tests_status=$?
+          node --check assets/js/clinic.js >/tmp/r20-js1.txt 2>&1; js1=$?
+          node --check assets/js/continuity.js >/tmp/r20-js2.txt 2>&1; js2=$?
+          node --check assets/js/future24.js >/tmp/r20-js3.txt 2>&1; js3=$?
+          set -e
           cat /tmp/r20-tests.txt
+          test "$lint_status" -eq 0
+          test "$tests_status" -eq 0
+          test "$js1" -eq 0
+          test "$js2" -eq 0
+          test "$js3" -eq 0
           if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r20-tests.txt; then exit 1; fi
-          node --check assets/js/clinic.js
-          node --check assets/js/continuity.js
-          node --check assets/js/future24.js
       - name: Deterministic corrected-tree package verification
         run: |
           set -euo pipefail
