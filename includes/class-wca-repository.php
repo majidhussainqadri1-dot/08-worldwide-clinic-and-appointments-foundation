@@ -566,6 +566,8 @@ final class WCA_Repository {
 			return new WP_Error( 'wca_idempotency_required', __( 'An idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
 		$idempotency_key = hash( 'sha256', $idempotency_plain );
+		$ttl = WCA_Service::strict_int( $data['ttl'] ?? 600, 300, 1800 );
+		if ( null === $ttl ) { return new WP_Error( 'wca_slot_ttl_range', __( 'Slot-hold TTL must be an integer from 300 through 1800 seconds.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$branch = $branch_id ? self::get_branch( $branch_id ) : null;
 		if ( $branch_id && ( ! $branch || absint( $branch['clinic_id'] ) !== $clinic_id || 'active' !== (string) $branch['status'] ) ) {
 			return new WP_Error( 'wca_slot_branch_scope', __( 'The selected slot branch is not active for this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
@@ -626,7 +628,7 @@ final class WCA_Repository {
 				'end_utc'         => $end,
 				'status'          => 'held',
 				'appointment_id'  => 0,
-				'expires_at'      => gmdate( 'Y-m-d H:i:s', time() + min( 1800, max( 300, absint( $data['ttl'] ?? 600 ) ) ) ),
+				'expires_at'      => gmdate( 'Y-m-d H:i:s', time() + $ttl ),
 				'created_at'      => self::now(),
 				'updated_at'      => self::now(),
 			);
@@ -784,6 +786,8 @@ final class WCA_Repository {
 	public static function create_clinical_context( $data ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['clinical_context'];
+		$ttl = WCA_Service::strict_int( $data['ttl'] ?? 300, 60, HOUR_IN_SECONDS );
+		if ( null === $ttl ) { return new WP_Error( 'wca_context_ttl_range', __( 'Clinical-context TTL must be an integer from 60 through 3600 seconds.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$row = array(
 			'public_ref'                    => self::uuid(),
 			'appointment_id'                => absint( $data['appointment_id'] ?? 0 ),
@@ -797,7 +801,7 @@ final class WCA_Repository {
 			'prescription_authority'        => 0,
 			'break_glass'                   => 0,
 			'version'                       => 1,
-			'expires_at'                    => gmdate( 'Y-m-d H:i:s', time() + min( HOUR_IN_SECONDS, max( 60, absint( $data['ttl'] ?? 300 ) ) ) ),
+			'expires_at'                    => gmdate( 'Y-m-d H:i:s', time() + $ttl ),
 			'created_at'                    => self::now(),
 		);
 		if ( false === $wpdb->insert( $table, $row ) ) {
@@ -845,8 +849,8 @@ final class WCA_Repository {
 		if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_replay_read_failed', __( 'Current payment-intent replay state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( $existing ) { return $existing; }
 		$amount_raw = $data['amount_minor'] ?? 0;
-		if ( is_bool( $amount_raw ) || ! preg_match( '/^\d+$/', trim( (string) $amount_raw ) ) ) { return new WP_Error( 'wca_payment_amount_invalid', __( 'Payment amount must be a non-negative integer in minor currency units.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$amount_minor = (int) $amount_raw;
+		$amount_minor = WCA_Service::strict_int( $amount_raw, 0, PHP_INT_MAX );
+		if ( null === $amount_minor ) { return new WP_Error( 'wca_payment_amount_invalid', __( 'Payment amount must be a non-negative integer in minor currency units within the supported range.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$row = array(
 			'public_ref'                 => self::uuid(),
 			'appointment_id'             => $appointment_id,

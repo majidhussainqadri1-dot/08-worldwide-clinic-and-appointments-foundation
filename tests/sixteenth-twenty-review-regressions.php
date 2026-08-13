@@ -31,4 +31,8 @@ t16h('R7 Future24 lock release failure observable','includes/class-wca-future24.
 t16h('R7 practitioner lock release failure observable','includes/class-wca-plan-guard.php','practitioner_ref_lock_release_failed_total');
 t16h('R7 repository rollback uncertainty explicit','includes/class-wca-repository.php','wca_transaction_rollback_failed');
 t16h('R7 appointment rollback uncertainty explicit','includes/class-swc-helpers.php','swc_transaction_rollback_failed');
+t16h('R8 slot hold TTL rejects out-of-range intent','includes/class-wca-repository.php','wca_slot_ttl_range');
+t16h('R8 slot hold TTL persists validated value','includes/class-wca-repository.php','time() + $ttl');
+t16h('R8 clinical context TTL rejects out-of-range intent','includes/class-wca-repository.php','wca_context_ttl_range');
+t16h('R8 payment amount uses strict integer range','includes/class-wca-repository.php','WCA_Service::strict_int( $amount_raw, 0, PHP_INT_MAX )');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";
