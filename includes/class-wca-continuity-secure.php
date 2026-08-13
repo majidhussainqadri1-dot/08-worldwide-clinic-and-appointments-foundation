@@ -397,7 +397,9 @@ final class WCA_Continuity {
 		$cursor = 0;
 		$batch = 100;
 		do {
-			$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref FROM {$table} WHERE appointment_id=%d AND id>%d ORDER BY id ASC LIMIT %d", $appointment_id, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$rows_raw = $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref FROM {$table} WHERE appointment_id=%d AND id>%d ORDER BY id ASC LIMIT %d", $appointment_id, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_followup_list_read_failed', __( 'Follow-up plans could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$rows = (array) $rows_raw;
 			foreach ( $rows as $row ) {
 				$cursor = max( $cursor, absint( $row['id'] ?? 0 ) );
 				$item = self::get_followup( $row['public_ref'], $actor_user_id );
@@ -414,6 +416,7 @@ final class WCA_Continuity {
 		$followup_ref = sanitize_text_field( $followup_ref );
 		$table = self::tables()['followups'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s LIMIT 1", $followup_ref ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_followup_read_failed', __( 'Follow-up plan state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $row ) { return new WP_Error( 'wca_followup_missing', __( 'Follow-up plan was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$access = WCA_Authorization::can_view_appointment( absint( $row['appointment_id'] ), $actor_user_id );
 		if ( is_wp_error( $access ) ) { return $access; }
@@ -440,6 +443,7 @@ final class WCA_Continuity {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$table = self::tables()['followups'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s LIMIT 1", sanitize_text_field( $followup_ref ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_followup_read_failed', __( 'Follow-up plan state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $row ) { return new WP_Error( 'wca_followup_missing', __( 'Follow-up plan was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$access = WCA_Authorization::can_view_appointment( absint( $row['appointment_id'] ), $actor_user_id );
 		if ( is_wp_error( $access ) ) { return $access; }
@@ -458,7 +462,8 @@ final class WCA_Continuity {
 	}
 
 	public static function maintenance() {
-		self::process_due_followups();
+		$reminders = self::process_due_followups();
+		if ( is_wp_error( $reminders ) ) { WCA_Observability::log( 'error', 'continuity_reminder_scan_failed', array( 'error_code' => $reminders->get_error_code() ) ); return $reminders; }
 		$retention = self::apply_retention();
 		if ( is_wp_error( $retention ) ) { WCA_Observability::log( 'error', 'continuity_retention_failed', array( 'error_code' => $retention->get_error_code() ) ); }
 		return $retention;
@@ -473,7 +478,9 @@ final class WCA_Continuity {
 		$batch  = 100;
 		$sent   = 0;
 		do {
-			$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id FROM {$table} WHERE status='scheduled' AND reminder_sent_at IS NULL AND due_at<=%s AND due_at>=%s AND id>%d ORDER BY id ASC LIMIT %d", $cutoff, $now, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$rows_raw = $wpdb->get_results( $wpdb->prepare( "SELECT id FROM {$table} WHERE status='scheduled' AND reminder_sent_at IS NULL AND due_at<=%s AND due_at>=%s AND id>%d ORDER BY id ASC LIMIT %d", $cutoff, $now, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_followup_reminder_scan_read_failed', __( 'Due follow-up reminders could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$rows = (array) $rows_raw;
 			foreach ( $rows as $candidate ) {
 				$id = absint( $candidate['id'] );
 				$cursor = max( $cursor, $id );
@@ -481,6 +488,7 @@ final class WCA_Continuity {
 				$outcome = WCA_Repository::transaction( function () use ( $table, $id, $now ) {
 					global $wpdb;
 					$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d AND status='scheduled' AND reminder_sent_at IS NULL FOR UPDATE", $id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_followup_reminder_lock_read_failed', __( 'Follow-up reminder state could not be locked safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 					if ( ! $row ) { return false; }
 					$trace = WCA_Observability::trace_id();
 					$queued = WCA_Repository::enqueue( 'File19.NotificationRequested.v1', (string) $row['public_ref'], array(
@@ -516,7 +524,9 @@ final class WCA_Continuity {
 		$batch = 200;
 		$cursor = 0;
 		do {
-			$intakes = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$intake_table} WHERE updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d", $intake_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$intakes_raw = $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$intake_table} WHERE updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d", $intake_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $intakes_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_intake_retention_read_failed', __( 'Expired pre-visit records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$intakes = (array) $intakes_raw;
 			foreach ( $intakes as $row ) {
 				$row_id = absint( $row['id'] );
 				if ( self::legal_hold( 'intake', $row ) ) { $cursor = max( $cursor, $row_id ); continue; }
@@ -530,7 +540,9 @@ final class WCA_Continuity {
 		} while ( count( $intakes ) === $batch );
 		$cursor = 0;
 		do {
-			$followups = (array) $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id,status FROM {$follow_table} WHERE updated_at<%s AND status IN ('completed','cancelled') AND id>%d ORDER BY id ASC LIMIT %d", $follow_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$followups_raw = $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id,status FROM {$follow_table} WHERE updated_at<%s AND status IN ('completed','cancelled') AND id>%d ORDER BY id ASC LIMIT %d", $follow_cutoff, $cursor, $batch ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $followups_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_followup_retention_read_failed', __( 'Expired follow-up records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+			$followups = (array) $followups_raw;
 			foreach ( $followups as $row ) {
 				$row_id = absint( $row['id'] );
 				if ( ! self::legal_hold( 'followup', $row ) ) {

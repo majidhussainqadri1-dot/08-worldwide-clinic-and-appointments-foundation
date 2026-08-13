@@ -31,7 +31,9 @@ final class SWC_Privacy {
 		}
 		$page  = max( 1, absint( $page ) );
 		$ids   = $this->related_ids( $user->ID, $page );
+		if ( is_wp_error( $ids ) ) { return $ids; }
 		$total = $this->related_count( $user->ID );
+		if ( is_wp_error( $total ) ) { return $total; }
 		$data  = array();
 		foreach ( $ids as $appointment_id ) {
 			$is_patient = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ) === $user->ID;
@@ -112,6 +114,7 @@ final class SWC_Privacy {
 			return array( 'items_removed' => false, 'items_retained' => false, 'messages' => array(), 'done' => true );
 		}
 		$ids      = $this->related_ids( $user->ID, 1 );
+		if ( is_wp_error( $ids ) ) { return array( 'items_removed' => false, 'items_retained' => false, 'messages' => array( __( 'Appointment privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' ) ), 'done' => false ); }
 		$removed  = false;
 		$retained = false;
 		$messages = array();
@@ -162,7 +165,9 @@ final class SWC_Privacy {
 			$removed = $removed || ! empty( $result['changed'] );
 			$retained = $retained || ! empty( $result['retained'] );
 		}
-		$done = ! $failed && 0 === $this->related_count( $user->ID );
+		$remaining = $this->related_count( $user->ID );
+		if ( is_wp_error( $remaining ) ) { $messages[] = __( 'Appointment privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $failed = true; $remaining = 1; }
+		$done = ! $failed && 0 === $remaining;
 		if ( $retained ) { $messages[] = __( 'A minimal anonymized appointment and status record was retained for integrity, security, and accountability. Direct identifiers, contact details, private notes, consent details, scheduling times, and user-linked audit content were removed.', 'worldwide-clinic-appointments' ); }
 		return array(
 			'items_removed'  => $removed,
@@ -183,12 +188,9 @@ final class SWC_Privacy {
 			WHERE p.post_type=%s AND p.post_status IN ('publish','private')
 			AND (p.post_author=%d OR patient.meta_value=%s OR doctor.meta_value=%s OR proposed.meta_value=%s)
 			ORDER BY p.ID ASC LIMIT %d OFFSET %d";
-		return array_map(
-			'absint',
-			(array) $wpdb->get_col(
-				$wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), self::PAGE_SIZE, $offset )
-			) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		);
+		$raw = $wpdb->get_col( $wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), self::PAGE_SIZE, $offset ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_privacy_related_ids_read_failed', __( 'Appointment privacy records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		return array_map( 'absint', (array) $raw );
 	}
 
 	private function related_count( $user_id ) {
@@ -200,11 +202,9 @@ final class SWC_Privacy {
 			LEFT JOIN {$wpdb->postmeta} proposed ON proposed.post_id=p.ID AND proposed.meta_key='_swc_proposed_doctor_id'
 			WHERE p.post_type=%s AND p.post_status IN ('publish','private')
 			AND (p.post_author=%d OR patient.meta_value=%s OR doctor.meta_value=%s OR proposed.meta_value=%s)";
-		return absint(
-			$wpdb->get_var(
-				$wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ) )
-			) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		);
+		$raw = $wpdb->get_var( $wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_privacy_related_count_read_failed', __( 'Appointment privacy record count could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		return absint( $raw );
 	}
 
 	public function policy() {

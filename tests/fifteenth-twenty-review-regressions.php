@@ -18,4 +18,15 @@ t15h('R1 queue position read failure explicit','includes/class-wca-future24.php'
 t15h('R1 support participant read failure explicit','includes/class-wca-future24.php','wca_support_participant_read_failed');
 t15h('R1 virtual room read failure explicit','includes/class-wca-future24.php','wca_virtual_room_read_failed');
 t15h('R1 external busy read fails closed','includes/class-wca-future24.php',"return (bool) \$busy;");
+
+t15h('R2 core erasure record read failure','includes/class-wca-privacy.php','wca_privacy_appointment_read_failed');
+t15h('R2 future retention read failure','includes/class-wca-privacy.php','wca_retention_future24_read_failed');
+t15h('R2 intake version read failure','includes/class-wca-continuity-guards.php','wca_intake_version_read_failed');
+t15h('R2 consent state read failure','includes/class-wca-continuity-guards.php','wca_consent_state_read_failed');
+t15h('R2 followup list read failure','includes/class-wca-continuity-secure.php','wca_followup_list_read_failed');
+t15h('R2 reminder scan read failure','includes/class-wca-continuity-secure.php','wca_followup_reminder_scan_read_failed');
+t15h('R2 intake retention read failure','includes/class-wca-continuity-secure.php','wca_intake_retention_read_failed');
+t15h('R2 followup retention read failure','includes/class-wca-continuity-secure.php','wca_followup_retention_read_failed');
+t15h('R2 legacy privacy ids read failure','includes/class-swc-privacy.php','swc_privacy_related_ids_read_failed');
+t15h('R2 legacy privacy count read failure','includes/class-swc-privacy.php','swc_privacy_related_count_read_failed');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

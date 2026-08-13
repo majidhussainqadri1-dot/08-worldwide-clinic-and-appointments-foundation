@@ -53,6 +53,7 @@ final class WCA_Continuity_Guards {
 		global $wpdb;
 		$table = WCA_Continuity::tables()['intake'];
 		$current = $wpdb->get_row( $wpdb->prepare( "SELECT id,version FROM {$table} WHERE appointment_id=%d LIMIT 1", $appointment_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $current && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_intake_version_read_failed', __( 'Current pre-visit version could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $current ) {
 			return $result;
 		}
@@ -123,13 +124,15 @@ final class WCA_Continuity_Guards {
 			}
 		}
 		$table = WCA_Schema::tables()['consents'];
-		$rows = (array) $wpdb->get_results(
+		$rows_raw = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT scope,status,terms_version,granted_at,revoked_at FROM {$table} WHERE appointment_id=%d ORDER BY id ASC",
 				$appointment_id
 			),
 			ARRAY_A
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_consent_state_read_failed', __( 'Current consent state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$rows = (array) $rows_raw;
 		$scopes = array( 'teleconsult', 'recording', 'messaging', 'privacy_notice', 'followup' );
 		$state  = array();
 		foreach ( $scopes as $scope ) {
@@ -221,15 +224,14 @@ final class WCA_Continuity_Guards {
 			$cursor = absint( get_transient( $cursor_key ) );
 			$table  = $config['table'];
 			$field  = $config['field'];
-			$rows = (array) $wpdb->get_results(
+			$rows_raw = $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT id,public_ref,appointment_id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT %d",
-					$user_id,
-					$cursor,
-					self::ERASE_BATCH
-				),
-				ARRAY_A
+					$user_id, $cursor, self::ERASE_BATCH
+				), ARRAY_A
 			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Continuity privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; $rows_raw = array(); }
+			$rows = (array) $rows_raw;
 
 			$last_id = $cursor;
 			foreach ( $rows as $row ) {
@@ -248,6 +250,7 @@ final class WCA_Continuity_Guards {
 				}
 				if ( 0 === (int) $deleted ) {
 					$still_exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE id=%d AND {$field}=%d", $row_id, $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( null === $still_exists && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Continuity privacy erasure could not verify a concurrent delete safely.', 'worldwide-clinic-appointments' ); $done = false; break; }
 					if ( $still_exists ) { $messages[] = __( 'Continuity privacy erasure could not remove an affected record and will retry.', 'worldwide-clinic-appointments' ); $done = false; break; }
 				}
 				$last_id = max( $last_id, $row_id );
@@ -263,7 +266,10 @@ final class WCA_Continuity_Guards {
 					$last_id
 				)
 			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( $more ) {
+			if ( null === $more && '' !== (string) $wpdb->last_error ) {
+				$messages[] = __( 'Continuity privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' );
+				$done = false;
+			} elseif ( $more ) {
 				$done = false;
 			} else {
 				delete_transient( $cursor_key );
@@ -276,7 +282,7 @@ final class WCA_Continuity_Guards {
 			if ( false === $guardian_update ) { $messages[] = __( 'Guardian continuity references could not be anonymized safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
 			elseif ( 0 === (int) $guardian_update ) {
 				$guardian_remaining = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$intake_table} WHERE guardian_user_id=%d LIMIT 1", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				if ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+				if ( null === $guardian_remaining && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Guardian continuity references could not be verified safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; } elseif ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
 			}
 		}
 		if ( $retained ) {

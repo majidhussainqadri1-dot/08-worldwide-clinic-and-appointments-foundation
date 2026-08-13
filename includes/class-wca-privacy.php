@@ -130,6 +130,7 @@ final class WCA_Privacy {
 		$cursor_key = $base . '_appointments';
 		$cursor = absint( get_transient( $cursor_key ) );
 		$ids = self::appointment_ids_after( $user_id, $cursor, self::ERASE_BATCH );
+		if ( is_wp_error( $ids ) ) { $messages[] = __( 'Appointment privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; $ids = array(); }
 		$last_id = $cursor;
 		foreach ( $ids as $id ) {
 			if ( self::legal_hold( $id ) ) {
@@ -159,19 +160,22 @@ final class WCA_Privacy {
 			$removed = true;
 		}
 		if ( $last_id > $cursor ) { set_transient( $cursor_key, $last_id, self::CURSOR_TTL ); }
-		if ( self::appointment_ids_after( $user_id, $last_id, 1 ) ) { $done = false; } else { delete_transient( $cursor_key ); }
+		$appointment_more = self::appointment_ids_after( $user_id, $last_id, 1 );
+		if ( is_wp_error( $appointment_more ) ) { $messages[] = __( 'Appointment privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; } elseif ( $appointment_more ) { $done = false; } else { delete_transient( $cursor_key ); }
 
 		$table = self::future24_table();
 		if ( $table ) {
 			$cursor_key = $base . '_future24';
 			$cursor = absint( get_transient( $cursor_key ) );
-			$rows = (array) $wpdb->get_results(
+			$rows_raw = $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT * FROM {$table} WHERE (actor_user_id=%d OR subject_user_id=%d) AND id>%d ORDER BY id ASC LIMIT %d",
 					$user_id, $user_id, $cursor, self::ERASE_BATCH
 				),
 				ARRAY_A
 			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Future24 privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; $rows_raw = array(); }
+			$rows = (array) $rows_raw;
 			$last = $cursor;
 			$subject_uuid = strtolower( sanitize_text_field( (string) get_user_meta( $user_id, '_smc_subject_uuid', true ) ) );
 			foreach ( $rows as $row ) {
@@ -214,7 +218,7 @@ final class WCA_Privacy {
 			}
 			if ( $last > $cursor ) { set_transient( $cursor_key, $last, self::CURSOR_TTL ); }
 			$more = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE (actor_user_id=%d OR subject_user_id=%d) AND id>%d ORDER BY id ASC LIMIT 1", $user_id, $user_id, $last ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
+			if ( null === $more && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Future24 privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; } elseif ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
 		}
 
 		if ( $retained ) { $messages[] = __( 'Some clinic records are retained under an active legal, safety, or professional-record hold.', 'worldwide-clinic-appointments' ); }
@@ -235,14 +239,11 @@ final class WCA_Privacy {
 			   AND p.ID>%d
 			   AND ((pm.meta_key='_swc_patient_user_id' AND pm.meta_value=%d) OR (pm.meta_key='_swc_guardian_user_id' AND pm.meta_value=%d) OR (pm.meta_key='_swc_doctor_id' AND pm.meta_value=%d))
 			 ORDER BY p.ID ASC LIMIT %d",
-			SWC_Helpers::TYPE,
-			$cursor,
-			$user_id,
-			$user_id,
-			$user_id,
-			$limit
+			SWC_Helpers::TYPE, $cursor, $user_id, $user_id, $user_id, $limit
 		);
-		return array_map( 'absint', (array) $wpdb->get_col( $sql ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$raw = $wpdb->get_col( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_privacy_appointment_read_failed', __( 'Appointment privacy records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		return array_map( 'absint', (array) $raw );
 	}
 
 	public static function legal_hold( $appointment_id ) {
@@ -298,10 +299,12 @@ final class WCA_Privacy {
 			$cursor = 0;
 			$batch = 250;
 			do {
-				$rows = (array) $wpdb->get_results(
+				$rows_raw = $wpdb->get_results(
 					$wpdb->prepare( "SELECT * FROM {$table} WHERE expires_at IS NOT NULL AND expires_at<%s AND updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d", WCA_Repository::now(), $cutoff, $cursor, $batch ),
 					ARRAY_A
 				); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_retention_future24_read_failed', __( 'Future24 retention cleanup could not read expired records safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+				$rows = (array) $rows_raw;
 				foreach ( $rows as $row ) {
 					$row_id = absint( $row['id'] );
 					if ( self::future24_legal_hold( $row ) ) { $cursor = max( $cursor, $row_id ); continue; }

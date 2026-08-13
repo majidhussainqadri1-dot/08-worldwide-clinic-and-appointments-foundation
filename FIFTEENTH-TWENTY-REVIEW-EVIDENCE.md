@@ -11,3 +11,10 @@ Frozen reviewed baseline: `46ec33f82e732d6b5dfdab0cd88b6d53be9da620` (runtime 1.
 The complete R1 review found a shared root defect class: several database reads on authoritative conflict, hold, replay, capacity, semantic-de-duplication, buffer/travel-policy, arrival/queue, support-participant, virtual-room and external-busy paths treated an SQL read failure like an empty result. This could permit duplicate or conflicting scheduling state, bypass a current policy, under-enforce rate limiting, or report a false successful absence. No correction was started until the R1 review was closed. The post-review corrective batch makes these paths fail closed or return explicit retryable errors and adds the permanent T15 regression gate.
 
 R1 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R2.**
+
+
+## R2 — complete privacy / export / erasure / retention review
+
+R2 was completed against the R1-corrected state before any R2 source change. It found SQL-read failure paths that could be interpreted as an empty privacy set, a missing continuity row, or successful completion: canonical and legacy erasure cursors, Future24 retention, continuity optimistic-version/consent reads, follow-up list/reminder scans, and continuity retention. The post-review batch makes read failure explicit/retryable and prevents false completion.
+
+R2 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R3.**
