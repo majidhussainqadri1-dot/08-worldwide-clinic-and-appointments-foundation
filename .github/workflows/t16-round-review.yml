@@ -34,6 +34,18 @@ jobs:
           new="register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) )"
           if s.count(old)!=1: raise SystemExit(f'activation parity anchor mismatch: {s.count(old)}')
           p.write_text(s.replace(old,new,1))
+
+          p=Path('tests/future24.php')
+          s=p.read_text()
+          old="$main = f24_file( 'worldwide-clinic.php' );"
+          new="$main = f24_file( 'worldwide-clinic.php' );\n$activator = f24_file( 'includes/class-swc-activator.php' );"
+          if s.count(old)!=1: raise SystemExit(f'Future24 activator source anchor mismatch: {s.count(old)}')
+          s=s.replace(old,new,1)
+          old="f24_has( 'bootstrap', $main, \"array( 'WCA_Future24', 'activate' )\" );"
+          new="f24_has( 'bootstrap', $activator, 'WCA_Future24::install_schema()' );"
+          if s.count(old)!=1: raise SystemExit(f'Future24 activation assertion anchor mismatch: {s.count(old)}')
+          p.write_text(s.replace(old,new,1))
+
           p=Path('tools/t16-r18-fix-tests.py')
           s=p.read_text()
           s=s.replace('self::OPTION_MIGRATION_STATE, $migration_state', 'self::OPTION_MIGRATION_STATE, \\$migration_state')
@@ -66,7 +78,7 @@ jobs:
           set -e
           cat /tmp/tests.txt
           if [ "$lint_status" -ne 0 ]; then msg=$(tail -n 15 /tmp/lint.txt | tr '\n' ';' | head -c 5000); echo "::error title=R18 PHP lint::$msg"; exit 1; fi
-          if [ "$tests_status" -ne 0 ]; then msg=$(tail -n 50 /tmp/tests.txt | tr '\n' ';' | head -c 6000); echo "::error title=R18 regression::$msg"; exit 1; fi
+          if [ "$tests_status" -ne 0 ]; then msg=$(tail -n 60 /tmp/tests.txt | tr '\n' ';' | head -c 7000); echo "::error title=R18 regression::$msg"; exit 1; fi
           if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt; then msg=$(grep -E 'Warning|Notice|Deprecated|Fatal|Parse' /tmp/tests.txt | tail -n 20 | tr '\n' ';' | head -c 5000); echo "::error title=R18 warning-free gate::$msg"; exit 1; fi
           if [ "$js1" -ne 0 ] || [ "$js2" -ne 0 ] || [ "$js3" -ne 0 ]; then echo "::error title=R18 JS syntax::clinic=$js1 continuity=$js2 future24=$js3"; exit 1; fi
       - name: Commit R18 corrected state only after green QA
@@ -74,7 +86,7 @@ jobs:
           set -euo pipefail
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add worldwide-clinic.php includes/class-swc-activator.php includes/class-wca-schema.php includes/class-wca-continuity-secure.php includes/class-wca-future24.php includes/class-wca-observability.php includes/class-wca-cli.php includes/class-wca-privacy.php tests/central-plan-2026.php tests/sixteenth-twenty-review-regressions.php
+          git add worldwide-clinic.php includes/class-swc-activator.php includes/class-wca-schema.php includes/class-wca-continuity-secure.php includes/class-wca-future24.php includes/class-wca-observability.php includes/class-wca-cli.php includes/class-wca-privacy.php tests/central-plan-2026.php tests/future24.php tests/sixteenth-twenty-review-regressions.php
           git diff --cached --check
           git commit -m 'fix(file08): close T16 R18 migration lifecycle integrity defects'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
