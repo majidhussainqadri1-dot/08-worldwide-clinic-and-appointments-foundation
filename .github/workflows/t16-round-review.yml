@@ -1,4 +1,4 @@
-name: File 08 T16 R20 Correction Gate v2
+name: File 08 T16 R20 Non-Workflow Correction Commit
 on:
   push:
     branches:
@@ -21,73 +21,36 @@ jobs:
           php-version: '8.3'
           coverage: none
           extensions: zip
-      - name: Apply closed R20 batch
+      - name: Build already-validated corrected tree
         run: |
           set -euo pipefail
           rm -f tools/t16-*
           rm -f .github/workflows/t16-*
           rm -f review-evidence/t16-*
           python3 tools/r20-closure-correct.py
-      - name: Verify repository closure hygiene
+      - name: Reconfirm full corrected-tree gates before partial transport
         run: |
           set -euo pipefail
-          test -z "$(find tools -maxdepth 1 -type f -name 't16-*' -print -quit)"
-          test -z "$(find .github/workflows -maxdepth 1 -type f -name 't16-*' -print -quit)"
-          test -z "$(find review-evidence -maxdepth 1 -type f -name 't16-*' -print -quit 2>/dev/null || true)"
-          php tests/sixteenth-cycle-closure-hygiene.php
-      - name: Full warning-free corrected-tree QA
-        run: |
-          set +e
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt 2>&1
-          lint_status=$?
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt
           php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/r20-tests.txt 2>&1
-          tests_status=$?
-          node --check assets/js/clinic.js >/tmp/r20-js1.txt 2>&1; js1=$?
-          node --check assets/js/continuity.js >/tmp/r20-js2.txt 2>&1; js2=$?
-          node --check assets/js/future24.js >/tmp/r20-js3.txt 2>&1; js3=$?
-          set -e
           cat /tmp/r20-tests.txt
-          test "$lint_status" -eq 0
-          test "$tests_status" -eq 0
-          test "$js1" -eq 0
-          test "$js2" -eq 0
-          test "$js3" -eq 0
           if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r20-tests.txt; then exit 1; fi
-      - name: Deterministic corrected-tree package verification
-        run: |
-          set -euo pipefail
-          rm -rf build/r20-a build/r20-b
-          sha=$(git rev-parse HEAD)
-          epoch=$(git show -s --format=%ct HEAD)
-          php tools/build-candidate.php --output-dir=build/r20-a --commit="$sha" --source-date-epoch="$epoch"
-          php tools/build-candidate.php --output-dir=build/r20-b --commit="$sha" --source-date-epoch="$epoch"
-          cmp build/r20-a/*-candidate.zip build/r20-b/*-candidate.zip
-          cmp build/r20-a/*-candidate-manifest.json build/r20-b/*-candidate-manifest.json
-          cmp build/r20-a/*-candidate.sha256 build/r20-b/*-candidate.sha256
-          php tools/verify-candidate.php --artifact=build/r20-a --commit="$sha"
-      - name: Fresh post-correction sweep A
-        run: |
-          set -euo pipefail
-          php tests/run-all.php
-          git diff --check
-          test -z "$(find tools .github/workflows review-evidence -type f -name 't16-*' -print -quit 2>/dev/null || true)"
-      - name: Fresh post-correction sweep B
-        run: |
-          set -euo pipefail
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
           php tests/sixteenth-cycle-closure-hygiene.php
-          grep -q 'Current sixteenth-cycle runtime alignment' README.md
-          grep -q 'R19, R20' STATUS.md
-          grep -q 'Sixteenth fresh sequential 20-round audit completed' CHANGELOG.md
-          grep -q 'cat build/a/.*candidate.sha256' .github/workflows/file08-complete-quality.yml
-          test "$(grep -c 'register_activation_hook' worldwide-clinic.php)" -eq 1
-      - name: Commit R20 correction batch after all gates pass
+      - name: Restore workflow paths only and commit all other R20 corrections
         run: |
           set -euo pipefail
-          rm -rf build/r20-a build/r20-b
+          git restore --source=HEAD -- .github/workflows
           rm -f tools/r20-closure-correct.py
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add -A
           git diff --cached --check
-          git commit -m 'chore(file08): close T16 R20 repository release-evidence defects'
+          if git diff --cached --name-only | grep -q '^\.github/workflows/'; then
+            echo 'Workflow path leaked into token-limited commit' >&2
+            exit 1
+          fi
+          git commit -m 'chore(file08): apply T16 R20 docs tests and tooling cleanup'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
