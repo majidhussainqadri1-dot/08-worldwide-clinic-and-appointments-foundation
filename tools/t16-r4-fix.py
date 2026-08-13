@@ -143,6 +143,14 @@ once(p,
   }"""
 )
 
+# Superseded first-cycle invariant: Future24 still owns a distinct guard, but
+# Continuity is now deliberately covered by the core HTTP replay guard.
+p='tests/ten-review-regressions.php'
+once(p,
+"r10has('continuity excluded from core double guard',$hardening,\"0 === strpos( \\$route, '/wca/v1/continuity/' )\");",
+"r10has('continuity covered by core replay guard',$hardening,'continuity/appointments/[0-9a-fA-F-]{36}');"
+)
+
 # R4 permanent assertions.
 p='tests/sixteenth-twenty-review-regressions.php'
 s=read(p)
