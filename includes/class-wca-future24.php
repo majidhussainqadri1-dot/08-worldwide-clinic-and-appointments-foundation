@@ -505,6 +505,7 @@ final class WCA_Future24 {
 				$outcome = WCA_Repository::transaction( function () use ( $table, $wait, $start, $end, $clinic_id, $service_ref, $recipient_id ) {
 					global $wpdb;
 					$duplicate = $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$table} WHERE feature_id='F08-FUT-01' AND parent_ref=%s AND status='offer_pending' AND starts_at=%s AND ends_at=%s AND (expires_at IS NULL OR expires_at>%s) LIMIT 1", (string) $wait['public_ref'], $start, $end, WCA_Repository::now() ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( null === $duplicate && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_waitlist_offer_read_failed', __( 'Current waitlist offers could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 					if ( $duplicate ) { return false; }
 					$offer = self::put_system_record( 'F08-FUT-01', array(
 						'clinic_id' => $clinic_id,
@@ -682,6 +683,7 @@ final class WCA_Future24 {
 		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_waitlist_dedupe_read_failed', __( 'Current waitlist state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( $existing ) { return self::public_record( $existing ); }
 			return self::put_record( 'F08-FUT-01', array(
 				'clinic_id' => $clinic_id,
@@ -742,6 +744,7 @@ final class WCA_Future24 {
 		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-02' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='open' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_windows_dedupe_read_failed', __( 'Current flexible-window state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( $existing ) { return self::public_record( $existing ); }
 			return self::put_record( 'F08-FUT-02', array(
 				'clinic_id' => $clinic_id,
@@ -837,7 +840,9 @@ final class WCA_Future24 {
 		if ( 1 !== $locked ) { return new WP_Error( 'wca_resource_busy', __( 'The resource is being updated. Try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		try {
 			$table = self::tables()['records'];
-			$count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-04' AND parent_ref=%s AND status='reserved' AND (expires_at IS NULL OR expires_at>%s) AND starts_at<%s AND ends_at>%s", strtolower( $resource_ref ), WCA_Repository::now(), $end, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$count_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-04' AND parent_ref=%s AND status='reserved' AND (expires_at IS NULL OR expires_at>%s) AND starts_at<%s AND ends_at>%s", strtolower( $resource_ref ), WCA_Repository::now(), $end, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $count_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_resource_capacity_read_failed', __( 'Current resource capacity could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$count = (int) $count_raw;
 			if ( $count >= max( 1, absint( $resource['capacity'] ) ) ) { return new WP_Error( 'wca_resource_conflict', __( 'The resource is already at capacity for this time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 			$resource_payload = json_decode( (string) $resource['payload_json'], true );
 			$resource_type = is_array( $resource_payload ) && isset( $resource_payload['resource_type'] ) ? sanitize_key( $resource_payload['resource_type'] ) : '';
@@ -904,9 +909,12 @@ final class WCA_Future24 {
 		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
 		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		try {
-			$exists = $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status='group_member' LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( $exists ) { return self::public_record( self::get_record( $exists, 'F08-FUT-05' ) ); }
-			$count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND status='group_member'", strtolower( $session_ref ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$existing_member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status='group_member' LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $existing_member && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_membership_read_failed', __( 'Current group membership could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			if ( $existing_member ) { return self::public_record( $existing_member ); }
+			$count_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND status='group_member'", strtolower( $session_ref ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $count_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_capacity_read_failed', __( 'Current group capacity could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$count = (int) $count_raw;
 			if ( $count >= absint( $session['capacity'] ) ) { return new WP_Error( 'wca_group_full', __( 'This group appointment is full.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 			return self::put_record( 'F08-FUT-05', array(
 				'clinic_id' => absint( $session['clinic_id'] ),
@@ -938,6 +946,7 @@ final class WCA_Future24 {
 		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		try {
 			$member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status IN ('group_member','group_left','group_cancelled') ORDER BY id DESC LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $member && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_leave_read_failed', __( 'Current group membership could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( ! $member ) { return array( 'session_ref' => strtolower( $session_ref ), 'left' => true, 'already_absent' => true ); }
 			if ( in_array( (string) $member['status'], array( 'group_left', 'group_cancelled' ), true ) ) { return self::public_record( $member ); }
 			$result = WCA_Repository::transaction( function () use ( $table, $member, $session_ref, $context ) {
@@ -1084,6 +1093,7 @@ final class WCA_Future24 {
 		if ( ! $clinic ) { return false; }
 		$table = self::tables()['records'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT payload_json FROM {$table} WHERE feature_id='F08-FUT-07' AND clinic_id=%d AND status='policy_active' ORDER BY id DESC LIMIT 1", absint( $clinic['id'] ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return false; }
 		if ( ! $row ) { return true; }
 		$policy = json_decode( (string) $row['payload_json'], true );
 		$policy = is_array( $policy ) ? $policy : array();
@@ -1132,7 +1142,12 @@ final class WCA_Future24 {
 				if ( $travel ) {
 					$branch_id = absint( SWC_Helpers::meta( $appointment_id, 'branch_id', 0 ) );
 					$branches_table = WCA_Schema::tables()['branches'];
-					$appointment_branch = $branch_id ? strtolower( (string) $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$branches_table} WHERE id=%d LIMIT 1", $branch_id ) ) ) : ''; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					$appointment_branch = '';
+					if ( $branch_id ) {
+						$branch_raw = $wpdb->get_var( $wpdb->prepare( "SELECT public_ref FROM {$branches_table} WHERE id=%d LIMIT 1", $branch_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+						if ( '' !== (string) $wpdb->last_error ) { return false; }
+						$appointment_branch = strtolower( (string) $branch_raw );
+					}
 					if ( $appointment_branch && $slot_branch && ! hash_equals( $appointment_branch, $slot_branch ) ) {
 						if ( ( $gap_before >= 0 && $gap_before < $travel * MINUTE_IN_SECONDS ) || ( $gap_after >= 0 && $gap_after < $travel * MINUTE_IN_SECONDS ) ) { return false; }
 					}
@@ -1495,6 +1510,7 @@ final class WCA_Future24 {
 		try {
 			$table = self::tables()['records'];
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND subject_user_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $actor_id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_arrival_dedupe_read_failed', __( 'Current arrival state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( $existing ) { return self::public_record( $existing ); }
 			return self::put_record( 'F08-FUT-15', array(
 				'clinic_id' => absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) ),
@@ -1519,8 +1535,11 @@ final class WCA_Future24 {
 		$clinic_id = absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) );
 		$now = WCA_Repository::now();
 		$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $now ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $current && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_read_failed', __( 'Current queue state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $current ) { return new WP_Error( 'wca_queue_not_arrived', __( 'Arrival has not been registered or has expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		$ahead = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-15' AND clinic_id=%d AND status='arrived' AND created_at<%s AND (expires_at IS NULL OR expires_at>%s)", $clinic_id, $current['created_at'], $now ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$ahead_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-15' AND clinic_id=%d AND status='arrived' AND created_at<%s AND (expires_at IS NULL OR expires_at>%s)", $clinic_id, $current['created_at'], $now ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $ahead_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_position_read_failed', __( 'Current queue position could not be calculated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$ahead = (int) $ahead_raw;
 		return array( 'contract' => 'wca.private-queue-position', 'version' => self::CONTRACT_VERSION, 'appointment_ref' => strtolower( $appointment_ref ), 'appointments_ahead' => $ahead, 'estimated_delay_minutes' => $ahead * 15, 'other_patient_identity_exposed' => false, 'estimate_only' => true );
 	}
 
@@ -1586,6 +1605,7 @@ final class WCA_Future24 {
 		if(is_wp_error($lock)){return $lock;}
 		try{
 			$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-18' AND appointment_id=%d AND subject_user_id=%d AND status='participant_active' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,$subject_user_id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if(null===$existing && ''!==(string)$wpdb->last_error){return new WP_Error('wca_support_participant_read_failed',__('Current support-participant state could not be verified safely.','worldwide-clinic-appointments'),array('status'=>503));}
 			if($existing){$payload=json_decode((string)$existing['payload_json'],true); if(is_array($payload)&&sanitize_key($payload['role'] ?? '')===$role){return self::public_record($existing);} return new WP_Error('wca_support_participant_conflict',__('This participant already has an active appointment role.','worldwide-clinic-appointments'),array('status'=>409));}
 			$end=self::utc(SWC_Helpers::meta($id,'appointment_end_utc','')); $expiry=$end?min(strtotime($end.' UTC')+DAY_IN_SECONDS,time()+30*DAY_IN_SECONDS):time()+7*DAY_IN_SECONDS;
 			return WCA_Repository::transaction( function () use ( $id, $subject_user_id, $expiry, $subject, $role, $actor_id, $appointment_ref ) {
@@ -1646,6 +1666,7 @@ final class WCA_Future24 {
 			return WCA_Repository::transaction( function () use ( $table, $id, $actor_id, $appointment_ref ) {
 				global $wpdb;
 				$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-19' AND appointment_id=%d AND status='room_requested' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				if(null===$existing && ''!==(string)$wpdb->last_error){return new WP_Error('wca_virtual_room_read_failed',__('Current virtual-room request state could not be verified safely.','worldwide-clinic-appointments'),array('status'=>503));}
 				if($existing){return self::public_record($existing);}
 				$record=self::put_record('F08-FUT-19',array('appointment_id'=>$id,'clinic_id'=>absint(SWC_Helpers::meta($id,'clinic_id',0)),'subject_user_id'=>$actor_id,'status'=>'room_requested','expires_at'=>gmdate('Y-m-d H:i:s',time()+HOUR_IN_SECONDS),'payload'=>array('appointment_ref'=>strtolower($appointment_ref),'transport_owner'=>'File17','recording_assumed'=>false,'teleconsult_consent_verified'=>true,'idempotent_request'=>true)),$actor_id);
 				if(is_wp_error($record)){return $record;}
@@ -1729,7 +1750,9 @@ final class WCA_Future24 {
 
 	private static function external_busy_conflict_ref( $practitioner_ref, $start, $end ) {
 		global $wpdb; $start=self::utc($start); $end=self::utc($end); $practitioner_ref=sanitize_text_field($practitioner_ref); if(!$practitioner_ref||!$start||!$end){return false;} $table=self::tables()['records'];
-		return (bool) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE feature_id='F08-FUT-22' AND parent_ref=%s AND status='busy' AND (expires_at IS NULL OR expires_at>%s) AND starts_at<%s AND ends_at>%s LIMIT 1", $practitioner_ref, WCA_Repository::now(), $end, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$busy = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE feature_id='F08-FUT-22' AND parent_ref=%s AND status='busy' AND (expires_at IS NULL OR expires_at>%s) AND starts_at<%s AND ends_at>%s LIMIT 1", $practitioner_ref, WCA_Repository::now(), $end, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( '' !== (string) $wpdb->last_error ) { return true; }
+		return (bool) $busy;
 	}
 
 	/* FUT-23 */

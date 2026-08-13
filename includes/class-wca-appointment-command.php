@@ -108,6 +108,7 @@ final class WCA_Appointment_Command {
 			),
 			ARRAY_A
 		);
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_idempotency_read_failed', __( 'Current request replay state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( $row && 'processing' === (string) $row['status'] && strtotime( (string) $row['updated_at'] . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS ) {
 			WCA_Observability::metric( 'idempotency_stale_processing_blocked_total', 1, array( 'scope' => 'request_appointment' ) );
 			return new WP_Error( 'wca_idempotency_in_progress', __( 'This appointment request has an ambiguous in-flight reservation and cannot be replayed automatically.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'reconciliation_required' => true ) );
@@ -135,6 +136,7 @@ final class WCA_Appointment_Command {
 				$scope
 			)
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $exists && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_consent_read_failed', __( 'Current consent state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( $exists ) { return true; }
 		$claims = WCA_Authorization::claims( $actor_user_id );
 		if ( is_wp_error( $claims ) ) { return $claims; }

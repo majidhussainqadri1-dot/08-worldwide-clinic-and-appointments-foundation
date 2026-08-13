@@ -518,7 +518,8 @@ final class WCA_Repository {
 	public static function hold_slot( $data ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['slot_holds'];
-		self::expire_slot_holds();
+		$expired = self::expire_slot_holds();
+		if ( false === $expired ) { return new WP_Error( 'wca_slot_hold_expiry_failed', __( 'Expired slot holds could not be reconciled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$start = WCA_Plan_Guard::strict_utc( $data['start_utc'] ?? '' );
 		$end   = WCA_Plan_Guard::strict_utc( $data['end_utc'] ?? '' );
 		$doctor_id = absint( $data['doctor_user_id'] ?? 0 );
@@ -552,6 +553,9 @@ final class WCA_Repository {
 		};
 
 		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE idempotency_key=%s LIMIT 1", $idempotency_key ), ARRAY_A );
+				if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_read_failed', __( 'Current slot-hold state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_read_failed', __( 'Current slot-hold state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_hold_read_failed', __( 'Current slot-hold state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$existing = $replay( $existing );
 		if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 
@@ -569,6 +573,7 @@ final class WCA_Repository {
 				"SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1",
 				$doctor_id, self::now(), $end, $start
 			) );
+			if ( '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_conflict_query_failed', __( 'Current slot conflicts could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			$duration = max( 1, (int) round( ( strtotime( $end . ' UTC' ) - strtotime( $start . ' UTC' ) ) / 60 ) );
 			if ( $conflict || SWC_Helpers::has_conflict( $doctor_id, $start, $duration, 0 ) ) {
 				return new WP_Error( 'wca_slot_conflict', __( 'The selected slot is no longer available.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );

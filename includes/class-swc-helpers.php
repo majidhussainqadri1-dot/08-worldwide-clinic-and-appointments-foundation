@@ -398,6 +398,7 @@ final class SWC_Helpers {
 			LEFT JOIN {$wpdb->postmeta} d ON d.post_id=p.ID AND d.meta_key='_swc_appointment_duration'
 			WHERE p.post_type=%s AND p.ID<>%d";
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, absint( $doctor_id ), $from, $to, self::TYPE, absint( $exclude_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $rows || '' !== (string) $wpdb->last_error ) { return true; }
 		foreach ( (array) $rows as $row ) {
 			try {
 				$other_start = new DateTimeImmutable( $row->appointment_time, new DateTimeZone( 'UTC' ) );
@@ -747,7 +748,13 @@ final class SWC_Helpers {
 			ON DUPLICATE KEY UPDATE hits=LAST_INSERT_ID(hits+1), expires_at=VALUES(expires_at)";
 		$result = $wpdb->query( $wpdb->prepare( $sql, $key, $now, $expiry ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( false === $result ) { return true; }
-		$hits = 1 === (int) $result ? 1 : (int) $wpdb->get_var( 'SELECT LAST_INSERT_ID()' ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( 1 === (int) $result ) {
+			$hits = 1;
+		} else {
+			$hits_raw = $wpdb->get_var( 'SELECT LAST_INSERT_ID()' ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $hits_raw || '' !== (string) $wpdb->last_error ) { return true; }
+			$hits = (int) $hits_raw;
+		}
 		return $hits > max( 1, $limit );
 	}
 }
