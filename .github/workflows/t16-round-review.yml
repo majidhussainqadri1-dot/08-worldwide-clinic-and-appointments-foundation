@@ -14,39 +14,55 @@ jobs:
         with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
-      - name: Freeze reviewed source identity
+      - name: Freeze reviewed product identity
         run: |
-          echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-          echo "PRODUCT_PARENT=$(git rev-parse HEAD^)"
-      - name: Round 12 complete review - lifecycle transitions stale state and single review eligibility
+          echo "REVIEW_TOOL_HEAD=$(git rev-parse HEAD)"
+          git log --format='%H %s' -8
+      - name: Round 12 focused lifecycle invariant review
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
           files=list(Path('includes').rglob('*.php'))+[Path('worldwide-clinic.php')]
-          pats={
-            'transition':r'transition|status|requested|confirmed|declined|reschedul|cancel|check.?in|completed|no.?show',
-            'version_cas':r'row_version|expected_version|version_mismatch|stale',
-            'slot_hold_release':r'slot_hold|hold_expires|release_appointment_slot|release.*slot',
-            'review_eligibility':r'review_eligib|consume_review|grant_review|expires_at',
-            'transactions':r'START TRANSACTION|COMMIT|ROLLBACK|transaction\s*\('
-          }
-          for k,p in pats.items():
-            print(k,sum(len(re.findall(p,f.read_text(errors='replace'),re.I)) for f in files))
-          focus=('transition','reschedul','checkin','check_in','complete','no_show','cancel','review_eligib','consume_review','release_appointment_slot','row_version','expected_version')
+          targets=re.compile(r'(transition_appointment|reschedul|check.?in|complete|no.?show|cancel|declin|confirm|grant_review|consume_review|review_eligib|release_appointment_slot|book_slot|slot_hold)',re.I)
+          def extract(lines,start):
+              depth=0; opened=False; out=[]
+              for j in range(start,len(lines)):
+                  line=lines[j]; out.append(line)
+                  # sufficient for these PHP methods; strings do not materially affect review print boundary
+                  for ch in line:
+                      if ch=='{': depth+=1; opened=True
+                      elif ch=='}' and opened: depth-=1
+                  if opened and depth<=0: break
+              return out
+          print('## TARGET METHODS')
           for f in files:
-            lines=f.read_text(errors='replace').splitlines()
-            for i,line in enumerate(lines):
-              low=line.lower()
-              if re.search(r'function\s+\w+',line) and any(x in low for x in focus):
-                print(f'\n## FUNCTION {f}:{i+1} {line.strip()}')
-                print('\n'.join(lines[i:min(len(lines),i+95)]))
-          print('\n## TERMINAL-STATE MUTATION CANDIDATES')
+              lines=f.read_text(errors='replace').splitlines()
+              for i,line in enumerate(lines):
+                  if re.search(r'function\s+\w+',line) and targets.search(line):
+                      print(f'\n### {f}:{i+1} {line.strip()}')
+                      print('\n'.join(extract(lines,i)))
+          print('\n## DIRECT APPOINTMENT STATUS WRITE CONTEXTS')
           for f in files:
-            lines=f.read_text(errors='replace').splitlines()
-            for i,line in enumerate(lines):
-              if any(x in line for x in ("'completed'","'declined'","'cancelled'","'no_show'")) and any(x in '\n'.join(lines[max(0,i-8):min(len(lines),i+12)]) for x in ('$wpdb->update','$wpdb->query','transition_appointment','update_post_meta')):
-                print(f'{f}:{i+1}: {line.strip()}')
+              lines=f.read_text(errors='replace').splitlines()
+              for i,line in enumerate(lines):
+                  low=line.lower()
+                  if ('status' in low and any(x in low for x in ('$wpdb->update','$wpdb->query','update_post_meta','set_status'))) or re.search(r"['\"]status['\"]\s*=>",line):
+                      ctx='\n'.join(lines[max(0,i-7):min(len(lines),i+10)])
+                      if 'appointment' in ctx.lower():
+                          print(f'\n### {f}:{i+1}\n{ctx}')
+          print('\n## REVIEW ELIGIBILITY SQL/WRITE CONTEXTS')
+          for f in files:
+              lines=f.read_text(errors='replace').splitlines()
+              for i,line in enumerate(lines):
+                  if 'review_eligib' in line.lower():
+                      print(f'{f}:{i+1}: {line.strip()}')
+          print('\n## SLOT BOOK/RELEASE CALL SITES')
+          for f in files:
+              lines=f.read_text(errors='replace').splitlines()
+              for i,line in enumerate(lines):
+                  if re.search(r'\b(book_slot|release_appointment_slot)\s*\(',line):
+                      print(f'\n### {f}:{i+1}\n'+'\n'.join(lines[max(0,i-12):min(len(lines),i+16)]))
           PY
       - name: Round 12 full regression confirmation
         run: |
