@@ -141,6 +141,8 @@ final class WCA_Plan_Guard {
 				'patient_user_id' => absint( $patient_user_id ),
 				'start_utc'       => $start,
 				'end_utc'         => $end,
+				'buffer_before'   => min( 240, absint( $rule['buffer_before'] ?? 0 ) ),
+				'buffer_after'    => min( 240, absint( $rule['buffer_after'] ?? 0 ) ),
 			)
 		);
 	}

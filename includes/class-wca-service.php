@@ -398,7 +398,12 @@ final class WCA_Service {
 						$end_utc = $slot_end->setTimezone( new DateTimeZone( 'UTC' ) );
 						$display_date = $start_utc->setTimezone( $display_zone )->format( 'Y-m-d' );
 						$inside_display = ( ! $display_from || ( $display_date >= $display_from && $display_date <= $display_to ) );
-						if ( $inside_display && $start_utc->getTimestamp() > time() + max( 0, absint( $rule['buffer_before'] ) ) * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! SWC_Helpers::has_conflict( absint( $rule['doctor_user_id'] ), $start_utc->format( 'Y-m-d H:i:s' ), $duration, 0 ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $start_utc->format( 'Y-m-d H:i:s' ), $end_utc->format( 'Y-m-d H:i:s' ), $ignore_hold_key ) ) {
+						$buffer_before = max( 0, absint( $rule['buffer_before'] ?? 0 ) );
+						$buffer_after  = max( 0, absint( $rule['buffer_after'] ?? 0 ) );
+						$conflict_start = $start_utc->modify( '-' . $buffer_before . ' minutes' );
+						$conflict_end   = $end_utc->modify( '+' . $buffer_after . ' minutes' );
+						$conflict_minutes = max( 1, (int) ceil( ( $conflict_end->getTimestamp() - $conflict_start->getTimestamp() ) / 60 ) );
+						if ( $inside_display && $start_utc->getTimestamp() > time() + $buffer_before * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! SWC_Helpers::has_conflict( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_minutes, 0 ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_end->format( 'Y-m-d H:i:s' ), $ignore_hold_key ) ) {
 							$slots[] = array(
 								'slot_ref'       => hash( 'sha256', $rule['public_ref'] . '|' . $start_utc->format( 'c' ) . '|' . $duration ),
 								'rule_ref'       => $rule['public_ref'],
@@ -426,12 +431,11 @@ final class WCA_Service {
 	}
 
 	private static function local_datetime( $date, $time, DateTimeZone $zone ) {
-		$value = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $date . ' ' . $time, $zone );
-		$errors = DateTimeImmutable::getLastErrors();
-		if ( ! $value || ( is_array( $errors ) && ( $errors['warning_count'] || $errors['error_count'] ) ) || $value->format( 'Y-m-d H:i' ) !== $date . ' ' . $time ) {
-			return null;
-		}
-		return $value;
+		/* Reuse the canonical ambiguity-aware converter: nonexistent and repeated DST wall times fail closed. */
+		$utc = SWC_Helpers::to_utc( (string) $date, (string) $time, $zone->getName() );
+		if ( ! $utc ) { return null; }
+		$value = DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $utc, new DateTimeZone( 'UTC' ) );
+		return $value ? $value->setTimezone( $zone ) : null;
 	}
 
 	private static function exception_for_date( $exceptions, $date ) {

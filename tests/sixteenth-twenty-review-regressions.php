@@ -65,4 +65,10 @@ t16h('R12 strict expected-state check rejects malformed status','includes/class-
 t16h('R12 slot-hold read DB failure is explicit','includes/class-wca-repository.php','wca_slot_hold_read_failed');
 t16h('R12 slot booking DB write failure is explicit','includes/class-wca-repository.php','wca_hold_book_failed');
 t16h('R12 appointment request propagates slot-hold read errors','includes/class-wca-service.php','if ( is_wp_error( $hold ) ) { return $hold; }');
+t16h('R13 canonical slot wall-time conversion rejects DST ambiguity','includes/class-wca-service.php','SWC_Helpers::to_utc( (string) $date, (string) $time, $zone->getName() )');
+t16h('R13 projected slot conflict expands buffer before','includes/class-wca-service.php','$conflict_start = $start_utc->modify');
+t16h('R13 projected slot conflict expands buffer after','includes/class-wca-service.php','$conflict_end   = $end_utc->modify');
+t16h('R13 canonical hold carries authoritative rule buffers','includes/class-wca-plan-guard.php',"'buffer_after'    => min( 240");
+t16h('R13 atomic hold validates buffer range','includes/class-wca-repository.php','wca_slot_buffer_range');
+t16h('R13 atomic hold rechecks buffered conflict window','includes/class-wca-repository.php','$conflict_duration = max');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";
