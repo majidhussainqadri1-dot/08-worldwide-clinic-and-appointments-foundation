@@ -24,33 +24,43 @@ jobs:
         run: |
           echo "REVIEW_HEAD=$(git rev-parse HEAD)"
           grep -n "Version:" worldwide-clinic-and-appointments.php || true
-      - name: Round 1 complete review - SQL read failure semantics
+      - name: Round 2 complete review - SQL writes and atomicity
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          roots=[Path('includes')]
-          reads=[]
-          for root in roots:
-            for p in sorted(root.rglob('*.php')):
-              lines=p.read_text(errors='replace').splitlines()
-              for i,line in enumerate(lines):
-                if re.search(r'\$wpdb->get_(?:var|row|col|results)\s*\(', line):
-                  before='\n'.join(lines[max(0,i-2):i+1])
-                  after='\n'.join(lines[i:min(len(lines),i+8)])
-                  # Strong evidence that the caller distinguishes a DB failure from an empty/not-found result.
-                  guarded = ('last_error' in after or 'last_error' in before or
-                             re.search(r'null\s*===', after) or re.search(r'false\s*===', after) or
-                             'is_wp_error' in after or 'WP_Error' in after)
-                  reads.append((str(p),i+1,guarded,line.strip(),after))
-          suspicious=[r for r in reads if not r[2]]
-          print(f'T16-R1 TOTAL_SQL_READS={len(reads)}')
-          print(f'T16-R1 SUSPICIOUS_UNGUARDED_READS={len(suspicious)}')
-          for p,ln,guarded,line,ctx in suspicious:
-            print(f'\n@@ {p}:{ln}\n{ctx}')
-          # Review is intentionally non-mutating. Exit success so the full round can finish and evidence is inspectable.
+          writes=[]
+          for p in sorted(Path('includes').rglob('*.php')):
+            lines=p.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if re.search(r'\$wpdb->(?:insert|update|delete|query)\s*\(', line):
+                before='\n'.join(lines[max(0,i-4):i+1])
+                after='\n'.join(lines[i:min(len(lines),i+12)])
+                ctx=before+'\n'+after
+                assigned=bool(re.search(r'\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*\$wpdb->(?:insert|update|delete|query)', line))
+                direct_checked=('false === $wpdb->' in line or 'false !== $wpdb->' in line)
+                checked=assigned and any(x in after for x in ('false ===','1 !==','1 ===','0 ===','is_wp_error','WP_Error','return '))
+                transaction='WCA_Repository::transaction' in '\n'.join(lines[max(0,i-25):min(len(lines),i+25)])
+                writes.append((str(p),i+1,assigned,direct_checked,checked,transaction,after))
+          suspicious=[w for w in writes if not (w[3] or w[4])]
+          print(f'T16-R2 TOTAL_SQL_WRITES={len(writes)}')
+          print(f'T16-R2 SUSPICIOUS_UNCHECKED_WRITES={len(suspicious)}')
+          print(f'T16-R2 WRITES_NEAR_TRANSACTION={sum(1 for w in writes if w[5])}')
+          for p,ln,a,d,c,t,ctx in suspicious:
+            print(f'\n@@ {p}:{ln} transaction_near={t}\n{ctx}')
+          # Also enumerate multi-write methods lacking an explicit transaction marker nearby.
+          for p in sorted(Path('includes').rglob('*.php')):
+            s=p.read_text(errors='replace')
+            for m in re.finditer(r'(public|private|protected)\s+(?:static\s+)?function\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{',s):
+              start=m.start(); nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():])
+              end=m.end()+(nxt.start() if nxt else len(s)-m.end())
+              body=s[start:end]
+              count=len(re.findall(r'\$wpdb->(?:insert|update|delete|query)\s*\(',body))
+              if count>=2 and 'WCA_Repository::transaction' not in body and 'START TRANSACTION' not in body:
+                print(f'\n## MULTI_WRITE_NO_EXPLICIT_TX {p}:{m.group(2)} writes={count}')
+                print(body[:2200])
           PY
-      - name: Round 1 baseline regression confirmation
+      - name: Round 2 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
