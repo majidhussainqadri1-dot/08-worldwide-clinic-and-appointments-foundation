@@ -16,41 +16,48 @@ jobs:
         with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
         run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Round 5 complete review - privacy export erasure retention legal hold
+      - name: Round 6 complete review - outbox idempotency recovery dead letter
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          targets=[Path('includes/class-wca-privacy.php'),Path('includes/class-swc-privacy.php'),Path('includes/class-wca-continuity-secure.php'),Path('includes/class-wca-continuity-guards.php')]
+          targets=[Path('includes/class-wca-outbox.php'),Path('includes/class-wca-repository.php'),Path('includes/class-wca-ten-review-hardening.php'),Path('includes/class-wca-observability.php')]
+          names=('process','maintenance','recover_stale_outbox','claim_outbox','complete_outbox','fail_outbox','enqueue','claim_idempotency','idempotency_status','release_idempotency','complete_idempotency','pre_dispatch','post_dispatch')
           for p in targets:
             s=p.read_text(errors='replace')
             print(f'\n===== {p} =====')
-            print('export=',len(re.findall(r'export',s,re.I)),'erase=',len(re.findall(r'eras',s,re.I)),'retention=',len(re.findall(r'retention',s,re.I)),'legal_hold=',len(re.findall(r'legal_hold',s,re.I)))
+            for fname in names:
+              for m in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+fname+r'\s*\([^)]*\)\s*\{',s):
+                nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),12000)); body=s[m.start():end]
+                print(f'\n## {p}:{fname}\n{body[:9000]}')
           alltext='\n'.join(p.read_text(errors='replace') for p in targets)
-          keys=re.findall(r"\$erasers\[['\"]([^'\"]+)['\"]\]",alltext)+re.findall(r"\$exporters\[['\"]([^'\"]+)['\"]\]",alltext)
-          print('REGISTRY_KEYS=',keys)
-          print('DUPLICATE_REGISTRY_KEYS=',sorted({k for k in keys if keys.count(k)>1}))
-          identifiers=['patient_user_id','guardian_user_id','doctor_id','proposed_doctor_id','phone','whatsapp','country','city','reason','patient_message','doctor_private_note','consent_at','consent_version','patient_timezone','preferred_at_utc','post_author','actor_user_id','subject_user_id']
-          for key in identifiers: print('IDENTIFIER',key,'occurrences=',alltext.count(key))
+          checks={
+            'advisory_lock': 'GET_LOCK' in alltext,
+            'release_lock': 'RELEASE_LOCK' in alltext,
+            'stable_message_id': 'message_id' in alltext,
+            'dead_letter': 'dead_letter' in alltext,
+            'retry_backoff': 'pow( 2' in alltext or 'next_attempt_at' in alltext,
+            'worker_fencing': 'locked_by' in alltext,
+            'stale_recovery': 'recover_stale_outbox' in alltext,
+            'idempotency_request_hash': 'request_hash' in alltext,
+            'stale_reconciliation': 'reconciliation_required' in alltext,
+            'mutation_status': 'mutation-status' in alltext or 'idempotency_status' in alltext,
+          }
+          print('\nCONTRACT_CHECKS=',checks)
+          # Flag DB reads/writes in critical functions when error/result semantics are not visible nearby.
           for p in targets:
             lines=p.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
               if re.search(r'\$wpdb->get_(?:results|row|var|col)\s*\(',line):
                 ctx='\n'.join(lines[max(0,i-3):min(len(lines),i+12)])
-                protected=any(x in ctx for x in ('last_error','WP_Error','audit_rows_strict','related_ids','related_count','throw new RuntimeException'))
-                if not protected: print(f'\n!! PRIVACY_READ_REVIEW {p}:{i+1}\n{ctx}')
-              if re.search(r'\$wpdb->(?:delete|update|query)\s*\(',line):
-                ctx='\n'.join(lines[max(0,i-2):min(len(lines),i+10)])
-                if not any(x in ctx for x in ('false ===','1 !==','is_wp_error','WP_Error','return ')):
-                  print(f'\n?? PRIVACY_WRITE_REVIEW {p}:{i+1}\n{ctx}')
-          for p in targets:
-            s=p.read_text(errors='replace')
-            for fname in ('export','erase','privacy_exporter','privacy_eraser','apply_retention'):
-              for m in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+fname+r'\s*\([^)]*\)\s*\{',s):
-                nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),8000)); body=s[m.start():end]
-                print(f'\n## PRIVACY_METHOD {p}:{fname}\n{body[:5000]}')
+                if any(k in ctx.lower() for k in ('outbox','idempotenc','get_lock','release_lock')) and not any(x in ctx for x in ('last_error','WP_Error','RuntimeException','1 !==','null ===')):
+                  print(f'\n!! CRITICAL_READ_REVIEW {p}:{i+1}\n{ctx}')
+              if re.search(r'\$wpdb->(?:insert|update|delete|query)\s*\(',line):
+                ctx='\n'.join(lines[max(0,i-3):min(len(lines),i+14)])
+                if any(k in ctx.lower() for k in ('outbox','idempotenc')) and not any(x in ctx for x in ('false ===','1 ===','1 !==','return ','WP_Error','RuntimeException')):
+                  print(f'\n?? CRITICAL_WRITE_REVIEW {p}:{i+1}\n{ctx}')
           PY
-      - name: Round 5 full regression confirmation
+      - name: Round 6 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
