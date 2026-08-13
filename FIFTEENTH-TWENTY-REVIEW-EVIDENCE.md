@@ -38,3 +38,10 @@ R4 result: **CLEAN — no correction required.**
 R5 completed before correction. It found that service currency silently stripped non-letters before validating; the R1 slot-hold read checks had been mechanically concentrated at one location instead of covering all three authoritative reads; and a DB failure acquiring the slot advisory lock was indistinguishable from normal contention. All R5 findings are corrected together after review completion.
 
 R5 result: **SUPPORTED DEFECTS FOUND — full retest required before R6.**
+
+
+## R6 — authorization / ownership / opaque-reference review
+
+R6 completed before correction. Object-level patient/doctor/guardian/staff checks and serving/delegation scopes were re-traced. Two supported gaps remained: purpose-limited administrative appointment access did not fail closed when its mandatory audit write failed; opaque practitioner-reference creation did not separately handle DB lock failure or metadata persistence failure. The R6 batch corrects both classes after review completion.
+
+R6 result: **SUPPORTED DEFECTS FOUND — full retest required before R7.**

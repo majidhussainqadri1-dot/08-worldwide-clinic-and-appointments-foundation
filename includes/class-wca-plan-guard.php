@@ -17,12 +17,15 @@ final class WCA_Plan_Guard {
 		$ref = strtolower( (string) get_user_meta( $user_id, '_wca_practitioner_ref', true ) );
 		if ( preg_match( '/^[0-9a-f-]{36}$/', $ref ) ) { return $ref; }
 		$lock = 'wca-practitioner-ref-' . $user_id;
-		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,3)', $lock ) ) ) { return ''; }
+		$lock_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,3)', $lock ) );
+		if ( null === $lock_raw && '' !== (string) $wpdb->last_error ) { return ''; }
+		if ( 1 !== (int) $lock_raw ) { return ''; }
 		try {
 			$ref = strtolower( (string) get_user_meta( $user_id, '_wca_practitioner_ref', true ) );
 			if ( ! preg_match( '/^[0-9a-f-]{36}$/', $ref ) ) {
 				$candidate = WCA_Repository::uuid();
-				update_user_meta( $user_id, '_wca_practitioner_ref', $candidate );
+				$written = update_user_meta( $user_id, '_wca_practitioner_ref', $candidate );
+				if ( false === $written ) { return ''; }
 				$ref = strtolower( (string) get_user_meta( $user_id, '_wca_practitioner_ref', true ) );
 			}
 			return preg_match( '/^[0-9a-f-]{36}$/', $ref ) ? $ref : '';

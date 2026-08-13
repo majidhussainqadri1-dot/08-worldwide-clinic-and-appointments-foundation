@@ -43,4 +43,8 @@ t15h('R5 exact currency validation','includes/class-wca-repository.php','$curren
 t15h('R5 slot lock read failure','includes/class-wca-repository.php','wca_slot_lock_read_failed');
 t15h('R5 inside-lock hold read failure','includes/class-wca-repository.php','wca_slot_hold_locked_read_failed');
 t15h('R5 insert-race hold read failure','includes/class-wca-repository.php','wca_slot_hold_race_read_failed');
+
+t15h('R6 admin access audit fail closed','includes/class-wca-authorization.php','wca_admin_access_audit_failed');
+t15h('R6 practitioner lock read separated','includes/class-wca-plan-guard.php','$lock_raw = $wpdb->get_var');
+t15h('R6 practitioner ref persistence checked','includes/class-wca-plan-guard.php','if ( false === $written )');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

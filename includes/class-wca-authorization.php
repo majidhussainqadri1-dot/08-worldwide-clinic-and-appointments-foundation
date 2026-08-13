@@ -126,7 +126,9 @@ final class WCA_Authorization {
 			if ( is_wp_error( $step ) ) {
 				return new WP_Error( 'wca_admin_step_up', __( 'Recent security verification is required for this purpose-limited access.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 			}
-			SWC_Helpers::audit( $appointment_id, 'purpose-limited-admin-access', array( 'reason' => $purpose, 'source' => 'authorization' ) );
+			if ( ! SWC_Helpers::audit( $appointment_id, 'purpose-limited-admin-access', array( 'reason' => $purpose, 'source' => 'authorization' ) ) ) {
+				return new WP_Error( 'wca_admin_access_audit_failed', __( 'Purpose-limited administrative access could not be audited safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
 			return true;
 		}
 		return new WP_Error( 'wca_appointment_forbidden', __( 'You cannot access this appointment.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
