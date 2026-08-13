@@ -64,7 +64,8 @@ final class SWC_CF01_Care_Context {
 			$envelope['reason_code'] = 'context_not_available';
 			return $envelope;
 		}
-		if ( ! self::actor_can_read( $appointment_id, $actor_id ) ) {
+		$object_access = self::actor_can_read( $appointment_id, $actor_id );
+		if ( is_wp_error( $object_access ) || ! $object_access ) {
 			$envelope['result'] = 'deny';
 			$envelope['reason_code'] = 'context_not_available';
 			return $envelope;
@@ -191,16 +192,11 @@ final class SWC_CF01_Care_Context {
 	}
 
 	private static function actor_can_read( $appointment_id, $actor_id ) {
-		if ( ! $actor_id || get_current_user_id() !== $actor_id ) {
-			return false;
+		if ( ! $actor_id || get_current_user_id() !== $actor_id ) { return false; }
+		if ( class_exists( 'WCA_Authorization' ) ) {
+			return WCA_Authorization::can_view_appointment( $appointment_id, $actor_id, '' );
 		}
-		if ( SWC_Helpers::can_patient_manage( $appointment_id, $actor_id ) ) {
-			return true;
-		}
-		if ( SWC_Helpers::can_doctor_manage( $appointment_id, $actor_id ) ) {
-			return true;
-		}
-		return user_can( $actor_id, 'manage_worldwide_clinic' );
+		return false;
 	}
 
 	private static function context_state( $status ) {

@@ -86,3 +86,10 @@ R11 result: **SUPPORTED DEFECTS FOUND — corrected together after review comple
 R12 completed against the R11-corrected state before any R12 source change. The opaque appointment read route did not itself guarantee private no-store/noindex headers, and an existing-but-unauthorized appointment could return an authorization error distinguishable from a missing opaque reference. The review also caught a remaining application-layer currency normalization path that could transform malformed input before the repository's strict persistence check. The R12 batch makes opaque object responses private/non-indexable, conceals participant-denial existence, and validates exact currency intent at the application root.
 
 R12 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R13.**
+
+
+## R13 — cross-file ownership / integration / projection review
+
+R13 completed before correction. CF-01 care context could bypass the canonical purpose-limited appointment authorization root for generic clinic administrators. File09 verification reconciliation ignored event/File26 outbox write failures and could treat a failed clinic page read as completion. File19 notification delivery treated WP_Error as a truthy success. The post-review batch routes CF-01 through object authorization, makes verification projection writes atomic/retryable and makes File19 provider errors explicit.
+
+R13 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R14.**

@@ -81,4 +81,10 @@ t15h('R12 opaque appointment access concealed','includes/class-wca-opaque-api.ph
 t15h('R12 opaque responses no-store','includes/class-wca-opaque-api.php',"header( 'Cache-Control', 'private, no-store, max-age=0' )");
 t15h('R12 opaque responses noindex','includes/class-wca-opaque-api.php',"header( 'X-Robots-Tag', 'noindex, nofollow, noarchive' )");
 t15h('R12 application currency exact validation','includes/class-wca-service.php','$currency_raw = trim');
+
+t15h('R13 CF01 uses canonical appointment authorization','includes/class-swc-cf01-care-context.php','WCA_Authorization::can_view_appointment');
+t15h('R13 verification reconciliation retry hook','includes/class-wca-verification-reconciliation.php','wca_retry_doctor_eligibility_reconciliation');
+t15h('R13 verification projection writes transactional','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_write');
+t15h('R13 verification clinic read failure explicit','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_read');
+t15h('R13 File19 WP_Error rejected','includes/class-wca-outbox.php','is_wp_error( $result ) || false === $result');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

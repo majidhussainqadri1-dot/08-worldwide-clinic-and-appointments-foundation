@@ -145,9 +145,10 @@ final class WCA_Outbox {
 				'appointment_ref' => sanitize_text_field( $payload['appointment_ref'] ?? '' ),
 				'trace_id'        => $trace_id,
 			) );
-			if ( false === $result ) {
-				WCA_Observability::circuit_failure( $provider, 'File 19 rejected the notification.' );
-				return new WP_Error( 'wca_file19_delivery', 'File 19 rejected the notification.' );
+			if ( is_wp_error( $result ) || false === $result ) {
+				$message = is_wp_error( $result ) ? $result->get_error_message() : 'File 19 rejected the notification.';
+				WCA_Observability::circuit_failure( $provider, $message );
+				return new WP_Error( 'wca_file19_delivery', $message );
 			}
 			WCA_Observability::circuit_success( $provider );
 			return true;
