@@ -1,6 +1,7 @@
 <?php
 $root=dirname(__DIR__); $pass=0; $fail=array();
 function t15h($label,$path,$needle){global $root,$pass,$fail;$s=file_get_contents($root.'/'.$path);if(is_string($s)&&false!==strpos($s,$needle)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' missing: '.$needle;}}
+function t15missing($label,$path){global $root,$pass,$fail;if(!file_exists($root.'/'.$path)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' unexpected file: '.$path;}}
 t15h('R1 appointment conflicts fail closed','includes/class-swc-helpers.php',"null === \$rows || '' !== (string) \$wpdb->last_error");
 t15h('R1 rate counter readback fails closed','includes/class-swc-helpers.php',"null === \$hits_raw || '' !== (string) \$wpdb->last_error");
 t15h('R1 active hold read fails closed','includes/class-wca-service.php',"return (bool) \$hold_id;");
@@ -112,4 +113,8 @@ t15h('R17 plugin release 1.2.15','worldwide-clinic.php','Version: 1.2.15');
 t15h('R17 runtime release 1.2.15','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
 t15h('R17 readme stable tag 1.2.15','readme.txt','Stable tag: 1.2.15');
 t15h('R17 package contract 1.2.15','tests/release-package-contract.php',"Version: 1.2.15");
+
+t15missing('R18 temporary T15 probe removed','.github/workflows/t15-probe.yml');
+t15h('R18 old corrective status explicitly historical','CORRECTIVE-STATUS.md','Historical evidence only.');
+t15h('R18 master-plan version label truthful','tests/master-plan-contract.php','plugin version is 1.2.15');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

@@ -36,8 +36,8 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — fifteenth-cycle R1-R17 source/release corrections are present; R18-R20 closure review remains. |
-| Fresh post-final-code reviews | **Pending for Fifteenth closure** — R18-R20 have not yet been closed on the final corrected code. |
+| Coded | **Corrected candidate** — fifteenth-cycle R1-R18 corrections/evidence cleanup are present; R19-R20 fresh closure reviews remain. |
+| Fresh post-final-code reviews | **Pending for Fifteenth closure** — R19-R20 have not yet been closed on the R18-corrected state. |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
 | Staging-Accepted | **Pending / not claimed.** |
@@ -82,4 +82,4 @@ This repository status does not prove the current staging or live installation. 
 - R1-R16 completed; R4 and R9 were clean, while supported findings in the other closed rounds were corrected and retested.
 - R17 identified stale runtime/release/document/package identity after the substantive corrections and aligns the current candidate to runtime **1.2.15** without schema inflation.
 - Core schema: **3.2.0**; continuity schema: **1.1.0**; Future24 schema: **1.0.0**.
-- R18-R20 remain required corrected-state/closure reviews. This checkpoint is not a claim of final repository closure, staging acceptance, live deployment or operational status.
+- R18 completed broad plan-to-code/repository-evidence review and its three findings were corrected/retested; R19-R20 remain required fresh corrected-state closure reviews. This checkpoint is not a claim of final repository closure, staging acceptance, live deployment or operational status.

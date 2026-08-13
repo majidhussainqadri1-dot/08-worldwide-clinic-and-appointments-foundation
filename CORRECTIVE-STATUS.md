@@ -1,3 +1,7 @@
+# Historical Corrective Status Snapshot — v0.2.1 Only
+
+> **Historical evidence only.** This document records the former 0.2.1 corrective checkpoint and is not the current File 08 candidate status. The authoritative current repository status is `STATUS.md`; exact staging/live truth must still be verified independently.
+
 # File 08 Corrective Status
 
 ## Current state

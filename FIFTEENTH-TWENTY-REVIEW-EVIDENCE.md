@@ -121,3 +121,10 @@ R16 result: **SUPPORTED DEFECTS FOUND — corrected together after review comple
 R17 completed against the R16-corrected state before any R17 source change. The deterministic builder/verifier remained exact-commit/runtime-derived, but source, contracts and package tests still declared 1.2.14 while readme description/install guidance still referred to 1.2.13. The corrected source therefore lacked a truthful new release identity. The post-review batch advances the runtime to 1.2.15, aligns package tests/readme/STATUS/CHANGELOG and leaves schemas unchanged. R18-R20 remain required fresh closure reviews.
 
 R17 result: **SUPPORTED RELEASE/EVIDENCE DEFECT FOUND — corrected together after review completion; full retest required before R18.**
+
+
+## R18 — broad plan-to-code / repository-evidence / hygiene review
+
+R18 completed against the R17-corrected state before any R18 correction. FR-001…018, NFR-001…010 and FUT-01…24 traceability remained present; deterministic candidate building is allow-listed to runtime content and binds exact commit/runtime in its generated manifest. Three repository/evidence defects remained: the temporary `t15-probe.yml` was still an active branch workflow, the old `CORRECTIVE-STATUS.md` described v0.2.1 under a misleading current-state heading without an explicit historical banner, and the master-plan gate checked 1.2.15 while reporting a stale 1.2.13 success label. The post-review batch removes temporary probe tooling, marks historical evidence unmistakably and makes the test label truthful.
+
+R18 result: **SUPPORTED REPOSITORY/EVIDENCE DEFECTS FOUND — corrected together after review completion; full retest required before R19.**

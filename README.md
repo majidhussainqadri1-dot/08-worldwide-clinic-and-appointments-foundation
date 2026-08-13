@@ -17,7 +17,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 The authoritative repository release identity is the **exact candidate HEAD + exact-head CI run + deterministic manifest + candidate SHA-256**. Repository evidence never proves the current staging or live installation.
 
-Current fifteenth-cycle source/release alignment is **1.2.15**; core schema remains **3.2.0**, restricted continuity **1.1.0**, and Future24 **1.0.0**. R18-R20 fresh closure reviews and exact-final-head CI/package evidence remain required before repository closure.
+Current fifteenth-cycle runtime alignment is **1.2.15**; core schema remains **3.2.0**, restricted continuity **1.1.0**, and Future24 **1.0.0**. R18 broad adversarial/evidence review is corrected; R19-R20 fresh closure reviews and exact-final-head CI/package evidence remain required before repository closure.
 
 ## Governing ownership boundaries
 
