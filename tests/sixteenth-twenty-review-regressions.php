@@ -24,4 +24,11 @@ t16h('R6 ambiguous response advertises reconciliation','includes/class-wca-ten-r
 t16h('R6 unverifiable response fails closed','includes/class-wca-ten-review-hardening.php','wca_idempotency_response_unverifiable');
 t16h('R6 idempotency release DB failure observable','includes/class-wca-repository.php','idempotency_release_db_failed_total');
 t16h('R6 outbox advisory release failure observable','includes/class-wca-outbox.php','outbox_lock_release_failed_total');
+t16h('R7 doctor-wide slot lock prevents cross-midnight lock split','includes/class-wca-repository.php',"wca-slot-doctor-");
+t16h('R7 slot lock release failure observable','includes/class-wca-repository.php','slot_lock_release_failed_total');
+t16h('R7 Future24 lock SQL failure explicit','includes/class-wca-future24.php','wca_future24_lock_read_failed');
+t16h('R7 Future24 lock release failure observable','includes/class-wca-future24.php','future24_lock_release_failed_total');
+t16h('R7 practitioner lock release failure observable','includes/class-wca-plan-guard.php','practitioner_ref_lock_release_failed_total');
+t16h('R7 repository rollback uncertainty explicit','includes/class-wca-repository.php','wca_transaction_rollback_failed');
+t16h('R7 appointment rollback uncertainty explicit','includes/class-swc-helpers.php','swc_transaction_rollback_failed');
 if($fail){fwrite(STDERR,"T16 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);} echo "T16 regression assertions passed: {$pass}/{$pass}\n";

@@ -333,7 +333,11 @@ final class WCA_Future24 {
 	private static function semantic_lock( $scope, $identity ) {
 		global $wpdb;
 		$lock = 'wca-f24-' . sanitize_key( $scope ) . '-' . substr( hash( 'sha256', (string) $identity ), 0, 32 );
-		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) {
+		$locked_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) );
+		if ( null === $locked_raw && '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_future24_lock_read_failed', __( 'The scheduling lock could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		if ( 1 !== (int) $locked_raw ) {
 			return new WP_Error( 'wca_future24_busy', __( 'This scheduling operation is already being updated. Try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		return $lock;
@@ -341,7 +345,12 @@ final class WCA_Future24 {
 
 	private static function release_semantic_lock( $lock ) {
 		global $wpdb;
-		if ( is_string( $lock ) && '' !== $lock ) { $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) ); }
+		if ( ! is_string( $lock ) || '' === $lock ) { return; }
+		$released_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+		if ( 1 !== (int) $released_raw ) {
+			WCA_Observability::metric( 'future24_lock_release_failed_total', 1 );
+			WCA_Observability::log( 'error', 'future24_lock_release_failed', array( 'db_error' => '' !== (string) $wpdb->last_error ) );
+		}
 	}
 
 	/** Preserve caller intent at persistence roots; never silently clamp capacity. */
@@ -847,9 +856,8 @@ final class WCA_Future24 {
 				return new WP_Error( 'wca_resource_appointment_scope', __( 'The appointment and scheduling resource must belong to the same clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 			}
 		}
-		$lock = 'wca-f24-resource-' . substr( hash( 'sha256', strtolower( $resource_ref ) ), 0, 32 );
-		$locked = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) );
-		if ( 1 !== $locked ) { return new WP_Error( 'wca_resource_busy', __( 'The resource is being updated. Try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$lock = self::semantic_lock( 'resource', strtolower( $resource_ref ) );
+		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$table = self::tables()['records'];
 			$count_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-04' AND parent_ref=%s AND status='reserved' AND (expires_at IS NULL OR expires_at>%s) AND starts_at<%s AND ends_at>%s", strtolower( $resource_ref ), WCA_Repository::now(), $end, $start ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -869,7 +877,7 @@ final class WCA_Future24 {
 				'payload' => array( 'reservation_kind' => 'multi_resource', 'resource_type' => $resource_type, 'cross_clinic_scope_checked' => true ),
 			), $actor );
 		} finally {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+self::release_semantic_lock( $lock );
 		}
 	}
 
@@ -919,8 +927,8 @@ final class WCA_Future24 {
 		if ( ! $clinic || is_wp_error( $service ) || ( $service_ref && ! $service ) ) { return new WP_Error( 'wca_group_scope_stale', __( 'This group appointment is no longer bookable because its clinic or service is not active.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		if ( ! empty( $session['starts_at'] ) && strtotime( $session['starts_at'] . ' UTC' ) <= time() ) { return new WP_Error( 'wca_group_started', __( 'This group appointment has already started and is closed to new joins.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$table = self::tables()['records'];
-		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
-		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$lock = self::semantic_lock( 'group-session', strtolower( $session_ref ) );
+		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$existing_member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status='group_member' LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $existing_member && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_membership_read_failed', __( 'Current group membership could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
@@ -938,7 +946,7 @@ final class WCA_Future24 {
 				'payload' => array( 'member_ref' => WCA_Authorization::subject_uuid( $context['patient_user_id'] ), 'guardian_user_id' => $context['guardian_user_id'], 'peer_identity_visible' => false ),
 			), $context['actor_user_id'] );
 		} finally {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+self::release_semantic_lock( $lock );
 		}
 	}
 
@@ -956,8 +964,8 @@ final class WCA_Future24 {
 			return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 		}
 		$table = self::tables()['records'];
-		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
-		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$lock = self::semantic_lock( 'group-session', strtolower( $session_ref ) );
+		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status IN ('group_member','group_left','group_cancelled') ORDER BY id DESC LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $member && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_leave_read_failed', __( 'Current group membership could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
@@ -973,7 +981,7 @@ final class WCA_Future24 {
 			if ( is_wp_error( $result ) ) { return $result; }
 			return self::public_record( self::get_record( $member['public_ref'], 'F08-FUT-05' ) );
 		} finally {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+self::release_semantic_lock( $lock );
 		}
 	}
 
@@ -988,8 +996,8 @@ final class WCA_Future24 {
 		if ( 'group_cancelled' === (string) $session['status'] ) { return self::public_record( $session ); }
 		if ( 'group_open' !== (string) $session['status'] ) { return new WP_Error( 'wca_group_state', __( 'This group appointment cannot be cancelled from its current state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$table = self::tables()['records'];
-		$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $session_ref ) ), 0, 32 );
-		if ( 1 !== (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 3)', $lock ) ) ) { return new WP_Error( 'wca_group_busy', __( 'The group session is being updated.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$lock = self::semantic_lock( 'group-session', strtolower( $session_ref ) );
+		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$result = WCA_Repository::transaction( function () use ( $table, $session_ref, $data, $actor ) {
 				global $wpdb;
@@ -1007,7 +1015,7 @@ final class WCA_Future24 {
 			if ( is_wp_error( $result ) ) { return $result; }
 			return self::public_record( self::get_record( $session_ref, 'F08-FUT-05' ) );
 		} finally {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+self::release_semantic_lock( $lock );
 		}
 	}
 

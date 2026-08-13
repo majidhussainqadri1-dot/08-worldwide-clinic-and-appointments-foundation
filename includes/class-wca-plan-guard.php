@@ -30,7 +30,11 @@ final class WCA_Plan_Guard {
 			}
 			return preg_match( '/^[0-9a-f-]{36}$/', $ref ) ? $ref : '';
 		} finally {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+			$released_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+			if ( 1 !== (int) $released_raw ) {
+				WCA_Observability::metric( 'practitioner_ref_lock_release_failed_total', 1 );
+				WCA_Observability::log( 'error', 'practitioner_ref_lock_release_failed', array( 'user_id' => $user_id, 'db_error' => '' !== (string) $wpdb->last_error ) );
+			}
 		}
 	}
 

@@ -537,20 +537,23 @@ final class SWC_Helpers {
 		try {
 			$result = call_user_func( $callback );
 			if ( is_wp_error( $result ) ) {
-				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 				wp_cache_delete( absint( $appointment_id ), 'post_meta' );
+				if ( false === $rolled_back ) { return new WP_Error( 'swc_transaction_rollback_failed', __( 'The appointment mutation failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 				return $result;
 			}
 			$committed = $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			if ( false === $committed ) {
-				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 				wp_cache_delete( absint( $appointment_id ), 'post_meta' );
+				if ( false === $rolled_back ) { return new WP_Error( 'swc_transaction_commit_rollback_failed', __( 'Appointment commit failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 				return new WP_Error( 'swc_transaction_commit_failed', __( 'The appointment transaction could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 			}
 			return $result;
 		} catch ( Throwable $error ) {
-			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			wp_cache_delete( absint( $appointment_id ), 'post_meta' );
+			if ( false === $rolled_back ) { return new WP_Error( 'swc_transaction_exception_rollback_failed', __( 'The appointment update failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 			return new WP_Error( 'swc_transaction_failed', __( 'The appointment update could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 		}
 	}

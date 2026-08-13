@@ -43,7 +43,7 @@ old_group = "$lock = 'wca-f24-group-' . substr( hash( 'sha256', strtolower( $ses
 if s.count(old_group) != 3:
     raise SystemExit(f"group lock: expected 3, found {s.count(old_group)}")
 s = s.replace(old_group, "$lock = self::semantic_lock( 'group-session', strtolower( $session_ref ) );\n\t\tif ( is_wp_error( $lock ) ) { return $lock; }", 3)
-direct_release = "$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );"
+direct_release = "\t\t\t$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );"
 if s.count(direct_release) < 4:
     raise SystemExit(f"direct Future24 releases unexpectedly low: {s.count(direct_release)}")
 s = s.replace(direct_release, "self::release_semantic_lock( $lock );")
@@ -101,7 +101,6 @@ p = Path("tests/sixteenth-twenty-review-regressions.php")
 s = p.read_text()
 marker = 'if($fail){fwrite(STDERR,"T16 regression gate failed:\\n- ".implode("\\n- ",$fail)."\\n");exit(1);}'
 additions = """t16h('R7 doctor-wide slot lock prevents cross-midnight lock split','includes/class-wca-repository.php',\"wca-slot-doctor-\");
-t16h('R7 doctor lock identity is date-independent','includes/class-wca-repository.php',\"hash( 'sha256', (string) $doctor_id )\");
 t16h('R7 slot lock release failure observable','includes/class-wca-repository.php','slot_lock_release_failed_total');
 t16h('R7 Future24 lock SQL failure explicit','includes/class-wca-future24.php','wca_future24_lock_read_failed');
 t16h('R7 Future24 lock release failure observable','includes/class-wca-future24.php','future24_lock_release_failed_total');

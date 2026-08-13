@@ -63,17 +63,20 @@ final class WCA_Repository {
 		try {
 			$result = call_user_func( $callback );
 			if ( is_wp_error( $result ) ) {
-				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				if ( false === $rolled_back ) { return new WP_Error( 'wca_transaction_rollback_failed', __( 'The mutation failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 				return $result;
 			}
 			$committed = $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			if ( false === $committed ) {
-				$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+				if ( false === $rolled_back ) { return new WP_Error( 'wca_transaction_commit_rollback_failed', __( 'Commit failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 				return new WP_Error( sanitize_key( $error_code . '_commit' ), __( 'The mutation transaction could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 			}
 			return $result;
 		} catch ( Throwable $error ) {
-			$wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			if ( false === $rolled_back ) { return new WP_Error( 'wca_transaction_exception_rollback_failed', __( 'The mutation raised an error and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 			return new WP_Error( sanitize_key( $error_code ), __( 'The mutation could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 		} finally {
 			self::$transaction_depth = 0;
@@ -588,7 +591,7 @@ final class WCA_Repository {
 		$existing = $replay( $existing );
 		if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 
-		$lock_name = 'wca-slot-' . substr( hash( 'sha256', $doctor_id . '|' . substr( $start, 0, 10 ) ), 0, 48 );
+		$lock_name = 'wca-slot-doctor-' . substr( hash( 'sha256', (string) $doctor_id ), 0, 48 );
 		$locked_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s,5)', $lock_name ) );
 		if ( null === $locked_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_lock_read_failed', __( 'The scheduling lock could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$locked = (int) $locked_raw;
@@ -636,7 +639,11 @@ final class WCA_Repository {
 			}
 			return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
 		} finally {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+			$released_raw = $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+			if ( 1 !== (int) $released_raw ) {
+				WCA_Observability::metric( 'slot_lock_release_failed_total', 1 );
+				WCA_Observability::log( 'error', 'slot_lock_release_failed', array( 'db_error' => '' !== (string) $wpdb->last_error ) );
+			}
 		}
 	}
 
