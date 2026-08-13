@@ -21,32 +21,34 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-          targets=[Path('includes/class-wca-privacy.php'),Path('includes/class-swc-privacy.php'),Path('includes/class-wca-continuity-secure.php'),Path('includes/class-wca-continuity.php')]
+          targets=[Path('includes/class-wca-privacy.php'),Path('includes/class-swc-privacy.php'),Path('includes/class-wca-continuity-secure.php'),Path('includes/class-wca-continuity-guards.php')]
           for p in targets:
             s=p.read_text(errors='replace')
             print(f'\n===== {p} =====')
-            print('exporters=',len(re.findall(r'export',s,re.I)),'erasers=',len(re.findall(r'eras',s,re.I)),'retention=',len(re.findall(r'retention',s,re.I)),'legal_hold=',len(re.findall(r'legal_hold',s,re.I)))
-            for token in ('get_results','get_var','get_row','delete(','update(','delete_meta_strict','update_meta_strict','set_transient','delete_transient'):
-              for i,line in enumerate(s.splitlines(),1):
-                if token in line:
-                  lines=s.splitlines(); ctx='\n'.join(lines[max(0,i-4):min(len(lines),i+9)])
-                  print(f'\n@@ {p}:{i} {token}\n{ctx[:1800]}')
-          # Privacy registrars must coexist without key collision.
+            print('export=',len(re.findall(r'export',s,re.I)),'erase=',len(re.findall(r'eras',s,re.I)),'retention=',len(re.findall(r'retention',s,re.I)),'legal_hold=',len(re.findall(r'legal_hold',s,re.I)))
           alltext='\n'.join(p.read_text(errors='replace') for p in targets)
           keys=re.findall(r"\$erasers\[['\"]([^'\"]+)['\"]\]",alltext)+re.findall(r"\$exporters\[['\"]([^'\"]+)['\"]\]",alltext)
-          print('\nREGISTRY_KEYS=',keys)
-          # Search all direct identifiers handled by erasure/export policy.
+          print('REGISTRY_KEYS=',keys)
+          print('DUPLICATE_REGISTRY_KEYS=',sorted({k for k in keys if keys.count(k)>1}))
           identifiers=['patient_user_id','guardian_user_id','doctor_id','proposed_doctor_id','phone','whatsapp','country','city','reason','patient_message','doctor_private_note','consent_at','consent_version','patient_timezone','preferred_at_utc','post_author','actor_user_id','subject_user_id']
-          for key in identifiers:
-            print(key,'occurrences=',alltext.count(key))
-          # Flag privacy SQL reads with no nearby last_error / strict helper / WP_Error.
+          for key in identifiers: print('IDENTIFIER',key,'occurrences=',alltext.count(key))
           for p in targets:
             lines=p.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
               if re.search(r'\$wpdb->get_(?:results|row|var|col)\s*\(',line):
+                ctx='\n'.join(lines[max(0,i-3):min(len(lines),i+12)])
+                protected=any(x in ctx for x in ('last_error','WP_Error','audit_rows_strict','related_ids','related_count','throw new RuntimeException'))
+                if not protected: print(f'\n!! PRIVACY_READ_REVIEW {p}:{i+1}\n{ctx}')
+              if re.search(r'\$wpdb->(?:delete|update|query)\s*\(',line):
                 ctx='\n'.join(lines[max(0,i-2):min(len(lines),i+10)])
-                if not any(x in ctx for x in ('last_error','WP_Error','audit_rows_strict','related_ids','related_count')):
-                  print(f'\n!! PRIVACY_READ_REVIEW {p}:{i+1}\n{ctx}')
+                if not any(x in ctx for x in ('false ===','1 !==','is_wp_error','WP_Error','return ')):
+                  print(f'\n?? PRIVACY_WRITE_REVIEW {p}:{i+1}\n{ctx}')
+          for p in targets:
+            s=p.read_text(errors='replace')
+            for fname in ('export','erase','privacy_exporter','privacy_eraser','apply_retention'):
+              for m in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+fname+r'\s*\([^)]*\)\s*\{',s):
+                nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),8000)); body=s[m.start():end]
+                print(f'\n## PRIVACY_METHOD {p}:{fname}\n{body[:5000]}')
           PY
       - name: Round 5 full regression confirmation
         run: |
