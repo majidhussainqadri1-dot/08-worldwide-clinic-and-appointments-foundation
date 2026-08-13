@@ -47,4 +47,11 @@ t15h('R5 insert-race hold read failure','includes/class-wca-repository.php','wca
 t15h('R6 admin access audit fail closed','includes/class-wca-authorization.php','wca_admin_access_audit_failed');
 t15h('R6 practitioner lock read separated','includes/class-wca-plan-guard.php','$lock_raw = $wpdb->get_var');
 t15h('R6 practitioner ref persistence checked','includes/class-wca-plan-guard.php','if ( false === $written )');
+
+t15h('R7 strict Founder helper result','includes/class-wca-authorization.php','$founder_raw = smc_is_founder');
+t15h('R7 strict guardian helper result','includes/class-wca-authorization.php','return true === $result || 1 === $result');
+t15h('R7 strict step-up helper result','includes/class-wca-authorization.php','$step_result = smc_step_up_is_valid');
+t15h('R7 versioned age claim failure is authoritative','includes/class-wca-central-governance.php','wca_age_claim_invalid_provider_response');
+t15h('R7 doctor Founder result strict','includes/class-swc-doctor-authority.php','$founder_raw = function_exists');
+t15h('R7 File09 verified result strict','includes/class-swc-doctor-authority.php','$verified_raw = gdo_user_is_verified');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

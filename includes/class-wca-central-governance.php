@@ -84,11 +84,16 @@ final class WCA_Central_Governance {
 
 		$raw = null;
 		$source = '';
+		$versioned_attempted = false;
 		if ( function_exists( 'smc_get_age_guardian_claim' ) ) {
-			$raw = smc_get_age_guardian_claim( $patient_user_id );
+			$versioned_attempted = true;
+			try { $raw = smc_get_age_guardian_claim( $patient_user_id ); } catch ( Throwable $e ) { return new WP_Error( 'wca_age_claim_provider_failure', __( 'Current age and guardian eligibility could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			if ( is_wp_error( $raw ) ) { return $raw; }
 			$source = 'file00:smc_get_age_guardian_claim';
 		} elseif ( function_exists( 'smc_get_membership_claims' ) ) {
-			$all = smc_get_membership_claims( $patient_user_id );
+			$versioned_attempted = true;
+			try { $all = smc_get_membership_claims( $patient_user_id ); } catch ( Throwable $e ) { return new WP_Error( 'wca_age_claim_provider_failure', __( 'Current membership claims could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			if ( is_wp_error( $all ) ) { return $all; }
 			if ( is_array( $all ) ) {
 				$raw = array(
 					'birth_date' => isset( $all['birth_date'] ) ? $all['birth_date'] : ( isset( $all['date_of_birth'] ) ? $all['date_of_birth'] : '' ),
@@ -102,6 +107,9 @@ final class WCA_Central_Governance {
 		$raw = apply_filters( 'wca_age_guardian_claim', $raw, $patient_user_id );
 		if ( is_array( $raw ) && ! $source ) { $source = 'versioned-filter'; }
 
+		if ( ! is_array( $raw ) && $versioned_attempted ) {
+			return new WP_Error( 'wca_age_claim_invalid_provider_response', __( 'Current age and guardian eligibility returned an invalid response.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		if ( ! is_array( $raw ) ) {
 			$birth = '';
 			$gender = '';
@@ -162,12 +170,14 @@ final class WCA_Central_Governance {
 			if ( ! $guardian_user_id || $guardian_user_id !== $actor_user_id || ! WCA_Authorization::is_guardian( $guardian_user_id ) ) {
 				return new WP_Error( 'wca_guardian_required', __( 'A current verified guardian must act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 			}
-			$allowed = function_exists( 'smc_guardian_may_act_for' ) ? (bool) smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ) : (bool) apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
+			$allowed = true === apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
+			if ( function_exists( 'smc_guardian_may_act_for' ) ) { try { $rel = smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); $allowed = true === $rel || 1 === $rel || '1' === $rel; } catch ( Throwable $e ) { $allowed = false; } }
 			return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		if ( $patient_user_id === $actor_user_id && ! $guardian_user_id ) { return true; }
 		if ( $guardian_user_id && $guardian_user_id === $actor_user_id && WCA_Authorization::is_guardian( $guardian_user_id ) ) {
-			$allowed = function_exists( 'smc_guardian_may_act_for' ) ? (bool) smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ) : (bool) apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
+			$allowed = true === apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
+			if ( function_exists( 'smc_guardian_may_act_for' ) ) { try { $rel = smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); $allowed = true === $rel || 1 === $rel || '1' === $rel; } catch ( Throwable $e ) { $allowed = false; } }
 			return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not currently authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
 		return new WP_Error( 'wca_patient_actor_mismatch', __( 'The current actor may not act for this patient.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );

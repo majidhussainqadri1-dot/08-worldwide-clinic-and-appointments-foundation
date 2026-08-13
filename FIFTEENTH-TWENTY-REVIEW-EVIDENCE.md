@@ -45,3 +45,10 @@ R5 result: **SUPPORTED DEFECTS FOUND — full retest required before R6.**
 R6 completed before correction. Object-level patient/doctor/guardian/staff checks and serving/delegation scopes were re-traced. Two supported gaps remained: purpose-limited administrative appointment access did not fail closed when its mandatory audit write failed; opaque practitioner-reference creation did not separately handle DB lock failure or metadata persistence failure. The R6 batch corrects both classes after review completion.
 
 R6 result: **SUPPORTED DEFECTS FOUND — full retest required before R7.**
+
+
+## R7 — File00/File09 claims, guardian/minor, consent/revocation review
+
+R7 completed before correction. Cross-plugin helper returns were not uniformly type-checked: error objects or unexpected values could become truthy in Founder, guardian, step-up, guardian-relationship or verification decisions. Versioned age/guardian helper failure could also fall through to legacy metadata. The post-review batch makes authority grants explicit and fail-closed and treats a versioned provider response as authoritative rather than silently downgrading to legacy state.
+
+R7 result: **SUPPORTED DEFECTS FOUND — full retest required before R8.**

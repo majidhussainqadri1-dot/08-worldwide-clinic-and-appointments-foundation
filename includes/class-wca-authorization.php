@@ -15,8 +15,14 @@ final class WCA_Authorization {
 			return new WP_Error( 'wca_auth_required', __( 'Authentication is required.', 'worldwide-clinic-appointments' ), array( 'status' => 401 ) );
 		}
 
-		$status    = function_exists( 'smc_user_status' ) ? (string) smc_user_status( $user_id ) : 'unknown';
-		$founder   = function_exists( 'smc_is_founder' ) && smc_is_founder( $user_id );
+		$status = 'unknown';
+		if ( function_exists( 'smc_user_status' ) ) {
+			try { $status_raw = smc_user_status( $user_id ); $status = is_scalar( $status_raw ) ? (string) $status_raw : 'unknown'; } catch ( Throwable $e ) { $status = 'unknown'; }
+		}
+		$founder = false;
+		if ( function_exists( 'smc_is_founder' ) ) {
+			try { $founder_raw = smc_is_founder( $user_id ); $founder = true === $founder_raw || 1 === $founder_raw || '1' === $founder_raw; } catch ( Throwable $e ) { $founder = false; }
+		}
 		$eligible  = $founder || 'approved' === $status;
 		$suspended = in_array( $status, array( 'suspended', 'revoked', 'rejected', 'expired', 'blocked' ), true );
 		$doctor    = class_exists( 'SWC_Doctor_Authority' ) ? SWC_Doctor_Authority::is_eligible( $user_id ) : false;
@@ -69,16 +75,18 @@ final class WCA_Authorization {
 
 	public static function is_guardian( $user_id ) {
 		if ( function_exists( 'smc_user_is_verified_guardian' ) ) {
-			return (bool) smc_user_is_verified_guardian( absint( $user_id ) );
+			try { $result = smc_user_is_verified_guardian( absint( $user_id ) ); return true === $result || 1 === $result || '1' === $result; } catch ( Throwable $e ) { return false; }
 		}
-		return (bool) apply_filters( 'wca_user_is_verified_guardian', false, absint( $user_id ) );
+		return true === apply_filters( 'wca_user_is_verified_guardian', false, absint( $user_id ) );
 	}
 
 	/** @return true|WP_Error */
 	public static function require_step_up( $purpose, $user_id = 0 ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
-		if ( function_exists( 'smc_step_up_is_valid' ) && smc_step_up_is_valid( $user_id, sanitize_key( $purpose ) ) ) { return true; }
-		if ( (bool) apply_filters( 'wca_step_up_is_valid', false, $user_id, sanitize_key( $purpose ) ) ) { return true; }
+		if ( function_exists( 'smc_step_up_is_valid' ) ) {
+			try { $step_result = smc_step_up_is_valid( $user_id, sanitize_key( $purpose ) ); if ( true === $step_result || 1 === $step_result || '1' === $step_result ) { return true; } } catch ( Throwable $e ) { /* fail closed below */ }
+		}
+		if ( true === apply_filters( 'wca_step_up_is_valid', false, $user_id, sanitize_key( $purpose ) ) ) { return true; }
 		return new WP_Error( 'wca_step_up_required', __( 'A recent security verification is required.', 'worldwide-clinic-appointments' ), array( 'status' => 403, 'purpose' => sanitize_key( $purpose ) ) );
 	}
 
@@ -257,8 +265,10 @@ final class WCA_Authorization {
 		if ( $guardian_user_id !== $actor_user_id || ! self::is_guardian( $guardian_user_id ) ) {
 			return new WP_Error( 'wca_guardian_unverified', __( 'The current actor must be the verified guardian.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
-		$allowed = (bool) apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
-		if ( function_exists( 'smc_guardian_may_act_for' ) ) { $allowed = (bool) smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); }
+		$allowed = true === apply_filters( 'wca_guardian_may_act_for_patient', false, $guardian_user_id, $patient_user_id );
+		if ( function_exists( 'smc_guardian_may_act_for' ) ) {
+			try { $relationship = smc_guardian_may_act_for( $guardian_user_id, $patient_user_id ); $allowed = true === $relationship || 1 === $relationship || '1' === $relationship; } catch ( Throwable $e ) { $allowed = false; }
+		}
 		return $allowed ? true : new WP_Error( 'wca_guardian_relationship', __( 'The guardian relationship is not authorized.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 	}
 }

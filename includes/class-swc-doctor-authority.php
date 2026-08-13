@@ -45,7 +45,8 @@ final class SWC_Doctor_Authority {
 
 		$founder = false;
 		try {
-			$founder = function_exists( 'smc_is_founder' ) && smc_is_founder( $user_id );
+			$founder_raw = function_exists( 'smc_is_founder' ) ? smc_is_founder( $user_id ) : false;
+			$founder = true === $founder_raw || 1 === $founder_raw || '1' === $founder_raw;
 		} catch ( Throwable $e ) {
 			$founder = false;
 		}
@@ -108,7 +109,8 @@ final class SWC_Doctor_Authority {
 		try {
 			$decision = gdo_get_verification_decision( $user_id );
 			$snapshot = gdo_get_approved_snapshot( $user_id );
-			$verified = gdo_user_is_verified( $user_id );
+			$verified_raw = gdo_user_is_verified( $user_id );
+			$verified = true === $verified_raw || 1 === $verified_raw || '1' === $verified_raw;
 		} catch ( Throwable $e ) {
 			return false;
 		}
