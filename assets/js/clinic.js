@@ -4,10 +4,14 @@
 	var runtime = window.wcaRuntime || window.swcClinic || {};
 	var restUrl = String(runtime.restUrl || '/wp-json/wca/v1/').replace(/\/?$/, '/');
 	var nonce = runtime.nonce || '';
+	function tr(message) {
+		if (window.wp && window.wp.i18n && typeof window.wp.i18n.__ === 'function') return window.wp.i18n.__(String(message), 'worldwide-clinic-appointments');
+		return String(message);
+	}
 
 	function uuid() {
 		if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
-		if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') throw new Error('Secure replay-key generation is unavailable in this browser.');
+		if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') throw new Error(tr('Secure replay-key generation is unavailable in this browser.'));
 		var bytes = new Uint8Array(16);
 		window.crypto.getRandomValues(bytes);
 		bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -25,7 +29,7 @@
 		var type = response.headers.get('content-type') || '';
 		var data = type.indexOf('json') !== -1 ? await response.json() : await response.text();
 		if (!response.ok) {
-			var message = data && data.message ? data.message : (runtime.i18n && runtime.i18n.error) || 'The request could not be completed.';
+			var message = data && data.message ? data.message : (runtime.i18n && runtime.i18n.error) || tr('The request could not be completed.');
 			var error = new Error(message);
 			error.status = response.status;
 			error.data = data;
@@ -37,7 +41,7 @@
 	function setStatus(root, message, isError) {
 		var node = root.querySelector('[data-wca-status]');
 		if (!node) return;
-		node.textContent = message || '';
+		node.textContent = message ? tr(message) : '';
 		node.classList.toggle('is-error', !!isError);
 		node.classList.toggle('is-success', !!message && !isError);
 	}
@@ -65,17 +69,34 @@
 		if (!form || !searchButton || !slotsNode) return;
 		var selectedHold = null;
 		var appointmentRequestKey = null;
+		var searchGeneration = 0;
+		var holdGeneration = 0;
+
+		function invalidateSelection() {
+			holdGeneration += 1;
+			selectedHold = null;
+			appointmentRequestKey = null;
+			Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) {
+				item.setAttribute('aria-pressed', 'false');
+			});
+		}
 
 		var tz = form.elements.timezone;
 		if (tz && (!tz.value || tz.value === 'UTC')) {
 			try { tz.value = Intl.DateTimeFormat().resolvedOptions().timeZone || tz.value; } catch (e) {}
 		}
 
+		Array.prototype.forEach.call(['service_ref', 'date_from', 'timezone'], function (name) {
+			var field = form.elements[name];
+			if (field) field.addEventListener('change', invalidateSelection);
+		});
+
 		searchButton.addEventListener('click', async function () {
+			var generation = ++searchGeneration;
+			invalidateSelection();
+			searchButton.disabled = true;
 			setStatus(root, (runtime.i18n && runtime.i18n.loading) || 'Loading…', false);
 			slotsNode.replaceChildren();
-			selectedHold = null;
-			appointmentRequestKey = null;
 			try {
 				var serviceSelect = form.elements.service_ref;
 				var selectedOption = serviceSelect && serviceSelect.options[serviceSelect.selectedIndex];
@@ -90,8 +111,9 @@
 					limit: '48'
 				});
 				var result = await api('slots?' + params.toString());
+				if (generation !== searchGeneration) return;
 				if (!result.slots || !result.slots.length) {
-					slotsNode.textContent = 'No available times were found.';
+					slotsNode.textContent = tr('No available times were found.');
 					setStatus(root, '', false);
 					return;
 				}
@@ -103,10 +125,12 @@
 					button.setAttribute('aria-pressed', 'false');
 					var holdRequestKey = uuid();
 					button.addEventListener('click', async function () {
-						Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) { item.setAttribute('aria-pressed', 'false'); });
-						button.disabled = true;
+						var requestGeneration = ++holdGeneration;
+						selectedHold = null;
+						appointmentRequestKey = null;
+						Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) { item.setAttribute('aria-pressed', 'false'); item.disabled = true; });
 						try {
-							selectedHold = await api('slot-holds', {method: 'POST', body: JSON.stringify({
+							var holdResult = await api('slot-holds', {method: 'POST', body: JSON.stringify({
 								clinic_ref: slot.clinic_ref,
 								service_ref: slot.service_ref,
 								practitioner_ref: slot.practitioner_ref,
@@ -117,17 +141,25 @@
 								end_utc: slot.end_utc,
 								idempotency_key: holdRequestKey
 							})});
+							if (requestGeneration !== holdGeneration) return;
+							selectedHold = holdResult;
 							button.setAttribute('aria-pressed', 'true');
 							appointmentRequestKey = uuid();
 							setStatus(root, 'Time reserved temporarily. Complete your request now.', false);
 						} catch (error) {
-							setStatus(root, error.message, true);
-						} finally { button.disabled = false; }
+							if (requestGeneration === holdGeneration) { selectedHold = null; appointmentRequestKey = null; setStatus(root, error.message, true); }
+						} finally {
+							if (requestGeneration === holdGeneration) Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) { item.disabled = false; });
+						}
 					});
 					slotsNode.appendChild(button);
 				});
 				setStatus(root, 'Choose an available time.', false);
-			} catch (error) { setStatus(root, error.message, true); }
+			} catch (error) {
+				if (generation === searchGeneration) setStatus(root, error.message, true);
+			} finally {
+				if (generation === searchGeneration) searchButton.disabled = false;
+			}
 		});
 
 		form.addEventListener('submit', async function (event) {
@@ -159,7 +191,7 @@
 					privacy_consent: checked(form, 'privacy_consent'),
 					emergency_acknowledged: checked(form, 'emergency_ack')
 				})});
-				setStatus(root, 'Appointment request submitted. Reference: ' + result.public_ref, false);
+				setStatus(root, tr('Appointment request submitted. Reference:') + ' ' + result.public_ref, false);
 				form.reset();
 				slotsNode.replaceChildren();
 				selectedHold = null;
@@ -175,7 +207,7 @@
 		Array.prototype.forEach.call(card.querySelectorAll('[data-wca-transition]'), function (button) {
 			button.addEventListener('click', async function () {
 				var next = button.dataset.wcaTransition;
-				if (!window.confirm('Continue with “' + next.replace(/_/g, ' ') + '”?')) return;
+				if (!window.confirm(tr('Continue with') + ' “' + next.replace(/_/g, ' ') + '”?')) return;
 				button.disabled = true;
 				try {
 					var result = await api('appointment-refs/' + encodeURIComponent(ref) + '/transitions', {method: 'POST', body: JSON.stringify({
@@ -187,7 +219,7 @@
 					})});
 					card.dataset.wcaStatus = result.status;
 					card.dataset.wcaVersion = result.version || result.record_version || card.dataset.wcaVersion;
-					setStatus(card, 'Appointment updated to ' + result.status.replace(/_/g, ' ') + '.', false);
+					setStatus(card, tr('Appointment updated to') + ' ' + result.status.replace(/_/g, ' ') + '.', false);
 					window.setTimeout(function () { window.location.reload(); }, 700);
 				} catch (error) { setStatus(card, error.message, true); button.disabled = false; }
 			});

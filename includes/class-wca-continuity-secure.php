@@ -733,7 +733,8 @@ final class WCA_Continuity {
 	}
 
 	private static function enqueue_assets() {
-		wp_enqueue_script( 'wca-continuity', WCA_URL . 'assets/js/continuity.js', array(), WCA_VERSION, true );
+		wp_enqueue_script( 'wca-continuity', WCA_URL . 'assets/js/continuity.js', array( 'wp-i18n' ), WCA_VERSION, true );
+		wp_set_script_translations( 'wca-continuity', 'worldwide-clinic-appointments', WCA_DIR . 'languages' );
 		wp_localize_script( 'wca-continuity', 'WCAContinuity', array( 'root' => esc_url_raw( rest_url( 'wca/v1/continuity/' ) ), 'nonce' => wp_create_nonce( 'wp_rest' ) ) );
 	}
 

@@ -38,7 +38,8 @@ final class SWC_Plugin {
 			return;
 		}
 		wp_enqueue_style( 'swc-clinic', SWC_URL . 'assets/css/clinic.css', array(), SWC_VERSION );
-		wp_enqueue_script( 'swc-clinic', SWC_URL . 'assets/js/clinic.js', array(), SWC_VERSION, true );
+		wp_enqueue_script( 'swc-clinic', SWC_URL . 'assets/js/clinic.js', array( 'wp-i18n' ), SWC_VERSION, true );
+		wp_set_script_translations( 'swc-clinic', 'worldwide-clinic-appointments', SWC_DIR . 'languages' );
 		wp_localize_script(
 			'swc-clinic',
 			'swcClinic',

@@ -147,7 +147,8 @@ final class WCA_Future24 {
 
 	public static function register_assets() {
 		wp_register_style( 'wca-future24', WCA_URL . 'assets/css/future24.css', array( 'wca-clinic' ), WCA_VERSION );
-		wp_register_script( 'wca-future24', WCA_URL . 'assets/js/future24.js', array(), WCA_VERSION, true );
+		wp_register_script( 'wca-future24', WCA_URL . 'assets/js/future24.js', array( 'wp-i18n' ), WCA_VERSION, true );
+		wp_set_script_translations( 'wca-future24', 'worldwide-clinic-appointments', WCA_DIR . 'languages' );
 	}
 
 	private static function enqueue_assets() {

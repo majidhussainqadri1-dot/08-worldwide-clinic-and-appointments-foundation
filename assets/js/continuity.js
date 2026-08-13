@@ -6,6 +6,10 @@
   }
 
   var config = window.WCAContinuity;
+  function tr(message) {
+    if (window.wp && window.wp.i18n && typeof window.wp.i18n.__ === 'function') return window.wp.i18n.__(String(message), 'worldwide-clinic-appointments');
+    return String(message);
+  }
   var pendingMutationKeys = Object.create(null);
 
   function mutationStorageKey(method, path) {
@@ -32,7 +36,7 @@
         return value.toString(16).padStart(2, '0');
       }).join('');
     }
-    throw new Error('Secure mutation identity is unavailable in this browser.');
+    throw new Error(tr('Secure mutation identity is unavailable in this browser.'));
   }
 
   function pendingMutationKey(method, path) {
@@ -57,7 +61,7 @@
 
   function status(node, message, isError) {
     if (!node) return;
-    node.textContent = message || '';
+    node.textContent = message ? tr(message) : '';
     node.classList.toggle('is-error', !!isError);
     node.classList.toggle('is-success', !isError && !!message);
   }
@@ -88,7 +92,7 @@
           clearPendingMutation(mutationState);
         }
         if (!response.ok) {
-          var message = data && data.message ? data.message : 'The request could not be completed.';
+          var message = data && data.message ? data.message : tr('The request could not be completed.');
           var error = new Error(message);
           error.status = response.status;
           error.data = data;
@@ -207,7 +211,7 @@
     list.textContent = '';
     if (!Array.isArray(items) || !items.length) {
       var empty = document.createElement('p');
-      empty.textContent = 'No active follow-up plan is available.';
+      empty.textContent = tr('No active follow-up plan is available.');
       list.appendChild(empty);
       return;
     }
@@ -215,10 +219,10 @@
       var article = document.createElement('article');
       article.className = 'wca-followup-item';
       var heading = document.createElement('h3');
-      heading.textContent = item.plan && item.plan.purpose ? item.plan.purpose : 'Follow-up';
+      heading.textContent = item.plan && item.plan.purpose ? item.plan.purpose : tr('Follow-up');
       article.appendChild(heading);
       var due = document.createElement('p');
-      due.textContent = 'Due: ' + (item.due_at_utc || '—') + ' UTC';
+      due.textContent = tr('Due:') + ' ' + (item.due_at_utc || '—') + ' UTC';
       article.appendChild(due);
       if (item.plan && item.plan.instructions) {
         var instructions = document.createElement('p');
@@ -234,10 +238,10 @@
             var a = document.createElement('a');
             a.href = resource.url;
             a.rel = 'noopener noreferrer';
-            a.textContent = resource.ref || resource.type || 'Educational resource';
+            a.textContent = resource.ref || resource.type || tr('Educational resource');
             li.appendChild(a);
           } else {
-            li.textContent = resource.ref || resource.type || 'Educational resource';
+            li.textContent = resource.ref || resource.type || tr('Educational resource');
           }
           resources.appendChild(li);
         });
@@ -292,11 +296,11 @@
 
   function scopeLabel(scope) {
     var labels = {
-      teleconsult: 'Teleconsultation / call context',
-      recording: 'Recording consent',
-      messaging: 'Clinic-linked messaging',
-      privacy_notice: 'Current privacy notice',
-      followup: 'Follow-up plan and reminders'
+      teleconsult: tr('Teleconsultation / call context'),
+      recording: tr('Recording consent'),
+      messaging: tr('Clinic-linked messaging'),
+      privacy_notice: tr('Current privacy notice'),
+      followup: tr('Follow-up plan and reminders')
     };
     return labels[scope] || scope.replace(/_/g, ' ');
   }
@@ -315,13 +319,13 @@
           var row = document.createElement('div');
           row.className = 'wca-consent-row';
           var label = document.createElement('span');
-          label.textContent = scopeLabel(scope) + ': ' + (state.status === 'granted' ? 'Granted' : 'Not granted');
+          label.textContent = scopeLabel(scope) + ': ' + (state.status === 'granted' ? tr('Granted') : tr('Not granted'));
           row.appendChild(label);
           if (data.can_manage_consents) {
             var button = document.createElement('button');
             button.type = 'button';
             button.className = 'wca-button wca-button-secondary';
-            button.textContent = state.status === 'granted' ? 'Revoke' : 'Grant';
+            button.textContent = state.status === 'granted' ? tr('Revoke') : tr('Grant');
             button.addEventListener('click', function () {
               button.disabled = true;
               var method = state.status === 'granted' ? 'DELETE' : 'POST';
@@ -357,10 +361,10 @@
     consent.setAttribute('data-wca-consents', '');
     consent.setAttribute('data-appointment-ref', ref);
     var consentTitle = document.createElement('h2');
-    consentTitle.textContent = 'Consultation consent and context';
+    consentTitle.textContent = tr('Consultation consent and context');
     consent.appendChild(consentTitle);
     var consentIntro = document.createElement('p');
-    consentIntro.textContent = 'Consent is purpose-specific and may be withdrawn. Recording is never assumed from teleconsultation consent.';
+    consentIntro.textContent = tr('Consent is purpose-specific and may be withdrawn. Recording is never assumed from teleconsultation consent.');
     consent.appendChild(consentIntro);
     var consentList = document.createElement('div');
     consentList.setAttribute('data-wca-consent-list', '');
@@ -381,12 +385,12 @@
       intake.className = 'wca-card wca-continuity';
       intake.setAttribute('data-appointment-ref', ref);
       var intakeTitle = document.createElement('h2');
-      intakeTitle.textContent = 'Pre-visit information';
+      intakeTitle.textContent = tr('Pre-visit information');
       intake.appendChild(intakeTitle);
       var emergency = document.createElement('div');
       emergency.className = 'wca-alert';
       emergency.setAttribute('role', 'note');
-      emergency.textContent = 'Do not wait here for an emergency. For severe or life-threatening symptoms, seek qualified local emergency care now.';
+      emergency.textContent = tr('Do not wait here for an emergency. For severe or life-threatening symptoms, seek qualified local emergency care now.');
       intake.appendChild(emergency);
 
       if (state.can_edit_intake) {
@@ -414,9 +418,9 @@
         var actions = document.createElement('div');
         actions.className = 'wca-actions';
         var save = document.createElement('button');
-        save.type = 'button'; save.className = 'wca-button wca-button-secondary'; save.setAttribute('data-action', 'save'); save.textContent = 'Save draft';
+        save.type = 'button'; save.className = 'wca-button wca-button-secondary'; save.setAttribute('data-action', 'save'); save.textContent = tr('Save draft');
         var submit = document.createElement('button');
-        submit.type = 'button'; submit.className = 'wca-button'; submit.setAttribute('data-action', 'submit'); submit.textContent = 'Submit securely';
+        submit.type = 'button'; submit.className = 'wca-button'; submit.setAttribute('data-action', 'submit'); submit.textContent = tr('Submit securely');
         actions.appendChild(save); actions.appendChild(submit); form.appendChild(actions);
         var intakeStatus = document.createElement('p');
         intakeStatus.setAttribute('data-wca-status', ''); intakeStatus.setAttribute('role', 'status'); intakeStatus.setAttribute('aria-live', 'polite'); form.appendChild(intakeStatus);
@@ -438,26 +442,26 @@
       follow.setAttribute('data-wca-followups', '');
       follow.setAttribute('data-appointment-ref', ref);
       var followTitle = document.createElement('h2');
-      followTitle.textContent = 'Follow-up plan';
+      followTitle.textContent = tr('Follow-up plan');
       follow.appendChild(followTitle);
       var followIntro = document.createElement('p');
-      followIntro.textContent = 'Follow-up is doctor-defined and may include approved educational resources. This surface does not generate treatment with AI.';
+      followIntro.textContent = tr('Follow-up is doctor-defined and may include approved educational resources. This surface does not generate treatment with AI.');
       follow.appendChild(followIntro);
       if (state.can_create_followup) {
         var create = document.createElement('form');
         create.className = 'wca-form';
         create.setAttribute('data-wca-followup-create', '');
-        var dueLabel = document.createElement('label'); dueLabel.textContent = 'Due date and time (UTC)';
+        var dueLabel = document.createElement('label'); dueLabel.textContent = tr('Due date and time (UTC)');
         var due = document.createElement('input'); due.type = 'datetime-local'; due.name = 'due_at_utc'; due.required = true; dueLabel.appendChild(due); create.appendChild(dueLabel);
-        var purposeLabel = document.createElement('label'); purposeLabel.textContent = 'Purpose';
+        var purposeLabel = document.createElement('label'); purposeLabel.textContent = tr('Purpose');
         var purpose = document.createElement('input'); purpose.name = 'purpose'; purpose.maxLength = 191; purpose.required = true; purposeLabel.appendChild(purpose); create.appendChild(purposeLabel);
-        var instructionLabel = document.createElement('label'); instructionLabel.textContent = 'Instructions';
+        var instructionLabel = document.createElement('label'); instructionLabel.textContent = tr('Instructions');
         var instructions = document.createElement('textarea'); instructions.name = 'instructions'; instructions.maxLength = 5000; instructionLabel.appendChild(instructions); create.appendChild(instructionLabel);
-        var refLabel = document.createElement('label'); refLabel.textContent = 'Approved educational resource reference (optional)';
+        var refLabel = document.createElement('label'); refLabel.textContent = tr('Approved educational resource reference (optional)');
         var resourceRef = document.createElement('input'); resourceRef.name = 'resource_ref'; resourceRef.maxLength = 191; refLabel.appendChild(resourceRef); create.appendChild(refLabel);
-        var urlLabel = document.createElement('label'); urlLabel.textContent = 'Approved same-site resource URL (optional)';
+        var urlLabel = document.createElement('label'); urlLabel.textContent = tr('Approved same-site resource URL (optional)');
         var resourceUrl = document.createElement('input'); resourceUrl.name = 'resource_url'; resourceUrl.type = 'url'; urlLabel.appendChild(resourceUrl); create.appendChild(urlLabel);
-        var createButton = document.createElement('button'); createButton.type = 'submit'; createButton.className = 'wca-button'; createButton.textContent = 'Create follow-up'; create.appendChild(createButton);
+        var createButton = document.createElement('button'); createButton.type = 'submit'; createButton.className = 'wca-button'; createButton.textContent = tr('Create follow-up'); create.appendChild(createButton);
         follow.appendChild(create);
       }
       var followList = document.createElement('div'); followList.setAttribute('data-wca-followup-list', ''); followList.setAttribute('aria-live', 'polite'); follow.appendChild(followList);
