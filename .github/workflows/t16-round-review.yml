@@ -1,4 +1,4 @@
-name: File 08 T16 R17 Correction Diagnostic
+name: File 08 T16 R17 Final Correction Gate
 on:
   push:
     branches: [codex/file08-new-governing-plans-completion-2026]
@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 jobs:
-  diagnose:
+  correct:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -14,36 +14,28 @@ jobs:
         with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
-      - name: Apply closed R17 corrections in disposable workspace
+      - name: Apply closed R17 corrections
         run: |
           set -euo pipefail
           python3 tools/t16-r17-fix-central.py
           python3 tools/t16-r17-fix-continuity.py
           python3 tools/t16-r17-fix-tests.py
-      - name: Capture exact QA diagnostics without committing product
+      - name: Full warning-free File 08 QA
         run: |
-          set +e
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r17-lint.txt 2>&1
-          lint_status=$?
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
           php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/r17-tests.txt 2>&1
-          tests_status=$?
-          node --check assets/js/clinic.js >/tmp/r17-js1.txt 2>&1; js1=$?
-          node --check assets/js/continuity.js >/tmp/r17-js2.txt 2>&1; js2=$?
-          node --check assets/js/future24.js >/tmp/r17-js3.txt 2>&1; js3=$?
-          set -e
-          mkdir -p review-evidence
-          {
-            echo "R17 correction diagnostic"
-            echo "lint_status=$lint_status tests_status=$tests_status js_clinic=$js1 js_continuity=$js2 js_future24=$js3"
-            echo "--- PHP LINT ---"; cat /tmp/r17-lint.txt
-            echo "--- RUN ALL ---"; cat /tmp/r17-tests.txt
-            echo "--- JS CLINIC ---"; cat /tmp/r17-js1.txt
-            echo "--- JS CONTINUITY ---"; cat /tmp/r17-js2.txt
-            echo "--- JS FUTURE24 ---"; cat /tmp/r17-js3.txt
-          } > review-evidence/t16-r17-correction-diagnostic.txt
-          git restore includes/class-wca-central-governance.php includes/class-wca-continuity-secure.php tests/sixteenth-twenty-review-regressions.php
+          cat /tmp/r17-tests.txt
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r17-tests.txt; then exit 1; fi
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit R17 corrected product only after green QA
+        run: |
+          set -euo pipefail
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add review-evidence/t16-r17-correction-diagnostic.txt
-          git commit -m 'chore(review): record T16 R17 correction QA diagnostic'
+          git add includes/class-wca-central-governance.php includes/class-wca-continuity-secure.php tests/sixteenth-twenty-review-regressions.php
+          git diff --cached --check
+          git commit -m 'fix(file08): close T16 R17 guardian consent degraded-state defects'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
