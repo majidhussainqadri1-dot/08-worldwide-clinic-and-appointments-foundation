@@ -1,0 +1,42 @@
+name: File 08 T16 R16 Post-Review Correction
+on:
+  push:
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/t16-r16-correction.yml]
+permissions:
+  contents: write
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none}
+      - name: Apply closed R16 defect ledger
+        run: python3 tools/t16-r16-correct.py
+      - name: Full warning-free corrected-state QA
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
+          set +e
+          output=$(php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$status" -eq 0
+          if printf '%s\n' "$output" | grep -E 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:'; then exit 1; fi
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit corrected green state
+        run: |
+          set -euo pipefail
+          git config user.name majidhussainqadri1-dot
+          git config user.email majidhussainqadri1@gmail.com
+          git add includes/class-wca-contracts.php includes/class-wca-repository.php includes/class-wca-service.php includes/class-wca-rest.php tests/sixteenth-twenty-review-regressions.php
+          git diff --cached --check
+          git commit -m 'T16 R16: complete complaint lifecycle and CF02 projection'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+          echo CORRECTED_HEAD=$(git rev-parse HEAD)
