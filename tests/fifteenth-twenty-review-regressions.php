@@ -76,4 +76,9 @@ t15h('R11 arrival serialized by appointment','includes/class-wca-future24.php',"
 t15h('R11 queue counts distinct appointments','includes/class-wca-future24.php','COUNT(DISTINCT appointment_id)');
 t15h('R11 subject resolver helper is authoritative','includes/class-wca-future24.php',"if ( is_wp_error( \$raw ) || ! is_scalar( \$raw ) )");
 t15h('R11 completed reschedule audit failure explicit','includes/class-wca-future24.php','wca_safe_reschedule_audit_failed');
+
+t15h('R12 opaque appointment access concealed','includes/class-wca-opaque-api.php','private static function appointment_access');
+t15h('R12 opaque responses no-store','includes/class-wca-opaque-api.php',"header( 'Cache-Control', 'private, no-store, max-age=0' )");
+t15h('R12 opaque responses noindex','includes/class-wca-opaque-api.php',"header( 'X-Robots-Tag', 'noindex, nofollow, noarchive' )");
+t15h('R12 application currency exact validation','includes/class-wca-service.php','$currency_raw = trim');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

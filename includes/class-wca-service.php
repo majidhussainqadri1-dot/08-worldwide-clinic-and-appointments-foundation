@@ -215,7 +215,8 @@ final class WCA_Service {
 		}
 		$consultation_type = sanitize_key( $data['consultation_type'] ?? ( $current['consultation_type'] ?? '' ) );
 		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) { return new WP_Error( 'wca_service_consultation_type', __( 'A valid consultation type is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$currency = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) ( $data['currency'] ?? ( $current['currency'] ?? '' ) ) ) );
+		$currency_raw = trim( (string) ( $data['currency'] ?? ( $current['currency'] ?? '' ) ) );
+		$currency = strtoupper( $currency_raw );
 		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) ) { return new WP_Error( 'wca_service_currency', __( 'A valid three-letter currency code is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$duration = self::strict_int( array_key_exists( 'duration_minutes', $data ) ? $data['duration_minutes'] : ( $current['duration_minutes'] ?? 30 ), 10, 480 );
 		$fee_minor = self::strict_int( array_key_exists( 'fee_minor', $data ) ? $data['fee_minor'] : ( $current['fee_minor'] ?? 0 ), 0, PHP_INT_MAX );

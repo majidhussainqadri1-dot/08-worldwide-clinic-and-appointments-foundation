@@ -77,7 +77,7 @@ final class WCA_Opaque_API {
 	public static function appointment( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
 		if ( ! $id ) { return self::not_found(); }
-		$access = WCA_Authorization::can_view_appointment( $id, 0, sanitize_key( $request->get_header( 'X-WCA-Access-Purpose' ) ) );
+		$access = self::appointment_access( $id, sanitize_key( $request->get_header( 'X-WCA-Access-Purpose' ) ) );
 		if ( is_wp_error( $access ) ) { return $access; }
 		return self::respond( self::appointment_projection( $id ) );
 	}
@@ -85,6 +85,8 @@ final class WCA_Opaque_API {
 	public static function transition( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
 		if ( ! $id ) { return self::not_found(); }
+		$access = self::appointment_access( $id );
+		if ( is_wp_error( $access ) ) { return $access; }
 		$data = self::data( $request );
 		$next = sanitize_key( isset( $data['next_status'] ) ? $data['next_status'] : '' );
 		if ( ! WCA_Contracts::is_appointment_status( $next, true ) ) {
@@ -96,6 +98,8 @@ final class WCA_Opaque_API {
 	public static function calendar( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
 		if ( ! $id ) { return self::not_found(); }
+		$access = self::appointment_access( $id );
+		if ( is_wp_error( $access ) ) { return $access; }
 		$proxy = new WP_REST_Request( 'GET', '/wca/v1/appointments/' . $id . '/calendar.ics' );
 		$proxy->set_url_params( array( 'id' => $id ) );
 		return WCA_REST::calendar( $proxy );
@@ -104,6 +108,8 @@ final class WCA_Opaque_API {
 	public static function payment_intent( WP_REST_Request $request ) {
 		$id = self::appointment_id( $request['ref'] );
 		if ( ! $id ) { return self::not_found(); }
+		$access = self::appointment_access( $id );
+		if ( is_wp_error( $access ) ) { return $access; }
 		$proxy = new WP_REST_Request( 'POST', '/wca/v1/appointments/' . $id . '/payment-intents' );
 		$proxy->set_url_params( array( 'id' => $id ) );
 		$proxy->set_body_params( self::data( $request ) );
@@ -185,7 +191,19 @@ final class WCA_Opaque_API {
 		$response->set_status( $status );
 		$response->header( 'X-WCA-Object-Contract', 'wca.opaque-object-refs/' . self::CONTRACT_VERSION );
 		$response->header( 'X-Request-ID', WCA_Observability::trace_id() );
+		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
+		$response->header( 'Pragma', 'no-cache' );
+		$response->header( 'X-Robots-Tag', 'noindex, nofollow, noarchive' );
 		return $response;
+	}
+
+	private static function appointment_access( $id, $purpose = '' ) {
+		$access = WCA_Authorization::can_view_appointment( absint( $id ), 0, sanitize_key( $purpose ) );
+		if ( ! is_wp_error( $access ) ) { return true; }
+		$data = $access->get_error_data();
+		$status = is_array( $data ) ? absint( $data['status'] ?? 0 ) : 0;
+		if ( in_array( $status, array( 401, 403, 404 ), true ) ) { return self::not_found(); }
+		return $access;
 	}
 
 	private static function appointment_id( $ref ) {

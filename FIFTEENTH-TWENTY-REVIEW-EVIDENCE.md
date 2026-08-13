@@ -79,3 +79,10 @@ R10 result: **SUPPORTED DEFECTS FOUND — full retest required before R11.**
 R11 was completed against the R10-corrected state before any R11 source change. Supported findings covered: nested Future24 owner transactions that could issue a second START TRANSACTION inside an outer atomic mutation; cancellation-waitlist traversal/delivery failures that could be acknowledged silently; SQL failure collapsed into Future24 record-not-found; policy/template traversal false-empty behavior; readiness intake false-state behavior; service-scoped waitlist/questionnaire mismatch when service truth was unavailable; optional group-session creation versus mandatory-service join inconsistency; cross-actor duplicate arrival rows and queue inflation; non-strict external subject resolution; and successful safe-reschedule returning success despite missing Future24 governance evidence. The correction batch joins nested transactions to the outer transaction, makes read/retry state authoritative, repairs scope semantics, deduplicates arrival per appointment and makes audit-finalization ambiguity explicit.
 
 R11 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R12.**
+
+
+## R12 — public/private projection, minimization, cache and existence-leak review
+
+R12 completed against the R11-corrected state before any R12 source change. The opaque appointment read route did not itself guarantee private no-store/noindex headers, and an existing-but-unauthorized appointment could return an authorization error distinguishable from a missing opaque reference. The review also caught a remaining application-layer currency normalization path that could transform malformed input before the repository's strict persistence check. The R12 batch makes opaque object responses private/non-indexable, conceals participant-denial existence, and validates exact currency intent at the application root.
+
+R12 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R13.**
