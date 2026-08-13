@@ -1,12 +1,12 @@
-name: File 08 T16 R19 Review Only
+name: File 08 T16 R19 Closed-Ledger Correction
 on:
   push:
     branches: [codex/file08-new-governing-plans-completion-2026]
     paths: [.github/workflows/t16-round-review.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  review:
+  correct:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -14,14 +14,29 @@ jobs:
         with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
-      - name: Freeze R19 state
-        run: echo "R19_REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Full source regression confirmation
+      - name: Apply only closed R19 findings
+        run: |
+          set -euo pipefail
+          python3 tools/t16-r19-fix-assets.py
+          python3 tools/t16-r19-fix-booking.py
+          python3 tools/t16-r19-fix-i18n.py
+          python3 tools/t16-r19-fix-tests.py
+      - name: Full warning-free File 08 QA
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r19-lint.txt
           php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/r19-tests.txt 2>&1
           cat /tmp/r19-tests.txt
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r19-tests.txt; then exit 1; fi
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
+      - name: Commit corrected R19 product only after QA green
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add includes/class-wca-plugin.php includes/class-swc-plugin.php includes/class-wca-continuity-secure.php includes/class-wca-future24.php assets/js/clinic.js assets/js/continuity.js assets/js/future24.js tests/sixteenth-twenty-review-regressions.php
+          git diff --cached --check
+          git commit -m 'fix(file08): close T16 R19 frontend race localization defects'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
