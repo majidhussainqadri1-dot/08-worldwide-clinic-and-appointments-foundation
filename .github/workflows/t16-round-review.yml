@@ -1,10 +1,8 @@
 name: File 08 T16 Sequential Round Review
 on:
   push:
-    branches:
-      - codex/file08-new-governing-plans-completion-2026
-    paths:
-      - .github/workflows/t16-round-review.yml
+    branches: [codex/file08-new-governing-plans-completion-2026]
+    paths: [.github/workflows/t16-round-review.yml]
 permissions:
   contents: read
 jobs:
@@ -13,54 +11,49 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: codex/file08-new-governing-plans-completion-2026
-          fetch-depth: 0
+        with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
-        with:
-          php-version: '8.3'
-          coverage: none
+        with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
-        run: |
-          echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-          grep -n "Version:" worldwide-clinic-and-appointments.php || true
-      - name: Round 2 complete review - SQL writes and atomicity
+        run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
+      - name: Round 3 complete review - authorization IDOR and ownership
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          writes=[]
-          for p in sorted(Path('includes').rglob('*.php')):
+          files=list(Path('includes').rglob('*.php'))
+          routes=[]
+          for p in files:
+            s=p.read_text(errors='replace')
+            for m in re.finditer(r'register_rest_route\s*\(',s):
+              chunk=s[m.start():m.start()+2800]
+              route=re.search(r"['\"](/[^'\"]+)['\"]",chunk)
+              methods=re.search(r"'methods'\s*=>\s*([^,\n]+)",chunk)
+              perm=re.search(r"'permission_callback'\s*=>\s*([^,\n]+(?:,[^\n]+)?)",chunk)
+              routes.append((str(p),route.group(1) if route else '?',methods.group(1).strip() if methods else '?',perm.group(1).strip() if perm else 'MISSING',chunk[:1300]))
+          print(f'T16-R3 REST_ROUTE_COUNT={len(routes)}')
+          for r in routes:
+            print('\n@@ ROUTE',r[0],r[1],'methods=',r[2],'permission=',r[3])
+            if r[3]=='MISSING' or '__return_true' in r[3]: print('!! REVIEW_PERMISSION')
+          # Publicly callable REST methods that accept refs/ids: require visible authorization or explicit public projection semantics.
+          for p in files:
+            s=p.read_text(errors='replace')
+            for m in re.finditer(r'public\s+(?:static\s+)?function\s+(rest_[A-Za-z0-9_]+)\s*\(([^)]*)\)\s*\{',s):
+              start=m.start(); nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),7000)); body=s[start:end]
+              auth_tokens=('can_view_appointment','can_manage_clinic','authorize_','appointment_actor','current_user_can','get_current_user_id','permission','public_','authenticated','claims','owner_user_id','doctor_user_id')
+              if not any(t in body for t in auth_tokens):
+                print(f'\n!! REST_METHOD_NO_VISIBLE_AUTH {p}:{m.group(1)} args={m.group(2)}\n{body[:1800]}')
+          # Direct object fetches from request parameters without nearby authorization are candidates for IDOR review.
+          patterns=(r'\$request\[[^\]]+\]',r'get_param\s*\(')
+          for p in files:
             lines=p.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
-              if re.search(r'\$wpdb->(?:insert|update|delete|query)\s*\(', line):
-                before='\n'.join(lines[max(0,i-4):i+1])
-                after='\n'.join(lines[i:min(len(lines),i+12)])
-                ctx=before+'\n'+after
-                assigned=bool(re.search(r'\$[A-Za-z_][A-Za-z0-9_]*\s*=\s*\$wpdb->(?:insert|update|delete|query)', line))
-                direct_checked=('false === $wpdb->' in line or 'false !== $wpdb->' in line)
-                checked=assigned and any(x in after for x in ('false ===','1 !==','1 ===','0 ===','is_wp_error','WP_Error','return '))
-                transaction='WCA_Repository::transaction' in '\n'.join(lines[max(0,i-25):min(len(lines),i+25)])
-                writes.append((str(p),i+1,assigned,direct_checked,checked,transaction,after))
-          suspicious=[w for w in writes if not (w[3] or w[4])]
-          print(f'T16-R2 TOTAL_SQL_WRITES={len(writes)}')
-          print(f'T16-R2 SUSPICIOUS_UNCHECKED_WRITES={len(suspicious)}')
-          print(f'T16-R2 WRITES_NEAR_TRANSACTION={sum(1 for w in writes if w[5])}')
-          for p,ln,a,d,c,t,ctx in suspicious:
-            print(f'\n@@ {p}:{ln} transaction_near={t}\n{ctx}')
-          # Also enumerate multi-write methods lacking an explicit transaction marker nearby.
-          for p in sorted(Path('includes').rglob('*.php')):
-            s=p.read_text(errors='replace')
-            for m in re.finditer(r'(public|private|protected)\s+(?:static\s+)?function\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{',s):
-              start=m.start(); nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():])
-              end=m.end()+(nxt.start() if nxt else len(s)-m.end())
-              body=s[start:end]
-              count=len(re.findall(r'\$wpdb->(?:insert|update|delete|query)\s*\(',body))
-              if count>=2 and 'WCA_Repository::transaction' not in body and 'START TRANSACTION' not in body:
-                print(f'\n## MULTI_WRITE_NO_EXPLICIT_TX {p}:{m.group(2)} writes={count}')
-                print(body[:2200])
+              if any(re.search(pt,line) for pt in patterns) and any(x in line.lower() for x in ('ref','id','clinic','appointment','doctor','service','branch')):
+                ctx='\n'.join(lines[max(0,i-5):min(len(lines),i+14)])
+                if not any(t in ctx for t in ('can_view_appointment','can_manage_clinic','authorize_','permission_callback','appointment_actor','current_user_can','public_','opaque')):
+                  print(f'\n?? REQUEST_OBJECT_AUTH_CANDIDATE {p}:{i+1}\n{ctx}')
           PY
-      - name: Round 2 full regression confirmation
+      - name: Round 3 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
