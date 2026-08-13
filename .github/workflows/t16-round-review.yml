@@ -1,4 +1,4 @@
-name: File 08 T16 R17 Final Correction Gate
+name: File 08 T16 R18 Correction
 on:
   push:
     branches: [codex/file08-new-governing-plans-completion-2026]
@@ -8,34 +8,38 @@ permissions:
 jobs:
   correct:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: codex/file08-new-governing-plans-completion-2026, fetch-depth: 0}
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
-      - name: Apply closed R17 corrections
+      - name: Apply closed R18 corrections
         run: |
           set -euo pipefail
-          python3 tools/t16-r17-fix-central.py
-          python3 tools/t16-r17-fix-continuity.py
-          python3 tools/t16-r17-fix-tests.py
-      - name: Full warning-free File 08 QA
+          python3 tools/t16-r18-fix-runtime.py
+          python3 tools/t16-r18-fix-schema.py
+          python3 tools/t16-r18-fix-health.py
+          python3 tools/t16-r18-fix-cli.py
+          target=$(find tools -maxdepth 1 -name 't16-r18-fix-p*.py' -print -quit)
+          test -n "$target"
+          python3 "$target"
+      - name: Full File 08 QA
         run: |
           set -euo pipefail
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
-          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/r17-tests.txt 2>&1
-          cat /tmp/r17-tests.txt
-          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r17-tests.txt; then exit 1; fi
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php >/tmp/tests.txt 2>&1
+          cat /tmp/tests.txt
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt; then exit 1; fi
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
-      - name: Commit R17 corrected product only after green QA
+      - name: Commit corrected state after green QA
         run: |
           set -euo pipefail
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add includes/class-wca-central-governance.php includes/class-wca-continuity-secure.php tests/sixteenth-twenty-review-regressions.php
+          git add worldwide-clinic.php includes/class-swc-activator.php includes/class-wca-schema.php includes/class-wca-continuity-secure.php includes/class-wca-future24.php includes/class-wca-observability.php includes/class-wca-cli.php includes/class-wca-privacy.php
           git diff --cached --check
-          git commit -m 'fix(file08): close T16 R17 guardian consent degraded-state defects'
+          git commit -m 'fix(file08): close T16 R18 migration and lifecycle integrity defects'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
