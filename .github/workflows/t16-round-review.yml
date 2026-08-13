@@ -16,45 +16,39 @@ jobs:
         with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
         run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Round 4 complete review - REST nonce replay idempotency and rate limits
+      - name: Round 5 complete review - privacy export erasure retention legal hold
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          files=list(Path('includes').rglob('*.php'))
-          alltext='\n'.join(p.read_text(errors='replace') for p in files)
-          print('NONCE_CHECKS=',len(re.findall(r'(?:wp_verify_nonce|X-WP-Nonce|wp_rest)',alltext,re.I)))
-          print('IDEMPOTENCY_REFERENCES=',len(re.findall(r'idempotenc',alltext,re.I)))
-          print('RATE_LIMIT_REFERENCES=',len(re.findall(r'rate_limit|rate\s*\(',alltext,re.I)))
-          # Registered mutating routes: inventory callbacks and inspect callback bodies for rate/idempotency.
-          for p in files:
+          targets=[Path('includes/class-wca-privacy.php'),Path('includes/class-swc-privacy.php'),Path('includes/class-wca-continuity-secure.php'),Path('includes/class-wca-continuity.php')]
+          for p in targets:
             s=p.read_text(errors='replace')
-            for m in re.finditer(r'register_rest_route\s*\(',s):
-              chunk=s[m.start():m.start()+3000]
-              mut=bool(re.search(r"(?:CREATABLE|EDITABLE|DELETABLE|'POST'|'PUT'|'PATCH'|'DELETE')",chunk))
-              if not mut: continue
-              cb=re.search(r"'callback'\s*=>\s*(?:array\(\s*__CLASS__\s*,\s*'([^']+)'|'([^']+)')",chunk)
-              name=(cb.group(1) or cb.group(2)) if cb else '?'
-              print(f'\n@@ MUTATING_ROUTE {p} callback={name}')
-              if name!='?':
-                fm=re.search(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+re.escape(name)+r'\s*\([^)]*\)\s*\{',s)
-                if fm:
-                  nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[fm.end():]); end=fm.end()+(nxt.start() if nxt else min(len(s)-fm.end(),6000)); body=s[fm.start():end]
-                  flags={
-                    'rate': bool(re.search(r'rate_limit|self::rate\s*\(',body)),
-                    'idem': bool(re.search(r'idempotenc|self::mutate\s*\(',body,re.I)),
-                    'auth_context': bool(re.search(r'get_current_user_id|can_|authorize|claims|guardian|actor',body)),
-                  }
-                  print(flags); print(body[:1600])
-          # Cookie-auth permission callback must verify REST nonce for browser sessions.
-          for p in files:
-            s=p.read_text(errors='replace')
-            for fname in ('authenticated','authorize_rest_request'):
-              for fm in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+'+fname+r'\s*\([^)]*\)\s*\{',s):
-                nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[fm.end():]); end=fm.end()+(nxt.start() if nxt else min(len(s)-fm.end(),3500)); body=s[fm.start():end]
-                print(f'\n## AUTH_CALLBACK {p}:{fname}\n{body[:2500]}')
+            print(f'\n===== {p} =====')
+            print('exporters=',len(re.findall(r'export',s,re.I)),'erasers=',len(re.findall(r'eras',s,re.I)),'retention=',len(re.findall(r'retention',s,re.I)),'legal_hold=',len(re.findall(r'legal_hold',s,re.I)))
+            for token in ('get_results','get_var','get_row','delete(','update(','delete_meta_strict','update_meta_strict','set_transient','delete_transient'):
+              for i,line in enumerate(s.splitlines(),1):
+                if token in line:
+                  lines=s.splitlines(); ctx='\n'.join(lines[max(0,i-4):min(len(lines),i+9)])
+                  print(f'\n@@ {p}:{i} {token}\n{ctx[:1800]}')
+          # Privacy registrars must coexist without key collision.
+          alltext='\n'.join(p.read_text(errors='replace') for p in targets)
+          keys=re.findall(r"\$erasers\[['\"]([^'\"]+)['\"]\]",alltext)+re.findall(r"\$exporters\[['\"]([^'\"]+)['\"]\]",alltext)
+          print('\nREGISTRY_KEYS=',keys)
+          # Search all direct identifiers handled by erasure/export policy.
+          identifiers=['patient_user_id','guardian_user_id','doctor_id','proposed_doctor_id','phone','whatsapp','country','city','reason','patient_message','doctor_private_note','consent_at','consent_version','patient_timezone','preferred_at_utc','post_author','actor_user_id','subject_user_id']
+          for key in identifiers:
+            print(key,'occurrences=',alltext.count(key))
+          # Flag privacy SQL reads with no nearby last_error / strict helper / WP_Error.
+          for p in targets:
+            lines=p.read_text(errors='replace').splitlines()
+            for i,line in enumerate(lines):
+              if re.search(r'\$wpdb->get_(?:results|row|var|col)\s*\(',line):
+                ctx='\n'.join(lines[max(0,i-2):min(len(lines),i+10)])
+                if not any(x in ctx for x in ('last_error','WP_Error','audit_rows_strict','related_ids','related_count')):
+                  print(f'\n!! PRIVACY_READ_REVIEW {p}:{i+1}\n{ctx}')
           PY
-      - name: Round 4 full regression confirmation
+      - name: Round 5 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
