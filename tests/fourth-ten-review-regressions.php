@@ -87,12 +87,12 @@ t410has('suspension scan metric',$service,'doctor_suspension_appointments_scanne
 t410lacks('no hard 500 truncation',$service,"'posts_per_page' => 500");
 
 // Release identity / schema law.
-t410has('plugin 1.2.13',$bootstrap,'Version: 1.2.14');
-t410has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.14'");
+t410has('plugin 1.2.13',$bootstrap,'Version: 1.2.15');
+t410has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
 t410has('core schema 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
-t410has('readme 1.2.7',$readme,'Stable tag: 1.2.14');
-t410has('repo readme 1.2.7',$repo_readme,'Runtime candidate: **1.2.14**');
-t410has('status 1.2.13',$status,'Runtime candidate: **1.2.14**');
+t410has('readme 1.2.7',$readme,'Stable tag: 1.2.15');
+t410has('repo readme 1.2.7',$repo_readme,'Runtime candidate: **1.2.15**');
+t410has('status 1.2.13',$status,'Runtime candidate: **1.2.15**');
 t410has('changelog 1.2.13',$changelog,'## 1.2.7 — 2026-08-11');
 
 $runtime=implode("\n",array($bootstrap,$contracts,$schema,$repo,$guard,$service,$rest,$calendar,$future));

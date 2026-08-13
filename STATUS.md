@@ -3,7 +3,7 @@
 ## Current repository candidate
 
 - Branch: `codex/file08-new-governing-plans-completion-2026`
-- Runtime candidate: **1.2.14**
+- Runtime candidate: **1.2.15**
 - Core File 08 schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -36,15 +36,15 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected candidate** — fourteenth-cycle source corrections and post-main corrections are present. |
-| Fresh post-final-code reviews | **Complete at repository/source-review level for Fourteenth closure.** |
+| Coded | **Corrected candidate** — fifteenth-cycle R1-R17 source/release corrections are present; R18-R20 closure review remains. |
+| Fresh post-final-code reviews | **Pending for Fifteenth closure** — R18-R20 have not yet been closed on the final corrected code. |
 | Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
 | Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
 | Staging-Accepted | **Pending / not claimed.** |
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
 
-No older v1.2.1 through v1.2.13 artifact or older CI run may be used as evidence for the v1.2.14 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
+No older v1.2.1 through v1.2.14 artifact or older CI run may be used as evidence for the v1.2.15 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
 
 ## Mandatory staging / production gates
 
@@ -74,3 +74,12 @@ This repository status does not prove the current staging or live installation. 
 - Runtime: 1.2.14; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.
 - Temporary T14 workflows/scripts were removed; only the canonical quality workflow remains.
 - Staging-Accepted: false; Live-Deployed: unverified; Operational: not claimed.
+
+
+## Fifteenth fresh 20-round audit — R17 release alignment checkpoint
+
+- Governing method: each review round completes before any correction; all findings from that round are then corrected together and fully retested before the next round.
+- R1-R16 completed; R4 and R9 were clean, while supported findings in the other closed rounds were corrected and retested.
+- R17 identified stale runtime/release/document/package identity after the substantive corrections and aligns the current candidate to runtime **1.2.15** without schema inflation.
+- Core schema: **3.2.0**; continuity schema: **1.1.0**; Future24 schema: **1.0.0**.
+- R18-R20 remain required corrected-state/closure reviews. This checkpoint is not a claim of final repository closure, staging acceptance, live deployment or operational status.

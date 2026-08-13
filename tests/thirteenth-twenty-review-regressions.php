@@ -29,7 +29,7 @@ t13_has('R20 strict Future24 capacity','includes/class-wca-future24.php','strict
 t13_has('post-final legacy mutation durability','includes/class-swc-helpers.php','apply_meta_mutations');
 t13_has('post-final legacy purge failure','includes/class-swc-activator.php','swc_purge_usermeta');
 t13_has('post-final canonical purge failure','includes/class-wca-schema.php','wca_purge_table_failed');
-t13_has('release plugin 1.2.13','worldwide-clinic.php','Version: 1.2.14');
-t13_has('release runtime constant 1.2.13','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.14'");
+t13_has('release plugin 1.2.13','worldwide-clinic.php','Version: 1.2.15');
+t13_has('release runtime constant 1.2.13','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
 t13_has('evidence main 20 complete','THIRTEENTH-TWENTY-REVIEW-EVIDENCE.md','All 20 main review rounds contained a supported repository defect/gap');
 if($fail){fwrite(STDERR,"File 08 thirteenth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);} echo 'File 08 thirteenth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";

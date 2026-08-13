@@ -78,13 +78,13 @@ s210has('doctor clinic serving filter',$first,'wca_doctor_may_serve_clinic');
 s210has('Future24 expected version',$future,'expected_version');
 
 // S2-R9: release/document identity is aligned without schema inflation.
-s210has('plugin header 1.2.14',$bootstrap,'Version: 1.2.14');
-s210has('runtime constant 1.2.14',$bootstrap,"WCA_VERSION', '1.2.14");
-s210has('contract runtime 1.2.14',$contracts,"RUNTIME_VERSION                 = '1.2.14'");
+s210has('plugin header 1.2.15',$bootstrap,'Version: 1.2.15');
+s210has('runtime constant 1.2.15',$bootstrap,"WCA_VERSION', '1.2.15");
+s210has('contract runtime 1.2.15',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
 s210has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
-s210has('readme stable 1.2.14',$readme,'Stable tag: 1.2.14');
-s210has('repository readme 1.2.14',$repo_readme,'Runtime candidate: **1.2.14**');
-s210has('status 1.2.14',$status,'Runtime candidate: **1.2.14**');
+s210has('readme stable 1.2.15',$readme,'Stable tag: 1.2.15');
+s210has('repository readme 1.2.15',$repo_readme,'Runtime candidate: **1.2.15**');
+s210has('status 1.2.15',$status,'Runtime candidate: **1.2.15**');
 s210has('changelog 1.2.13 historical record',$changelog,'## 1.2.13 — 2026-08-11');
 s210has('second hardening loaded',$bootstrap,'class-wca-second-ten-review-hardening.php');
 s210has('second hardening booted',$bootstrap,'WCA_Second_Ten_Review_Hardening::boot()');

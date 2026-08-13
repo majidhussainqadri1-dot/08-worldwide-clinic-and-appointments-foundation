@@ -3,7 +3,7 @@
  * Plugin Name: Worldwide Clinic and Appointments
  * Plugin URI: https://www.sabrihomeopathy.com/
  * Description: Canonical worldwide clinic identity, branches, services, fees, availability, slot holds, appointments, consent, lifecycle, calendar, complaints, review eligibility, privacy, observability, migration, secure continuity, and Future Clinic Intelligence & Interoperability 24 for the Sabri Social Homeopathy Platform.
- * Version: 1.2.14
+ * Version: 1.2.15
  * Requires at least: 6.6
  * Requires PHP: 7.4
  * Author: Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
@@ -14,7 +14,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WCA_VERSION', '1.2.14' );
+define( 'WCA_VERSION', '1.2.15' );
 define( 'WCA_FILE', __FILE__ );
 define( 'WCA_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WCA_URL', plugin_dir_url( __FILE__ ) );

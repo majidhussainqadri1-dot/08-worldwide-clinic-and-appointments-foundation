@@ -107,4 +107,9 @@ t15h('R16 health includes legacy checks','includes/class-wca-observability.php',
 t15h('R16 cron process wrapper logs worker failure','includes/class-wca-outbox.php','outbox_cron_failed');
 t15h('R16 maintenance cron wrapper logs failure','includes/class-wca-outbox.php','maintenance_cron_failed');
 t15h('R16 opportunistic worker logs failure','includes/class-wca-outbox.php','outbox_opportunistic_failed');
+
+t15h('R17 plugin release 1.2.15','worldwide-clinic.php','Version: 1.2.15');
+t15h('R17 runtime release 1.2.15','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
+t15h('R17 readme stable tag 1.2.15','readme.txt','Stable tag: 1.2.15');
+t15h('R17 package contract 1.2.15','tests/release-package-contract.php',"Version: 1.2.15");
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";

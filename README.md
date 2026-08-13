@@ -6,7 +6,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 - Repository/package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.14**
+- Runtime candidate: **1.2.15**
 - Core schema: **3.2.0**
 - Restricted continuity schema: **1.1.0**
 - Future24 additive operational schema: **1.0.0**
@@ -16,6 +16,8 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 - Platform commission: **0%**
 
 The authoritative repository release identity is the **exact candidate HEAD + exact-head CI run + deterministic manifest + candidate SHA-256**. Repository evidence never proves the current staging or live installation.
+
+Current fifteenth-cycle source/release alignment is **1.2.15**; core schema remains **3.2.0**, restricted continuity **1.1.0**, and Future24 **1.0.0**. R18-R20 fresh closure reviews and exact-final-head CI/package evidence remain required before repository closure.
 
 ## Governing ownership boundaries
 

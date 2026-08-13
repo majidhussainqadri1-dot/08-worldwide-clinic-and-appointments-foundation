@@ -26,8 +26,8 @@ t14has('R14 country rejection','includes/class-wca-repository.php','wca_branch_c
 t14has('R15 clinic status rejection','includes/class-wca-repository.php',"return new WP_Error( 'wca_clinic_status'");
 t14has('R16 numeric REST retirement','includes/class-wca-ten-review-hardening.php','wca_legacy_numeric_rest_disabled');
 t14has('R17 public numeric clinic rejection','includes/class-wca-rest.php','wca_public_numeric_id_disabled');
-t14has('R18 plugin 1.2.14','worldwide-clinic.php','Version: 1.2.14');
-t14has('R18 runtime 1.2.14','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.14'");
+t14has('R18+ current plugin release remains aligned','worldwide-clinic.php','Version: 1.2.15');
+t14has('R18+ current runtime release remains aligned','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
 t14has('post-main heatmap timezone projection','includes/class-wca-future24.php',"'time_basis' => 'UTC day; configured capacity is projected from each rule local timezone with DST and effective-range handling'");
 t14has('post-main heatmap effective range','includes/class-wca-future24.php','$effective_from && $local_date < $effective_from');
 t14has('post-main low-volume suppression','includes/class-wca-future24.php','wca_heatmap_outcome_privacy_threshold');

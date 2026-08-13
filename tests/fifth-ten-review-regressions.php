@@ -49,12 +49,12 @@ t510has('deep public payload drops',$hardening,'if ( $depth > 8 ) { return array
 t510has('slot policy batch',$future,'$batch = 200;');
 t510has('slot policy page',$future,"'paged' => \$page");
 t510has('slot policy stable order',$future,"'orderby' => 'ID'");
-t510has('plugin 1.2.13',$bootstrap,'Version: 1.2.14');
-t510has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.14'");
+t510has('plugin 1.2.13',$bootstrap,'Version: 1.2.15');
+t510has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
 t510has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
-t510has('readme stable 1.2.13',$readme,'Stable tag: 1.2.14');
-t510has('repository readme 1.2.13',$repo_readme,'Runtime candidate: **1.2.14**');
-t510has('status 1.2.13',$status,'Runtime candidate: **1.2.14**');
+t510has('readme stable 1.2.13',$readme,'Stable tag: 1.2.15');
+t510has('repository readme 1.2.13',$repo_readme,'Runtime candidate: **1.2.15**');
+t510has('status 1.2.13',$status,'Runtime candidate: **1.2.15**');
 t510has('changelog 1.2.13',$changelog,'## 1.2.7 — 2026-08-11');
 t510has('zero commission',$contracts,"'commission_percent' => 0");
 t510has('no automated diagnosis',$contracts,"'automated_diagnosis' => false");

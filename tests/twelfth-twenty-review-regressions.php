@@ -26,8 +26,8 @@ t12_has('R17 buffer range validation','includes/class-wca-future24.php','wca_buf
 t12_has('R18 capacity range validation','includes/class-wca-future24.php','wca_resource_capacity_range');
 t12_has('R19 core numeric validation','includes/class-wca-service.php','wca_service_duration_range');
 t12_has('R20 disruption transaction','includes/class-wca-future24.php','wca_disruption_transaction');
-t12_has('release plugin 1.2.14','worldwide-clinic.php','Version: 1.2.14');
-t12_has('release runtime constant 1.2.14','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.14'");
+t12_has('release plugin 1.2.15','worldwide-clinic.php','Version: 1.2.15');
+t12_has('release runtime constant 1.2.15','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
 t12_has('twelfth evidence complete','TWELFTH-TWENTY-REVIEW-EVIDENCE.md','All 20 substantive review rounds completed');
 if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
 echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";

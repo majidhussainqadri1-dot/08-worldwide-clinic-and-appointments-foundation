@@ -114,3 +114,10 @@ R15 result: **SUPPORTED DEFECTS FOUND — corrected together after review comple
 R16 completed before correction. WP-CLI outbox could report success on a WP_Error, the CLI health command did not fail its exit status on unhealthy state, overall health ignored cron/legacy-system-check failures, and top-level cron/shutdown outbox errors could be returned without a guaranteed operational log. The post-review batch makes CLI outcomes authoritative, folds cron/system checks into health and wraps scheduled/opportunistic execution with explicit failure logging.
 
 R16 result: **SUPPORTED DEFECTS FOUND — corrected together after review completion; full retest required before R17.**
+
+
+## R17 — package / version / documentation / release-evidence review
+
+R17 completed against the R16-corrected state before any R17 source change. The deterministic builder/verifier remained exact-commit/runtime-derived, but source, contracts and package tests still declared 1.2.14 while readme description/install guidance still referred to 1.2.13. The corrected source therefore lacked a truthful new release identity. The post-review batch advances the runtime to 1.2.15, aligns package tests/readme/STATUS/CHANGELOG and leaves schemas unchanged. R18-R20 remain required fresh closure reviews.
+
+R17 result: **SUPPORTED RELEASE/EVIDENCE DEFECT FOUND — corrected together after review completion; full retest required before R18.**

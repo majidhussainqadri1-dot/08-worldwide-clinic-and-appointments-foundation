@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.15 — 2026-08-13
+
+- Fifteenth fresh 20-round corrective audit advanced the runtime identity after R1-R16 substantive corrections: fail-closed authoritative reads, privacy/retention completion integrity, outbox/idempotency recovery, exact currency validation, stricter object/cross-file authorization, migration snapshot provenance, Future24 nested transaction/read/scope safety, opaque REST privacy/replay, browser replay/deep-link safety, public discovery read failure propagation, and operational health/CLI error handling.
+- R17 aligns runtime/tests/docs/package identity to 1.2.15 without schema inflation. R18-R20 remain fresh corrected-state closure reviews; exact-final-head package/CI and staging/live evidence remain separate.
+- Core schema remains 3.2.0; continuity 1.1.0; Future24 1.0.0.
+
 ## 1.2.14 — 2026-08-12
 
 - Fourteenth fresh sequential 20-round review: consent atomicity, strict IANA timezone and age/guardian validation, Future24 heatmap/advisor contract corrections, bounded legacy doctor discovery, secure UUID/worker identity, branch/clinic fail-closed validation, and legacy numeric REST retirement.
