@@ -862,6 +862,8 @@ final class WCA_Repository {
 		$amount_raw = $data['amount_minor'] ?? 0;
 		$amount_minor = WCA_Service::strict_int( $amount_raw, 0, PHP_INT_MAX );
 		if ( null === $amount_minor ) { return new WP_Error( 'wca_payment_amount_invalid', __( 'Payment amount must be a non-negative integer in minor currency units within the supported range.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$status = sanitize_key( $data['status'] ?? 'pending' );
+		if ( ! in_array( $status, WCA_Contracts::payment_statuses(), true ) ) { return new WP_Error( 'wca_payment_status_invalid', __( 'Payment intent status is not recognized.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$row = array(
 			'public_ref'                 => self::uuid(),
 			'appointment_id'             => $appointment_id,
@@ -871,7 +873,7 @@ final class WCA_Repository {
 			'currency'                   => strtoupper( sanitize_text_field( $data['currency'] ?? 'PKR' ) ),
 			'amount_minor'               => $amount_minor,
 			'platform_commission_minor'  => 0,
-			'status'                     => sanitize_key( $data['status'] ?? 'pending' ),
+			'status'                     => $status,
 			'version'                    => 1,
 			'metadata_json'              => self::json( WCA_Observability::redact( (array) ( $data['metadata'] ?? array() ) ) ),
 			'created_at'                 => self::now(),
@@ -885,6 +887,37 @@ final class WCA_Repository {
 			return new WP_Error( 'wca_payment_insert', __( 'Payment intent could not be recorded.', 'worldwide-clinic-appointments' ) );
 		}
 		return array_merge( array( 'id' => (int) $wpdb->insert_id ), $row );
+	}
+
+	/** @return array<string,mixed>|null|WP_Error */
+	public static function latest_payment_for_appointment( $appointment_id ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['payment_intents'];
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d ORDER BY id DESC LIMIT 1", absint( $appointment_id ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_projection_read_failed', __( 'Payment status could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		return $row ?: null;
+	}
+
+	/** Trusted CF03 fact -> File08 local projection. Financial ledger truth remains CF03-owned. */
+	public static function project_payment_status( $payment_ref, $status, $provider_ref = '' ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['payment_intents'];
+		$status = sanitize_key( $status );
+		if ( ! in_array( $status, WCA_Contracts::payment_statuses(), true ) || 'pending' === $status ) { return new WP_Error( 'wca_payment_status_untrusted', __( 'The financial owner supplied an unsupported payment status.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s LIMIT 1 FOR UPDATE", sanitize_text_field( $payment_ref ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_status_read_failed', __( 'Payment projection could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		if ( ! $row ) { return new WP_Error( 'wca_payment_status_not_found', __( 'Payment intent was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+		$provider_ref = sanitize_text_field( $provider_ref );
+		if ( $provider_ref && ! empty( $row['provider_ref'] ) && ! hash_equals( (string) $row['provider_ref'], $provider_ref ) ) { return new WP_Error( 'wca_payment_provider_ref_conflict', __( 'Payment provider identity does not match the existing projection.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( (string) $row['status'] === $status && ( ! $provider_ref || (string) $row['provider_ref'] === $provider_ref ) ) { return $row; }
+		$update = array( 'status' => $status, 'version' => absint( $row['version'] ) + 1, 'updated_at' => self::now() );
+		if ( $provider_ref && empty( $row['provider_ref'] ) ) { $update['provider_ref'] = $provider_ref; }
+		$changed = $wpdb->update( $table, $update, array( 'id' => absint( $row['id'] ), 'version' => absint( $row['version'] ) ) );
+		if ( false === $changed ) { return new WP_Error( 'wca_payment_status_write_failed', __( 'Payment status projection could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		if ( 1 !== (int) $changed ) { return new WP_Error( 'wca_payment_status_stale', __( 'Payment status changed concurrently. Reconciliation is required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$updated = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d LIMIT 1", absint( $row['id'] ) ), ARRAY_A );
+		if ( null === $updated && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_status_readback_failed', __( 'Updated payment status could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		return $updated ?: new WP_Error( 'wca_payment_status_readback_missing', __( 'Updated payment projection could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 	}
 
 	/** @return array<string,mixed>|WP_Error */

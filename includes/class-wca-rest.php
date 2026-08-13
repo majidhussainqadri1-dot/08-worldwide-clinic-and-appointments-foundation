@@ -283,6 +283,9 @@ final class WCA_REST {
 		$service = WCA_Repository::get_service( absint( SWC_Helpers::meta( $id, 'service_id' ) ), false );
 		$service_read_error = WCA_Repository::consume_read_error();
 		if ( is_wp_error( $service_read_error ) ) { return $service_read_error; }
+		$payment = WCA_Repository::latest_payment_for_appointment( $id );
+		if ( is_wp_error( $payment ) ) { return $payment; }
+		$payment_projection = $payment ? array_intersect_key( $payment, array_flip( array( 'public_ref','provider','currency','amount_minor','platform_commission_minor','status','version','created_at','updated_at' ) ) ) : null;
 		return array(
 			'public_ref'        => (string) SWC_Helpers::meta( $id, 'public_ref', 'appointment-' . $id ),
 			'status'            => SWC_Helpers::status( $id ),
@@ -294,6 +297,7 @@ final class WCA_REST {
 			'clinic_ref'        => $clinic ? (string) $clinic['public_ref'] : '',
 			'service_ref'       => $service ? (string) $service['public_ref'] : '',
 			'allowed_actions'   => WCA_Contracts::allowed_transitions( WCA_Authorization::appointment_actor( $id, get_current_user_id() ), SWC_Helpers::status( $id ) ),
+			'payment'           => $payment_projection,
 			'clinical_authority'=> false,
 		);
 	}

@@ -144,6 +144,11 @@ final class WCA_Contracts {
 	public static function published_events() { return array_keys( self::event_schemas() ); }
 
 	/** @return array<int,string> */
+	/** Payment truth remains CF03-owned; these are File08's accepted local projection states. */
+	public static function payment_statuses() {
+		return array( 'pending','created','pending_provider','authorized','captured','settled','failed','cancelled','expired','refunded','disputed','uncertain' );
+	}
+
 	public static function consumed_events() { return array( 'DoctorVerified.v1', 'DoctorSuspended.v1', 'PaymentStatusChanged.v1', 'MessageReported.v1' ); }
 
 	/** @return array<string,array<string,string>> */
