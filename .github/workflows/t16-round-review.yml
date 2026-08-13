@@ -16,45 +16,32 @@ jobs:
         with: {php-version: '8.3', coverage: none}
       - name: Freeze reviewed source identity
         run: echo "REVIEW_HEAD=$(git rev-parse HEAD)"
-      - name: Round 8 complete review - input types bounds money and time canonicalization
+      - name: Round 9 complete review - schema migrations upgrades rollback uninstall
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          files=list(Path('includes').rglob('*.php'))
-          print('R8_FILE_COUNT',len(files))
-          patterns={
-            'raw_superglobal':r'\$_(?:GET|POST|REQUEST|FILES|COOKIE)\[',
-            'request_param':r'get_param\(|get_json_params\(|get_query_params\(',
-            'absint':r'\babsint\s*\(',
-            'intval_cast':r'\(int\)|\bintval\s*\(',
-            'strtotime':r'\bstrtotime\s*\(',
-            'datetime':r'new\s+DateTime(?:Immutable)?\s*\(',
-            'currency':r'currency|fee_minor|amount_minor|amount\b',
-            'bounded':r'\b(?:min|max)\s*\(',
-            'strict_int':r'strict_int\s*\(',
-          }
-          for name,pat in patterns.items():
-            print(name, sum(len(re.findall(pat,p.read_text(errors='replace'),re.I)) for p in files))
-          for p in files:
+          targets=[p for p in Path('.').rglob('*.php') if 'vendor' not in p.parts]
+          pats=['dbDelta','CREATE TABLE','ALTER TABLE','DROP TABLE','SCHEMA_VERSION','DB_VERSION','db_version','maybe_upgrade','activate','deactivate','uninstall','purge','migration','cursor','snapshot','rollback','update_option','delete_option']
+          for pat in pats:
+            print(pat, sum(p.read_text(errors='replace').count(pat) for p in targets))
+          for p in targets:
+            s=p.read_text(errors='replace')
+            if any(x in s for x in ('dbDelta','CREATE TABLE','maybe_upgrade','migration','purge_all_data','DROP TABLE')):
+              print(f'\n===== {p} =====\n{s[:30000]}')
+          # Flag schema/version writes not visibly preceded by verification and destructive operations.
+          for p in targets:
             lines=p.read_text(errors='replace').splitlines()
             for i,line in enumerate(lines):
               low=line.lower()
-              if ('$_post[' in low or '$_get[' in low or 'get_param(' in low or 'get_json_params(' in low) and any(k in low for k in ('amount','fee','duration','capacity','ttl','version','date','time','timezone','days','limit','page','offset','latitude','longitude')):
-                print(f'\n## INPUT {p}:{i+1}\n'+'\n'.join(lines[max(0,i-6):min(len(lines),i+12)]))
-              if ('strtotime(' in low or 'new datetime' in low) and any(x in '\n'.join(lines[max(0,i-8):i+2]) for x in ('$data','$request','$_POST','$_GET')):
-                print(f'\n?? USER_TIME_PARSE {p}:{i+1}\n'+'\n'.join(lines[max(0,i-8):min(len(lines),i+8)]))
-              if ('min(' in low or 'max(' in low) and any(x in '\n'.join(lines[max(0,i-6):i+4]) for x in ('$data','$request','$_POST','$_GET')):
-                print(f'\n?? POSSIBLE_SILENT_CLAMP {p}:{i+1}\n'+'\n'.join(lines[max(0,i-6):min(len(lines),i+8)]))
-          # Persistence roots deserve explicit validation before writes.
-          for p in files:
-            s=p.read_text(errors='replace')
-            for m in re.finditer(r'(?:public|private|protected)\s+(?:static\s+)?function\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{',s):
-              nxt=re.search(r'\n\s*(?:public|private|protected)\s+(?:static\s+)?function\s+',s[m.end():]); end=m.end()+(nxt.start() if nxt else min(len(s)-m.end(),9000)); body=s[m.start():end]
-              if any(x in body for x in ('$wpdb->insert','$wpdb->update','$wpdb->query')) and any(k in body.lower() for k in ('duration','fee','amount','capacity','timezone','expires','starts_at','ends_at')):
-                print(f'\n## PERSISTENCE_ROOT {p}:{m.group(1)}\n{body[:4500]}')
+              if ('update_option' in low or 'update_option_strict' in low) and ('version' in low or 'migration' in low):
+                print(f'\n## VERSION_STATE_WRITE {p}:{i+1}\n'+'\n'.join(lines[max(0,i-15):min(len(lines),i+8)]))
+              if any(x in low for x in ('drop table','delete from','wp_delete_post','delete_option')):
+                print(f'\n## DESTRUCTIVE {p}:{i+1}\n'+'\n'.join(lines[max(0,i-8):min(len(lines),i+10)]))
+              if 'dbdelta' in low:
+                print(f'\n## DBDELTA {p}:{i+1}\n'+'\n'.join(lines[max(0,i-12):min(len(lines),i+18)]))
           PY
-      - name: Round 8 full regression confirmation
+      - name: Round 9 full regression confirmation
         run: |
           set -euo pipefail
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.log
