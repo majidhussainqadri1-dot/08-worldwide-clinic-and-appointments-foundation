@@ -1,0 +1,46 @@
+name: File 08 T17 Sequential Round Review
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-round-review.yml
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Full source baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt; then exit 1; fi
+      - name: R3 authorization and IDOR evidence dump
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== REST ROUTES / PERMISSIONS ==='
+          grep -RInE "register_rest_route|permission_callback|__return_true|authenticated|can_view_appointment|can_transition_appointment" includes --include='*.php' | head -n 600 || true
+          echo '=== AUTHORITY FILTERS / FALLBACKS ==='
+          grep -RInE "apply_filters|smc_|SWC_Doctor_Authority|guardian|delegat|doctor_can_serve_clinic|user_can|current_user_can" includes --include='*.php' | head -n 1000 || true
+          echo '=== NATIVE ID / OPAQUE REF EDGES ==='
+          grep -RInE "appointment_id|clinic_id|doctor_user_id|patient_user_id|public_ref|practitioner_ref|resolve_.*ref|_id\)" includes --include='*.php' | head -n 1000 || true
+          echo '=== FUTURE24 PERMISSION / OBJECT CHECKS ==='
+          grep -nE "register_rest_route|permission|authorize|can_|clinic_id|appointment|patient_context|doctor" includes/class-wca-future24.php | head -n 1000 || true
+          echo '=== CONTINUITY PERMISSION / OBJECT CHECKS ==='
+          grep -nE "register_rest_route|permission|authorize|can_|appointment|patient|guardian|doctor" includes/class-wca-continuity-secure.php | head -n 900 || true
+          echo '=== END R3 REVIEW EVIDENCE ==='
