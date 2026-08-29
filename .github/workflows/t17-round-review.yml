@@ -1,4 +1,4 @@
-name: File 08 T17 Sequential Round Review
+name: File 08 T17 Sequential R4-R20 Review
 on:
   push:
     branches:
@@ -8,9 +8,9 @@ on:
 permissions:
   contents: read
 jobs:
-  review:
+  sequential-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -19,28 +19,178 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-      - name: Full source baseline
+          extensions: zip
+      - name: Freeze exact review head
         shell: bash
         run: |
           set -euo pipefail
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/lint.txt
-          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/tests.txt
-          node --check assets/js/clinic.js
-          node --check assets/js/continuity.js
-          node --check assets/js/future24.js
-          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt; then exit 1; fi
-      - name: R3 authorization and IDOR evidence dump
+          echo "T17_R4_R20_REVIEW_HEAD=$(git rev-parse HEAD)"
+          git status --porcelain
+          test -z "$(git status --porcelain)"
+      - name: R4 complete review - lifecycle state machine and concurrency
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== REST ROUTES / PERMISSIONS ==='
-          grep -RInE "register_rest_route|permission_callback|__return_true|authenticated|can_view_appointment|can_transition_appointment" includes --include='*.php' | head -n 600 || true
-          echo '=== AUTHORITY FILTERS / FALLBACKS ==='
-          grep -RInE "apply_filters|smc_|SWC_Doctor_Authority|guardian|delegat|doctor_can_serve_clinic|user_can|current_user_can" includes --include='*.php' | head -n 1000 || true
-          echo '=== NATIVE ID / OPAQUE REF EDGES ==='
-          grep -RInE "appointment_id|clinic_id|doctor_user_id|patient_user_id|public_ref|practitioner_ref|resolve_.*ref|_id\)" includes --include='*.php' | head -n 1000 || true
-          echo '=== FUTURE24 PERMISSION / OBJECT CHECKS ==='
-          grep -nE "register_rest_route|permission|authorize|can_|clinic_id|appointment|patient_context|doctor" includes/class-wca-future24.php | head -n 1000 || true
-          echo '=== CONTINUITY PERMISSION / OBJECT CHECKS ==='
-          grep -nE "register_rest_route|permission|authorize|can_|appointment|patient|guardian|doctor" includes/class-wca-continuity-secure.php | head -n 900 || true
-          echo '=== END R3 REVIEW EVIDENCE ==='
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r4-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r4-tests.txt
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r4-tests.txt
+          grep -RInE 'transition|expected_version|optimistic|idempot|terminal|confirmed|completed|cancelled|no_show' includes --include='*.php' | head -n 1200 || true
+          grep -q 'canonical appointment lifecycle has eight states' tests/contracts.php
+          grep -q 'optimistic concurrency is enforced' tests/security-static.php
+      - name: R5 complete review - scheduling slots timezone availability holds
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r5-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r5-tests.txt
+          grep -RInE 'timezone|availability|slot_hold|slot hold|capacity|buffer|conflict|external_busy|effective_from|effective_until' includes --include='*.php' | head -n 1500 || true
+          grep -q 'public static function valid_timezone' includes/class-wca-service.php
+          grep -q 'wca_slot_holds' includes/class-wca-schema.php
+      - name: R6 complete review - clinic branch service ownership lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r6-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r6-tests.txt
+          grep -RInE 'create_clinic|activate_clinic|pause_clinic|branch|service|ClinicActivated|ClinicAvailabilityChanged|owner_subject_uuid' includes --include='*.php' | head -n 1500 || true
+          grep -q 'schema owns wca_clinics' tests/master-plan-contract.php
+          grep -q 'event ClinicActivated.v1 is implemented' tests/master-plan-contract.php
+      - name: R7 complete review - minors guardians consent delegation
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r7-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r7-tests.txt
+          grep -RInE 'guardian|minor|consent|delegat|age_assert|patient_context|subject_uuid|revoke' includes --include='*.php' | head -n 1500 || true
+          grep -q 'guardian_context' includes/class-wca-authorization.php
+          grep -q 'wca_consents' includes/class-wca-schema.php
+      - name: R8 complete review - privacy export erasure retention legal hold
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r8-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r8-tests.txt
+          grep -RInE 'erase|erasure|export|retention|legal.?hold|encrypt|decrypt|privacy|redact|clinical_context' includes --include='*.php' | head -n 1800 || true
+          grep -q 'legal-hold-aware privacy lifecycle exists' tests/security-static.php
+      - name: R9 complete review - payments fees currency entitlement boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r9-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r9-tests.txt
+          grep -RInE 'payment|currency|amount|commission|donation|entitlement|idempotency|cf03' includes --include='*.php' | head -n 1600 || true
+          grep -q 'platform commission is immutable at zero' tests/contracts.php
+          grep -q 'payment bridge is implemented without ledger ownership' tests/master-plan-contract.php
+      - name: R10 complete review - outbox events notifications replay failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r10-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r10-tests.txt
+          grep -RInE 'outbox|enqueue|append_event|dead|retry|notification|dispatcher|claim|trace_id|replay' includes --include='*.php' | head -n 1800 || true
+          grep -q 'notification fallback is privacy-minimal' tests/security-static.php
+          grep -q 'outbox fallback never emails clinical narrative' tests/security-static.php
+      - name: R11 complete review - schema migrations activation rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r11-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r11-tests.txt
+          grep -RInE 'schema|migrat|dbDelta|upgrade|activation|rollback|version|lock|snapshot' includes worldwide-clinic.php --include='*.php' | head -n 1800 || true
+          grep -q 'class WCA_Schema' includes/class-wca-schema.php
+      - name: R12 complete review - public discovery projection opaque refs caching SEO
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r12-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r12-tests.txt
+          grep -RInE 'public_ref|opaque|projection|public clinic|no-store|noindex|cache|cursor|pagination|eligib|clinic_slug' includes --include='*.php' | head -n 1800 || true
+          grep -q 'public projection applies a deny list' tests/security-static.php
+          grep -q 'route /clinic/{clinic_slug} is contracted' tests/master-plan-contract.php
+      - name: R13 complete review - Future24 REST object authorization and automation safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r13-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r13-tests.txt
+          grep -nE 'register_rest_route|permission_callback|authorize|can_|appointment|clinic_id|patient_context|doctor|rate_limit|no_store|advis|offer|diagnos|prescrib' includes/class-wca-future24.php | head -n 2000 || true
+          ! grep -nE "permission_callback[[:space:]]*=>[[:space:]]*['\"]__return_true['\"]" includes/class-wca-future24.php
+          grep -q 'future automation remains offer/advisory based without hidden patient scoring' tests/master-plan-contract.php
+      - name: R14 complete review - continuity intake followup reminders waitlist group sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r14-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r14-tests.txt
+          grep -nE 'intake|followup|reminder|waitlist|group|participant|virtual|arrival|queue|guardian|transaction|permission' includes/class-wca-continuity-secure.php | head -n 2200 || true
+          grep -q 'WCA_Authorization::claims( get_current_user_id() )' includes/class-wca-continuity-secure.php
+      - name: R15 complete review - external calendar interoperability and SSRF boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r15-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r15-tests.txt
+          grep -RInE 'calendar|ICS|ical|FHIR|webhook|http|wp_remote|same-origin|origin|redirect|deep.?link|external' includes assets --include='*.php' --include='*.js' | head -n 1800 || true
+          grep -q 'calendar export is implemented' tests/master-plan-contract.php
+      - name: R16 complete review - observability health cron CLI degraded modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r16-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r16-tests.txt
+          grep -RInE 'health|metric|trace|cron|WP_CLI|degraded|readiness|worker|failure|error' includes --include='*.php' | head -n 2000 || true
+          grep -q 'class WCA_Observability' includes/class-wca-observability.php
+      - name: R17 complete review - input validation bounded queries and abuse resistance
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r17-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r17-tests.txt
+          grep -RInE 'strict_id|strict_int|sanitize_|validate_|per_page|limit|posts_per_page|numberposts|rate_limit|cursor' includes --include='*.php' | head -n 2200 || true
+          ! grep -RInE "posts_per_page['\"]?[[:space:]]*=>[[:space:]]*-1|numberposts['\"]?[[:space:]]*=>[[:space:]]*-1|nopaging['\"]?[[:space:]]*=>[[:space:]]*true" includes --include='*.php'
+          grep -q 'REST abuse controls are present' tests/security-static.php
+      - name: R18 complete review - frontend accessibility RTL privacy cache and UX safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r18-tests.txt
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r18-tests.txt
+          grep -RInE 'rtl|aria-|role=|no-store|noindex|escape|esc_|nonce|emergency|accessib|reduced-motion|contrast' assets includes --include='*.php' --include='*.js' --include='*.css' | head -n 1800 || true
+          grep -q 'accessibility media modes are implemented' tests/master-plan-contract.php
+          grep -q 'RTL support is present' tests/master-plan-contract.php
+      - name: R19 complete review - release identity repository hygiene reproducible package
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r19-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r19-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r19-tests.txt
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          sha=$(git rev-parse HEAD); epoch=$(git show -s --format=%ct HEAD)
+          rm -rf build/t17-r19-a build/t17-r19-b
+          php tools/build-candidate.php --output-dir=build/t17-r19-a --commit="$sha" --source-date-epoch="$epoch" >/tmp/r19-build-a.txt
+          php tools/build-candidate.php --output-dir=build/t17-r19-b --commit="$sha" --source-date-epoch="$epoch" >/tmp/r19-build-b.txt
+          cmp build/t17-r19-a/*-candidate.zip build/t17-r19-b/*-candidate.zip
+          cmp build/t17-r19-a/*-candidate-manifest.json build/t17-r19-b/*-candidate-manifest.json
+          cmp build/t17-r19-a/*-candidate.sha256 build/t17-r19-b/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/t17-r19-a --commit="$sha"
+          cat build/t17-r19-a/*-candidate.sha256
+      - name: R20 complete review - final cross-cutting adversarial zero-known-defect gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r20-tests.txt
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r20-tests.txt
+          ! grep -RInE 'eval\(|base64_decode\(|shell_exec\(|passthru\(|proc_open\(' includes assets worldwide-clinic.php --include='*.php' --include='*.js'
+          ! grep -RInE "permission_callback[[:space:]]*=>[[:space:]]*['\"]__return_true['\"]" includes --include='*.php'
+          ! grep -RInE 'TODO|FIXME|XXX|HACK' includes assets worldwide-clinic.php --include='*.php' --include='*.js' --include='*.css'
+          git diff --check
+          test -z "$(git status --porcelain)"
+          echo "T17 R4-R20 sequential read-only review completed clean at $(git rev-parse HEAD)"
