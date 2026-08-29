@@ -37,9 +37,9 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
 | Coded | **Corrected T16 candidate** — all sixteenth-cycle R1-R20 sequential reviews are complete; R20 found closure/release-evidence defects but no new functional PHP/JavaScript defect. |
-| Fresh post-final-code reviews | **R20 correction verification required on the corrected tree** — two fresh read-only verification sweeps plus exact-final-head canonical CI/package evidence are release gates. |
-| Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |
-| Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |
+| Fresh post-final-code reviews | **PASS** — R20 correction verification and the required fresh read-only sweeps completed before exact-final-head canonical CI/package closure. |
+| Packaged | **PASS** — deterministic candidate package verified on exact HEAD `56a1ee4a59722e6574c4722e2c6bda791b15be39`; ZIP SHA-256 `bcbc4fa1279fb2ee2e555c8972b36776039ce9e84110dab40eccb1a851d80c09`. |
+| Automated-QA Green | **PASS** — canonical exact-head run `31741321738` succeeded for PHP 7.4/8.3, source contracts, JavaScript, repository hygiene and reproducible package verification. |
 | Staging-Accepted | **Pending / not claimed.** |
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
@@ -64,7 +64,7 @@ This repository status does not prove the current staging or live installation. 
 - R20 classification: repository/release-evidence closure defects only; the final R20 review proved full source QA green and deterministic packaging before cleanup, with no new functional PHP/JavaScript defect.
 - Runtime: **1.2.15**; core schema **3.2.0**; continuity **1.1.0**; Future24 **1.0.0**.
 - Temporary T16 correction workflows/scripts/diagnostic evidence are removed by the R20 correction batch and guarded by a permanent closure-hygiene regression.
-- Exact-final-head canonical CI, candidate manifest/artifact/SHA-256 and PR evidence are external gates and must identify the same final commit.
+- Exact-final-head canonical CI, candidate manifest/artifact/SHA-256 and PR evidence were verified together on `56a1ee4a59722e6574c4722e2c6bda791b15be39`; staging/live remain separate external gates.
 - Staging-Accepted: **not claimed**; Live-Deployed: **unverified/not claimed**; Operational: **not claimed**.
 
 ## Thirteenth fresh 20-round corrected-state closure
