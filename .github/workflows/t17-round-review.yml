@@ -54,8 +54,8 @@ jobs:
           php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r6-tests.txt
           ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r6-tests.txt
           grep -RInE 'create_clinic|activate_clinic|pause_clinic|branch|service|ClinicActivated|ClinicAvailabilityChanged|owner_subject_uuid' includes --include='*.php' | head -n 1500 || true
-          grep -q 'schema owns wca_clinics' tests/master-plan-contract.php
-          grep -q 'event ClinicActivated.v1 is implemented' tests/master-plan-contract.php
+          grep -q 'schema owns clinic, branch and service primitives' tests/master-plan-contract.php
+          grep -q 'clinic activation and availability change events are explicit' tests/master-plan-contract.php
       - name: R7 complete review - minors guardians consent delegation
         shell: bash
         run: |
