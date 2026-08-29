@@ -1,0 +1,46 @@
+name: File 08 T17 R6 Closed-Ledger Validation
+on:
+  push:
+    branches:
+      - tmp-t17-r6-validation
+    paths:
+      - .github/workflows/t17-r6-validate.yml
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: tmp-t17-r6-validation
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Apply closed R6 correction batch
+        run: |
+          set -euo pipefail
+          python3 tools/t17-r6-correct.py
+      - name: Full warning-free source QA
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit validated product correction on validation branch
+        run: |
+          set -euo pipefail
+          git config user.name 'majidhussainqadri1-dot'
+          git config user.email 'majidhussainqadri1@gmail.com'
+          git add includes/class-wca-repository.php includes/class-wca-service.php tests/seventeenth-twenty-review-regressions.php
+          git diff --cached --check
+          test -n "$(git diff --cached --name-only)"
+          git commit -m 'fix(file08): fail closed R6 clinic lifecycle storage reads'
+          git push origin HEAD:tmp-t17-r6-validation
