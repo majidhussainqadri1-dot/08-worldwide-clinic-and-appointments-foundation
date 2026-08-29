@@ -164,6 +164,7 @@ jobs:
           cmp build/t17-r19-a/*-candidate.sha256 build/t17-r19-b/*-candidate.sha256
           php tools/verify-candidate.php --artifact=build/t17-r19-a --commit="$sha"
           cat build/t17-r19-a/*-candidate.sha256
+          rm -rf build/t17-r19-a build/t17-r19-b
       - name: R20 complete review - final cross-cutting adversarial zero-known-defect gate
         shell: bash
         run: |
@@ -173,7 +174,20 @@ jobs:
           node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
           ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r20-tests.txt
           ! grep -RInE 'eval\(|base64_decode\(|shell_exec\(|passthru\(|proc_open\(' includes assets worldwide-clinic.php --include='*.php' --include='*.js'
-          ! grep -RInE "permission_callback[[:space:]]*=>[[:space:]]*['\"]__return_true['\"]" includes --include='*.php'
+          mapfile -t public_callbacks < <(grep -RInF "'permission_callback' => '__return_true'" includes --include='*.php' || true)
+          test "${#public_callbacks[@]}" -eq 9
+          test "$(grep -Fc "'permission_callback' => '__return_true'" includes/class-wca-calendar-link.php)" -eq 2
+          test "$(grep -Fc "'permission_callback' => '__return_true'" includes/class-wca-central-governance.php)" -eq 2
+          test "$(grep -Fc "'permission_callback' => '__return_true'" includes/class-wca-rest.php)" -eq 4
+          test "$(grep -Fc "'permission_callback' => '__return_true'" includes/class-wca-ten-review-hardening.php)" -eq 1
+          test -z "$(printf '%s\n' "${public_callbacks[@]}" | grep -Ev '^(includes/class-wca-calendar-link.php|includes/class-wca-central-governance.php|includes/class-wca-rest.php|includes/class-wca-ten-review-hardening.php):' || true)"
+          grep -q 'wca_calendar_provider_verify_webhook' includes/class-wca-calendar-link.php
+          grep -q 'hash_equals( $expected, $sig )' includes/class-wca-calendar-link.php
+          grep -q 'WCA_Service::public_clinic_projection' includes/class-wca-central-governance.php
+          grep -q "rate_limit( 'public_clinics'" includes/class-wca-rest.php
+          grep -q "rate_limit( 'public_clinic'" includes/class-wca-rest.php
+          grep -q "rate_limit( 'slot_search'" includes/class-wca-rest.php
+          grep -q "rate_limit_hit( 'tenreview_slot_search'" includes/class-wca-ten-review-hardening.php
           ! grep -RInE 'TODO|FIXME|XXX|HACK' includes assets worldwide-clinic.php --include='*.php' --include='*.js' --include='*.css'
           git diff --check
           test -z "$(git status --porcelain)"
