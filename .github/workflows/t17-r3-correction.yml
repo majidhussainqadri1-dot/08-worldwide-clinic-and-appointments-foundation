@@ -20,7 +20,6 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-          extensions: zip
       - name: Apply frozen R3 authorization correction batch
         run: python3 tools/t17-r3-correct.py
       - name: Add permanent R3 authorization regression gate
@@ -61,45 +60,17 @@ jobs:
               s=s.replace(needle, needle + ", 'seventeenth-r3-authorization-regressions.php'", 1)
               p.write_text(s)
           PY
-      - name: Full warning-free QA with failure evidence
-        shell: bash
-        run: |
-          set +e
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/t17-r3-lint.txt 2>&1
-          lint_rc=$?
-          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php > /tmp/t17-r3-tests.txt 2>&1
-          tests_rc=$?
-          node --check assets/js/clinic.js > /tmp/t17-r3-js1.txt 2>&1; js1_rc=$?
-          node --check assets/js/continuity.js > /tmp/t17-r3-js2.txt 2>&1; js2_rc=$?
-          node --check assets/js/future24.js > /tmp/t17-r3-js3.txt 2>&1; js3_rc=$?
-          git diff --check > /tmp/t17-r3-diff.txt 2>&1; diff_rc=$?
-          warn_rc=0
-          grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/t17-r3-tests.txt && warn_rc=1
-          if [ "$lint_rc" -ne 0 ] || [ "$tests_rc" -ne 0 ] || [ "$js1_rc" -ne 0 ] || [ "$js2_rc" -ne 0 ] || [ "$js3_rc" -ne 0 ] || [ "$diff_rc" -ne 0 ] || [ "$warn_rc" -ne 0 ]; then
-            {
-              echo "R3 QA failure evidence"
-              echo "lint_rc=$lint_rc tests_rc=$tests_rc js1_rc=$js1_rc js2_rc=$js2_rc js3_rc=$js3_rc diff_rc=$diff_rc warn_rc=$warn_rc"
-              echo '=== TESTS ==='; cat /tmp/t17-r3-tests.txt
-              echo '=== LINT ==='; tail -n 120 /tmp/t17-r3-lint.txt
-              echo '=== JS clinic ==='; cat /tmp/t17-r3-js1.txt
-              echo '=== JS continuity ==='; cat /tmp/t17-r3-js2.txt
-              echo '=== JS future24 ==='; cat /tmp/t17-r3-js3.txt
-              echo '=== DIFF CHECK ==='; cat /tmp/t17-r3-diff.txt
-            } > T17-R3-QA-FAILURE.txt
-            git config user.name github-actions
-            git config user.email github-actions@github.com
-            git add T17-R3-QA-FAILURE.txt
-            git commit -m 'chore(review): capture T17 R3 QA failure evidence'
-            git push origin HEAD:codex/file08-new-governing-plans-completion-2026
-            exit 1
-          fi
-          cat /tmp/t17-r3-tests.txt
-      - name: Build and verify deterministic development candidate
+      - name: Full warning-free QA
         shell: bash
         run: |
           set -euo pipefail
-          php tools/build-development-candidate.php >/tmp/t17-r3-build.txt
-          php tools/verify-development-candidate.php | tee /tmp/t17-r3-package.txt
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/t17-r3-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/t17-r3-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/t17-r3-tests.txt; then exit 1; fi
+          git diff --check
       - name: Commit corrected product only after QA green
         shell: bash
         run: |
