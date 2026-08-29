@@ -1,0 +1,83 @@
+name: File 08 T17 R2 Post-Review Correction
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r2-correction.yml
+permissions:
+  contents: write
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Apply closed R2 correction batch
+        run: python3 tools/t17-r2-correct.py
+      - name: Add permanent T17 regression gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > tests/seventeenth-twenty-review-regressions.php <<'PHP'
+          <?php
+          $root = dirname( __DIR__ );
+          $service = file_get_contents( $root . '/includes/class-wca-service.php' );
+          $rest = file_get_contents( $root . '/includes/class-wca-rest.php' );
+          $opaque = file_get_contents( $root . '/includes/class-wca-opaque-api.php' );
+          $future = file_get_contents( $root . '/includes/class-wca-future24.php' );
+          $assertions = array(
+              'strict object identifier validator exists' => false !== strpos( $service, 'public static function strict_id' ),
+              'transition CAS uses strict identifier validation' => false !== strpos( $service, "self::strict_id( \$data['expected_version'] )" ),
+              'service mutation validates object/CAS identifiers' => false !== strpos( $service, "wca_service_identifier" ),
+              'availability mutation validates object/CAS identifiers' => false !== strpos( $service, "wca_availability_identifier" ),
+              'REST preserves raw expected version for service-root validation' => false === strpos( $rest, "absint( \$request->get_param( 'expected_version' ) )" ),
+              'opaque API preserves raw expected version' => false === strpos( $opaque, "absint( \$request->get_param( 'expected_version' ) )" ),
+              'Future24 body identifiers use strict validation' => false !== strpos( $future, 'private static function input_id' ),
+              'Future24 flexible windows reject malformed members' => false !== strpos( $future, 'wca_windows_member_invalid' ),
+              'Future24 questionnaire rejects unsupported or duplicate fields' => false !== strpos( $future, 'wca_questionnaire_field_invalid' ),
+              'Future24 prerequisites reject malformed rules' => false !== strpos( $future, 'wca_prerequisite_rule_invalid' ) && false !== strpos( $future, 'wca_prerequisite_behavior_invalid' ),
+          );
+          $failed = array_keys( array_filter( $assertions, static function ( $ok ) { return ! $ok; } ) );
+          foreach ( $assertions as $name => $ok ) { echo ( $ok ? '[PASS] ' : '[FAIL] ' ) . $name . PHP_EOL; }
+          if ( $failed ) { fwrite( STDERR, 'T17 regression failures: ' . implode( ', ', $failed ) . PHP_EOL ); exit( 1 ); }
+          echo 'T17 regression assertions: ' . count( $assertions ) . '/' . count( $assertions ) . ' PASS' . PHP_EOL;
+          PHP
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/run-all.php'); s=p.read_text()
+          needle="'sixteenth-cycle-closure-hygiene.php'"
+          if "'seventeenth-twenty-review-regressions.php'" not in s:
+              if needle not in s: raise SystemExit('run-all anchor missing')
+              s=s.replace(needle, needle + ", 'seventeenth-twenty-review-regressions.php'", 1)
+              p.write_text(s)
+          PY
+      - name: Full warning-free QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/t17-r2-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/t17-r2-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/t17-r2-tests.txt; then exit 1; fi
+          git diff --check
+      - name: Commit corrected product only after QA green
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add includes/class-wca-service.php includes/class-wca-rest.php includes/class-wca-opaque-api.php includes/class-wca-future24.php tests/run-all.php tests/seventeenth-twenty-review-regressions.php
+          git diff --cached --check
+          git commit -m 'fix(file08): reject coerced identifiers and partial structured intent'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
