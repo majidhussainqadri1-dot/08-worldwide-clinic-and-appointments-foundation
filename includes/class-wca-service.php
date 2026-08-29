@@ -37,6 +37,14 @@ final class WCA_Service {
 		return (int) $validated;
 	}
 
+	/** Execute one repository read and propagate any registered storage failure. */
+	private static function repository_read( $callback ) {
+		WCA_Repository::clear_read_error();
+		$result = call_user_func( $callback );
+		$read_error = WCA_Repository::consume_read_error();
+		return is_wp_error( $read_error ) ? $read_error : $result;
+	}
+
 	public static function strict_id( $value, $allow_zero = false ) {
 		if ( $allow_zero && in_array( $value, array( null, '', 0, '0' ), true ) ) { return 0; }
 		return self::strict_int( $value, 1, PHP_INT_MAX );
@@ -128,16 +136,22 @@ final class WCA_Service {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$clinic_id = self::strict_id( $clinic_id ); $expected_version = self::strict_id( $expected_version );
 		if ( null === $clinic_id || null === $expected_version ) { return new WP_Error( 'wca_clinic_review_identifier', __( 'Identifier and expected version must be positive integers.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$clinic = WCA_Repository::get_clinic( $clinic_id, false );
+		$clinic = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, false ); } );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$auth = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
 		if ( 'draft' !== (string) $clinic['status'] ) { return new WP_Error( 'wca_clinic_review_state', __( 'Only a draft clinic may be submitted for institutional review.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		if ( ! WCA_Repository::list_services( $clinic['id'], false ) || ! WCA_Repository::list_branches( $clinic['id'], false ) ) { return new WP_Error( 'wca_clinic_incomplete', __( 'At least one branch and one service are required before review.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$services = self::repository_read( static function () use ( $clinic ) { return WCA_Repository::list_services( $clinic['id'], false ); } );
+		if ( is_wp_error( $services ) ) { return $services; }
+		$branches = self::repository_read( static function () use ( $clinic ) { return WCA_Repository::list_branches( $clinic['id'], false ); } );
+		if ( is_wp_error( $branches ) ) { return $branches; }
+		if ( ! $services || ! $branches ) { return new WP_Error( 'wca_clinic_incomplete', __( 'At least one branch and one service are required before review.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		return WCA_Repository::transaction( function () use ( $clinic_id, $expected_version, $actor_user_id ) {
 			$updated = WCA_Repository::update_clinic( $clinic_id, $expected_version, array( 'status' => 'review' ) );
 			if ( is_wp_error( $updated ) ) { return $updated; }
-			$current = WCA_Repository::get_clinic( $clinic_id, false );
+			$current = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, false ); } );
+			if ( is_wp_error( $current ) ) { return $current; }
 			if ( ! $current ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found after update.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			$trace = WCA_Observability::trace_id();
 			$event = WCA_Repository::append_event( 'ClinicReviewRequested.v1', 'clinic', $current['public_ref'], array( 'clinic_ref' => $current['public_ref'], 'trace_id' => $trace ), $actor_user_id, $trace );
@@ -153,7 +167,8 @@ final class WCA_Service {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$clinic_id = self::strict_id( $clinic_id ); $expected_version = self::strict_id( $expected_version );
 		if ( null === $clinic_id || null === $expected_version ) { return new WP_Error( 'wca_clinic_activate_identifier', __( 'Identifier and expected version must be positive integers.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$clinic = WCA_Repository::get_clinic( $clinic_id, false );
+		$clinic = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, false ); } );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$claims = WCA_Authorization::claims( $actor_user_id );
 		if ( is_wp_error( $claims ) ) { return $claims; }
@@ -163,11 +178,16 @@ final class WCA_Service {
 		if ( is_wp_error( $step ) ) { return $step; }
 		if ( ! SWC_Doctor_Authority::is_eligible( absint( $clinic['owner_user_id'] ?? 0 ) ) ) { return new WP_Error( 'wca_clinic_owner_ineligible', __( 'The clinic owner is not currently eligible for activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		if ( ! in_array( $clinic['status'], array( 'review','paused' ), true ) ) { return new WP_Error( 'wca_clinic_transition', __( 'Clinic cannot be activated from its current state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		if ( ! WCA_Repository::list_services( $clinic['id'], true ) || ! WCA_Repository::list_branches( $clinic['id'], true ) ) { return new WP_Error( 'wca_clinic_incomplete', __( 'At least one active public branch and one active eligible service are required before activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$services = self::repository_read( static function () use ( $clinic ) { return WCA_Repository::list_services( $clinic['id'], true ); } );
+		if ( is_wp_error( $services ) ) { return $services; }
+		$branches = self::repository_read( static function () use ( $clinic ) { return WCA_Repository::list_branches( $clinic['id'], true ); } );
+		if ( is_wp_error( $branches ) ) { return $branches; }
+		if ( ! $services || ! $branches ) { return new WP_Error( 'wca_clinic_incomplete', __( 'At least one active public branch and one active eligible service are required before activation.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		return WCA_Repository::transaction( function () use ( $clinic_id, $expected_version, $actor_user_id ) {
 			$updated = WCA_Repository::update_clinic( $clinic_id, $expected_version, array( 'status' => 'active' ) );
 			if ( is_wp_error( $updated ) ) { return $updated; }
-			$current = WCA_Repository::get_clinic( $clinic_id, false );
+			$current = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, false ); } );
+			if ( is_wp_error( $current ) ) { return $current; }
 			if ( ! $current ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found after activation.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			$trace = WCA_Observability::trace_id();
 			$payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'clinic_ref' => $current['public_ref'], 'owner_subject_uuid' => $current['owner_subject_uuid'], 'trace_id' => $trace );
@@ -188,7 +208,8 @@ final class WCA_Service {
 	public static function create_branch( $data, $actor_user_id = 0 ) {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$clinic_id = self::strict_id( $data['clinic_id'] ?? null ); if ( null === $clinic_id ) { return new WP_Error( 'wca_branch_clinic_identifier', __( 'Clinic identifier must be a positive integer.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); } $data['clinic_id'] = $clinic_id;
-		$clinic = WCA_Repository::get_clinic( $clinic_id, false );
+		$clinic = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, false ); } );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$auth = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
@@ -218,13 +239,15 @@ final class WCA_Service {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$clinic_id=self::strict_id($data['clinic_id']??null); $service_id=self::strict_id($service_id,true); $expected_version=self::strict_id($expected_version,true);
 		if(null===$clinic_id||null===$service_id||null===$expected_version||($service_id&&!$expected_version)||(!$service_id&&$expected_version)){return new WP_Error('wca_service_identifier',__('Service identifiers and expected version are invalid.','worldwide-clinic-appointments'),array('status'=>400));} $data['clinic_id']=$clinic_id;
-		$clinic = WCA_Repository::get_clinic( $clinic_id, false );
+		$clinic = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, false ); } );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$auth = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
 		$current = null;
 		if ( $service_id ) {
-			$current = WCA_Repository::get_service( $service_id, false );
+			$current = self::repository_read( static function () use ( $service_id ) { return WCA_Repository::get_service( $service_id, false ); } );
+			if ( is_wp_error( $current ) ) { return $current; }
 			if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_service_scope', __( 'The service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		}
 		$consultation_type = sanitize_key( $data['consultation_type'] ?? ( $current['consultation_type'] ?? '' ) );
@@ -242,7 +265,12 @@ final class WCA_Service {
 		$data['duration_minutes'] = $duration;
 		$data['fee_minor'] = $fee_minor;
 		$data['fee_max_minor'] = $fee_max_minor;
-		if ( ! empty( $data['branch_id'] ) ) { $branch = WCA_Repository::get_branch( absint( $data['branch_id'] ) ); if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_branch_scope', __( 'The branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
+		if ( ! empty( $data['branch_id'] ) ) {
+			$branch_id = absint( $data['branch_id'] );
+			$branch = self::repository_read( static function () use ( $branch_id ) { return WCA_Repository::get_branch( $branch_id ); } );
+			if ( is_wp_error( $branch ) ) { return $branch; }
+			if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_branch_scope', __( 'The branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		}
 		if ( ! empty( $data['doctor_user_id'] ) ) {
 			$service_doctor_id = absint( $data['doctor_user_id'] );
 			if ( ! SWC_Doctor_Authority::is_eligible( $service_doctor_id ) ) { return new WP_Error( 'wca_service_doctor', __( 'The assigned practitioner is not currently eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
@@ -266,7 +294,8 @@ final class WCA_Service {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$clinic_id=self::strict_id($data['clinic_id']??null); $rule_id=self::strict_id($rule_id,true); $expected_version=self::strict_id($expected_version,true);
 		if(null===$clinic_id||null===$rule_id||null===$expected_version||($rule_id&&!$expected_version)||(!$rule_id&&$expected_version)){return new WP_Error('wca_availability_identifier',__('Availability identifiers and expected version are invalid.','worldwide-clinic-appointments'),array('status'=>400));} $data['clinic_id']=$clinic_id;
-		$clinic = WCA_Repository::get_clinic( $clinic_id, false );
+		$clinic = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, false ); } );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$auth = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
 		if ( is_wp_error( $auth ) ) { return $auth; }
@@ -290,9 +319,23 @@ final class WCA_Service {
 		$data['buffer_after'] = $buffer_after;
 		$data['capacity'] = $capacity;
 		$data['timezone'] = $timezone;
-		if ( $rule_id ) { $current = WCA_Repository::get_availability_rule( $rule_id ); if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_scope', __( 'The availability rule does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); } }
-		if ( ! empty( $data['service_id'] ) ) { $service = WCA_Repository::get_service( absint( $data['service_id'] ), false ); if ( ! $service || absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_service', __( 'The availability service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
-		if ( ! empty( $data['branch_id'] ) ) { $branch = WCA_Repository::get_branch( absint( $data['branch_id'] ) ); if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_branch', __( 'The availability branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); } }
+		if ( $rule_id ) {
+			$current = self::repository_read( static function () use ( $rule_id ) { return WCA_Repository::get_availability_rule( $rule_id ); } );
+			if ( is_wp_error( $current ) ) { return $current; }
+			if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_scope', __( 'The availability rule does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+		}
+		if ( ! empty( $data['service_id'] ) ) {
+			$availability_service_id = absint( $data['service_id'] );
+			$service = self::repository_read( static function () use ( $availability_service_id ) { return WCA_Repository::get_service( $availability_service_id, false ); } );
+			if ( is_wp_error( $service ) ) { return $service; }
+			if ( ! $service || absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_service', __( 'The availability service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		}
+		if ( ! empty( $data['branch_id'] ) ) {
+			$availability_branch_id = absint( $data['branch_id'] );
+			$branch = self::repository_read( static function () use ( $availability_branch_id ) { return WCA_Repository::get_branch( $availability_branch_id ); } );
+			if ( is_wp_error( $branch ) ) { return $branch; }
+			if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_availability_branch', __( 'The availability branch does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		}
 		$doctor_id = absint( $data['doctor_user_id'] ?? $actor_user_id );
 		if ( ! SWC_Doctor_Authority::is_eligible( $doctor_id ) ) {
 			return new WP_Error( 'wca_doctor_ineligible', __( 'The doctor is not currently eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );

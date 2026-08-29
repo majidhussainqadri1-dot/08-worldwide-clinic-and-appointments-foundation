@@ -112,7 +112,11 @@ final class WCA_Repository {
 		if ( false === $wpdb->insert( $table, $row, array( '%s','%s','%d','%s','%s','%s','%s','%s','%s','%s','%d','%s','%s' ) ) ) {
 			return new WP_Error( 'wca_clinic_insert', __( 'Clinic could not be created.', 'worldwide-clinic-appointments' ) );
 		}
-		return self::get_clinic( (int) $wpdb->insert_id, false );
+		self::clear_read_error();
+		$created = self::get_clinic( (int) $wpdb->insert_id, false );
+		$read_error = self::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
+		return $created ?: new WP_Error( 'wca_clinic_readback_missing', __( 'Clinic creation could not be verified after persistence.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 	}
 
 	/** @return array<string,mixed>|null */
@@ -173,7 +177,10 @@ final class WCA_Repository {
 	public static function update_clinic( $clinic_id, $expected_version, $data ) {
 		global $wpdb;
 		$table  = WCA_Schema::tables()['clinics'];
+		self::clear_read_error();
 		$clinic = self::get_clinic( $clinic_id, false );
+		$read_error = self::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) {
 			return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ) );
 		}
@@ -234,7 +241,11 @@ final class WCA_Repository {
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			return new WP_Error( 'wca_branch_insert', __( 'Branch could not be created.', 'worldwide-clinic-appointments' ) );
 		}
-		return self::get_branch( (int) $wpdb->insert_id );
+		self::clear_read_error();
+		$created = self::get_branch( (int) $wpdb->insert_id );
+		$read_error = self::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
+		return $created ?: new WP_Error( 'wca_branch_readback_missing', __( 'Branch creation could not be verified after persistence.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 	}
 
 	/** @return array<string,mixed>|null */
@@ -242,6 +253,7 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['branches'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d LIMIT 1", absint( $id ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_branch_read_failed', __( 'Branch data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		if ( ! $row ) { return null; }
 		$row['contacts'] = self::decode( $row['contacts_json'] );
 		unset( $row['contacts_json'] );
@@ -320,14 +332,21 @@ final class WCA_Repository {
 			return new WP_Error( 'wca_service_fee', __( 'Maximum fee cannot be lower than the minimum fee.', 'worldwide-clinic-appointments' ) );
 		}
 		if ( $service_id ) {
+			self::clear_read_error();
 			$current = self::get_service( $service_id, false );
+			$read_error = self::consume_read_error();
+			if ( is_wp_error( $read_error ) ) { return $read_error; }
 			if ( ! $current || absint( $current['version'] ) !== absint( $expected_version ) ) {
 				return new WP_Error( 'wca_stale', __( 'Service data changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 			}
 			$row['version'] = absint( $current['version'] ) + 1;
 			$ok = $wpdb->update( $table, $row, array( 'id' => absint( $service_id ), 'version' => absint( $expected_version ) ) );
 			if ( ! $ok ) { return new WP_Error( 'wca_service_update', __( 'Service could not be updated.', 'worldwide-clinic-appointments' ) ); }
-			return self::get_service( $service_id, false );
+			self::clear_read_error();
+			$updated = self::get_service( $service_id, false );
+			$read_error = self::consume_read_error();
+			if ( is_wp_error( $read_error ) ) { return $read_error; }
+			return $updated ?: new WP_Error( 'wca_service_readback_missing', __( 'Service update could not be verified after persistence.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
 		$row['public_ref'] = self::uuid();
 		$row['version']    = 1;
@@ -335,7 +354,11 @@ final class WCA_Repository {
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			return new WP_Error( 'wca_service_insert', __( 'Service could not be created.', 'worldwide-clinic-appointments' ) );
 		}
-		return self::get_service( (int) $wpdb->insert_id, false );
+		self::clear_read_error();
+		$created = self::get_service( (int) $wpdb->insert_id, false );
+		$read_error = self::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
+		return $created ?: new WP_Error( 'wca_service_readback_missing', __( 'Service creation could not be verified after persistence.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 	}
 
 	/** @return array<string,mixed>|null */
@@ -471,13 +494,21 @@ final class WCA_Repository {
 			return new WP_Error( 'wca_availability_required', __( 'Clinic and doctor are required for availability.', 'worldwide-clinic-appointments' ) );
 		}
 		if ( $rule_id ) {
+			self::clear_read_error();
 			$current = self::get_availability_rule( $rule_id );
+			$read_error = self::consume_read_error();
+			if ( is_wp_error( $read_error ) ) { return $read_error; }
 			if ( ! $current || absint( $current['version'] ) !== absint( $expected_version ) ) {
 				return new WP_Error( 'wca_stale', __( 'Availability changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 			}
 			$row['version'] = absint( $current['version'] ) + 1;
 			$ok = $wpdb->update( $table, $row, array( 'id' => absint( $rule_id ), 'version' => absint( $expected_version ) ) );
-			return $ok ? self::get_availability_rule( $rule_id ) : new WP_Error( 'wca_availability_update', __( 'Availability could not be updated.', 'worldwide-clinic-appointments' ) );
+			if ( ! $ok ) { return new WP_Error( 'wca_availability_update', __( 'Availability could not be updated.', 'worldwide-clinic-appointments' ) ); }
+			self::clear_read_error();
+			$updated = self::get_availability_rule( $rule_id );
+			$read_error = self::consume_read_error();
+			if ( is_wp_error( $read_error ) ) { return $read_error; }
+			return $updated ?: new WP_Error( 'wca_availability_readback_missing', __( 'Availability update could not be verified after persistence.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
 		$row['public_ref'] = self::uuid();
 		$row['version']    = 1;
@@ -485,7 +516,11 @@ final class WCA_Repository {
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			return new WP_Error( 'wca_availability_insert', __( 'Availability could not be saved.', 'worldwide-clinic-appointments' ) );
 		}
-		return self::get_availability_rule( (int) $wpdb->insert_id );
+		self::clear_read_error();
+		$created = self::get_availability_rule( (int) $wpdb->insert_id );
+		$read_error = self::consume_read_error();
+		if ( is_wp_error( $read_error ) ) { return $read_error; }
+		return $created ?: new WP_Error( 'wca_availability_readback_missing', __( 'Availability creation could not be verified after persistence.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 	}
 
 	/** @return array<string,mixed>|null */
@@ -493,6 +528,7 @@ final class WCA_Repository {
 		global $wpdb;
 		$table = WCA_Schema::tables()['availability'];
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d LIMIT 1", absint( $id ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_availability_read_failed', __( 'Availability data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		if ( ! $row ) { return null; }
 		foreach ( array( 'rrule', 'breaks', 'exceptions' ) as $key ) {
 			$row[ $key ] = self::decode( $row[ $key . '_json' ] );
@@ -525,6 +561,7 @@ final class WCA_Repository {
 		$table = WCA_Schema::tables()['branches'];
 		$sql = "SELECT * FROM {$table} WHERE public_ref=%s" . ( $public_only ? " AND status='active' AND visibility='public'" : '' ) . ' LIMIT 1';
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, sanitize_text_field( $ref ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_branch_ref_read_failed', __( 'Branch reference could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		return $row ?: null;
 	}
 
@@ -534,6 +571,7 @@ final class WCA_Repository {
 		$table = WCA_Schema::tables()['services'];
 		$sql = "SELECT * FROM {$table} WHERE public_ref=%s" . ( $public_only ? " AND status='active'" : '' ) . ' LIMIT 1';
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, sanitize_text_field( $ref ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_service_ref_read_failed', __( 'Service reference could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		return $row ?: null;
 	}
 
@@ -543,6 +581,7 @@ final class WCA_Repository {
 		$table = WCA_Schema::tables()['availability'];
 		$sql = "SELECT * FROM {$table} WHERE public_ref=%s" . ( $active_only ? " AND status='active'" : '' ) . ' LIMIT 1';
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, sanitize_text_field( $ref ) ), ARRAY_A );
+		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_availability_ref_read_failed', __( 'Availability reference could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		if ( ! $row ) { return null; }
 		foreach ( array( 'rrule', 'breaks', 'exceptions' ) as $key ) { $row[ $key ] = self::decode( $row[ $key . '_json' ] ); unset( $row[ $key . '_json' ] ); }
 		return $row;

@@ -15,6 +15,12 @@ $assertions = array(
     'Future24 flexible windows reject malformed members' => false !== strpos( $future, 'wca_windows_member_invalid' ),
     'Future24 questionnaire rejects unsupported or duplicate fields' => false !== strpos( $future, 'wca_questionnaire_field_invalid' ),
     'Future24 prerequisites reject malformed rules' => false !== strpos( $future, 'wca_prerequisite_rule_invalid' ) && false !== strpos( $future, 'wca_prerequisite_behavior_invalid' ),
+    'R6 service roots use fail-closed repository read helper' => false !== strpos( $service, 'private static function repository_read' ),
+    'R6 clinic lifecycle propagates repository read errors' => substr_count( $service, 'if ( is_wp_error( $clinic ) ) { return $clinic; }' ) >= 5,
+    'R6 review and activation list reads propagate DB failure' => false !== strpos( $service, 'return WCA_Repository::list_services' ) && false !== strpos( $service, 'return WCA_Repository::list_branches' ),
+    'R6 branch getter records storage failure' => false !== strpos( file_get_contents( $root . '/includes/class-wca-repository.php' ), 'wca_branch_read_failed' ),
+    'R6 availability getter records storage failure' => false !== strpos( file_get_contents( $root . '/includes/class-wca-repository.php' ), 'wca_availability_read_failed' ),
+    'R6 repository mutation roots verify readback' => false !== strpos( file_get_contents( $root . '/includes/class-wca-repository.php' ), 'wca_clinic_readback_missing' ) && false !== strpos( file_get_contents( $root . '/includes/class-wca-repository.php' ), 'wca_service_readback_missing' ) && false !== strpos( file_get_contents( $root . '/includes/class-wca-repository.php' ), 'wca_availability_readback_missing' ),
 );
 $failed = array_keys( array_filter( $assertions, static function ( $ok ) { return ! $ok; } ) );
 foreach ( $assertions as $name => $ok ) { echo ( $ok ? '[PASS] ' : '[FAIL] ' ) . $name . PHP_EOL; }
