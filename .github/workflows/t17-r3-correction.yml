@@ -36,16 +36,16 @@ jobs:
           $admin = file_get_contents( $root . '/includes/class-wca-admin.php' );
           $continuity = file_get_contents( $root . '/includes/class-wca-continuity-secure.php' );
           $assertions = array(
-              'legacy doctor management revalidates central claims' => substr_count( $helpers, "WCA_Authorization::claims( $user_id )" ) >= 2,
-              'legacy patient management revalidates central claims' => false !== strpos( $helpers, "public static function can_patient_manage" ) && false !== strpos( $helpers, "return ! is_wp_error( WCA_Authorization::can_view_appointment" ),
-              'legacy booking revalidates membership claims' => false !== strpos( $appointments, "WCA_Authorization::claims( $user_id )" ),
-              'legacy booking enforces patient guardian context' => false !== strpos( $appointments, "WCA_Authorization::guardian_context( $user_id, 0, $user_id )" ),
-              'legacy clinic admin revalidates File 00 claims' => false !== strpos( $legacy_admin, "WCA_Authorization::claims( get_current_user_id() )" ),
+              'legacy doctor management revalidates central claims' => substr_count( $helpers, 'WCA_Authorization::claims( $user_id )' ) >= 2,
+              'legacy patient management revalidates central claims' => false !== strpos( $helpers, 'public static function can_patient_manage' ) && false !== strpos( $helpers, 'return ! is_wp_error( WCA_Authorization::can_view_appointment' ),
+              'legacy booking revalidates membership claims' => false !== strpos( $appointments, 'WCA_Authorization::claims( $user_id )' ),
+              'legacy booking enforces patient guardian context' => false !== strpos( $appointments, 'WCA_Authorization::guardian_context( $user_id, 0, $user_id )' ),
+              'legacy clinic admin revalidates File 00 claims' => false !== strpos( $legacy_admin, 'WCA_Authorization::claims( get_current_user_id() )' ),
               'legacy clinic admin requires step up' => false !== strpos( $legacy_admin, "require_step_up( 'appointment_operations'" ),
-              'operations page revalidates File 00 claims' => false !== strpos( $admin, "WCA_Authorization::claims( get_current_user_id() )" ),
+              'operations page revalidates File 00 claims' => false !== strpos( $admin, 'WCA_Authorization::claims( get_current_user_id() )' ),
               'operations mutation requires step up' => false !== strpos( $admin, "require_step_up( 'clinic_operations'" ),
-              'continuity operations health revalidates File 00 claims' => false !== strpos( $continuity, "wca_admin_membership" ) && false !== strpos( $continuity, "WCA_Authorization::claims( get_current_user_id() )" ),
-              'legacy can_view no longer trusts native capability alone' => false === strpos( $helpers, "self::can_patient_manage( $id ) || self::can_doctor_manage( $id ) || current_user_can( 'manage_worldwide_clinic' )" ),
+              'continuity operations health revalidates File 00 claims' => false !== strpos( $continuity, 'wca_admin_membership' ) && false !== strpos( $continuity, 'WCA_Authorization::claims( get_current_user_id() )' ),
+              'legacy can_view no longer trusts native capability alone' => false === strpos( $helpers, "self::can_patient_manage( \$id ) || self::can_doctor_manage( \$id ) || current_user_can( 'manage_worldwide_clinic' )" ),
           );
           $failed = array_keys( array_filter( $assertions, static function ( $ok ) { return ! $ok; } ) );
           foreach ( $assertions as $name => $ok ) { echo ( $ok ? '[PASS] ' : '[FAIL] ' ) . $name . PHP_EOL; }
@@ -104,9 +104,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f T17-R3-QA-FAILURE.txt
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add includes/class-swc-helpers.php includes/class-swc-appointments.php includes/class-swc-admin.php includes/class-wca-admin.php includes/class-wca-continuity-secure.php tests/run-all.php tests/seventeenth-r3-authorization-regressions.php
+          git add -A T17-R3-QA-FAILURE.txt
           git diff --cached --check
           git commit -m 'fix(file08): close legacy and operations authorization bypasses'
           git push origin HEAD:codex/file08-new-governing-plans-completion-2026
