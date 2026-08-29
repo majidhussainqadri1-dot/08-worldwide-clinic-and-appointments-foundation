@@ -115,7 +115,7 @@ jobs:
           php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r15-tests.txt
           ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r15-tests.txt
           grep -RInE 'calendar|ICS|ical|FHIR|webhook|http|wp_remote|same-origin|origin|redirect|deep.?link|external' includes assets --include='*.php' --include='*.js' | head -n 1800 || true
-          grep -q "'appointment_ics'" includes/class-wca-service.php
+          grep -q 'public static function appointment_ics' includes/class-wca-service.php
       - name: R16 complete review - observability health cron CLI degraded modes
         shell: bash
         run: |
