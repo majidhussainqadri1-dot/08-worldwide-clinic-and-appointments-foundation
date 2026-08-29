@@ -24,6 +24,14 @@ final class SWC_Appointments {
 		check_admin_referer( 'swc_submit_appointment', 'swc_nonce' );
 
 		$user_id = get_current_user_id();
+		$claims = class_exists( 'WCA_Authorization' ) ? WCA_Authorization::claims( $user_id ) : new WP_Error( 'wca_authorization_unavailable', __( 'Current membership authorization is unavailable.', 'worldwide-clinic-appointments' ) );
+		if ( is_wp_error( $claims ) ) {
+			wp_die( esc_html__( 'Your current membership state does not permit an appointment request.', 'worldwide-clinic-appointments' ), '', array( 'response' => 403 ) );
+		}
+		$patient_context = WCA_Authorization::guardian_context( $user_id, 0, $user_id );
+		if ( is_wp_error( $patient_context ) ) {
+			wp_die( esc_html__( 'This legacy request form cannot establish the required patient or guardian context. Use the governed booking flow.', 'worldwide-clinic-appointments' ), '', array( 'response' => 403 ) );
+		}
 		if ( SWC_Helpers::rate_limit_hit( $user_id, 5, HOUR_IN_SECONDS ) ) {
 			wp_die( esc_html__( 'Please wait before submitting another request.', 'worldwide-clinic-appointments' ), '', array( 'response' => 429 ) );
 		}

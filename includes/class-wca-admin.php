@@ -20,6 +20,8 @@ final class WCA_Admin {
 
 	public static function page() {
 		if ( ! current_user_can( 'manage_worldwide_clinic' ) && ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Permission denied.', 'worldwide-clinic-appointments' ) ); }
+		$claims = WCA_Authorization::claims( get_current_user_id() );
+		if ( is_wp_error( $claims ) ) { wp_die( esc_html__( 'Current membership authorization is required.', 'worldwide-clinic-appointments' ) ); }
 		$health = WCA_Observability::health();
 		$deps = WCA_Compatibility::dependency_health();
 		?>
@@ -53,6 +55,10 @@ final class WCA_Admin {
 
 	private static function authorize( $nonce ) {
 		if ( ! current_user_can( 'manage_worldwide_clinic' ) && ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Permission denied.', 'worldwide-clinic-appointments' ) ); }
+		$claims = WCA_Authorization::claims( get_current_user_id() );
+		if ( is_wp_error( $claims ) ) { wp_die( esc_html__( 'Current membership authorization is required.', 'worldwide-clinic-appointments' ) ); }
+		$step = WCA_Authorization::require_step_up( 'clinic_operations', get_current_user_id() );
+		if ( is_wp_error( $step ) ) { wp_die( esc_html__( 'Recent security verification is required.', 'worldwide-clinic-appointments' ) ); }
 		check_admin_referer( $nonce );
 	}
 }

@@ -360,8 +360,16 @@ final class SWC_Admin {
 	}
 
 	private function guard() {
-		if ( ! current_user_can( 'manage_worldwide_clinic' ) ) {
+		if ( ! current_user_can( 'manage_worldwide_clinic' ) || ! class_exists( 'WCA_Authorization' ) ) {
 			wp_die( esc_html__( 'You are not allowed to manage the clinic.', 'worldwide-clinic-appointments' ), '', array( 'response' => 403 ) );
+		}
+		$claims = WCA_Authorization::claims( get_current_user_id() );
+		if ( is_wp_error( $claims ) ) {
+			wp_die( esc_html__( 'Your current membership state does not permit clinic administration.', 'worldwide-clinic-appointments' ), '', array( 'response' => 403 ) );
+		}
+		$step = WCA_Authorization::require_step_up( 'appointment_operations', get_current_user_id() );
+		if ( is_wp_error( $step ) ) {
+			wp_die( esc_html__( 'Recent security verification is required for clinic administration.', 'worldwide-clinic-appointments' ), '', array( 'response' => 403 ) );
 		}
 	}
 

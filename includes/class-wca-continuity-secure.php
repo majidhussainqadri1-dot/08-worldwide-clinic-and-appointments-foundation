@@ -704,7 +704,13 @@ final class WCA_Continuity {
 	}
 
 	public static function authenticated() { return is_user_logged_in() ? true : new WP_Error( 'wca_auth_required', __( 'Authentication is required.', 'worldwide-clinic-appointments' ), array( 'status' => 401 ) ); }
-	public static function admin() { return current_user_can( 'manage_wca_operations' ) || current_user_can( 'manage_worldwide_clinic' ) || current_user_can( 'manage_options' ) ? true : new WP_Error( 'wca_admin_required', __( 'Operations permission is required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
+	public static function admin() {
+		if ( ! ( current_user_can( 'manage_wca_operations' ) || current_user_can( 'manage_worldwide_clinic' ) || current_user_can( 'manage_options' ) ) ) {
+			return new WP_Error( 'wca_admin_required', __( 'Operations permission is required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+		}
+		$claims = WCA_Authorization::claims( get_current_user_id() );
+		return is_wp_error( $claims ) ? new WP_Error( 'wca_admin_membership', __( 'Current membership authorization is required.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ) : true;
+	}
 	public static function rest_get_intake( WP_REST_Request $request ) { return self::no_store( self::get_intake( $request['ref'] ) ); }
 	public static function rest_save_intake( WP_REST_Request $request ) { $r=self::rate_limit('intake_save',30,300); if(is_wp_error($r)){return $r;} return self::no_store( self::save_intake( $request['ref'], self::request_data( $request ), 0, false ) ); }
 	public static function rest_submit_intake( WP_REST_Request $request ) { $r=self::rate_limit('intake_submit',10,HOUR_IN_SECONDS); if(is_wp_error($r)){return $r;} return self::no_store( self::save_intake( $request['ref'], self::request_data( $request ), 0, true ) ); }

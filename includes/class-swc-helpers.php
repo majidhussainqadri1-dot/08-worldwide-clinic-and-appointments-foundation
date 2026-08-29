@@ -131,21 +131,36 @@ final class SWC_Helpers {
 
 	public static function can_doctor_manage( $appointment_id, $user_id = 0 ) {
 		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
-		return $user_id
-			&& self::TYPE === get_post_type( absint( $appointment_id ) )
+		if ( ! $user_id || ! class_exists( 'WCA_Authorization' ) ) {
+			return false;
+		}
+		$claims = WCA_Authorization::claims( $user_id );
+		if ( is_wp_error( $claims ) ) {
+			return false;
+		}
+		return self::TYPE === get_post_type( absint( $appointment_id ) )
 			&& absint( self::meta( $appointment_id, 'doctor_id' ) ) === $user_id
 			&& self::is_verified_doctor( $user_id );
 	}
 
 	public static function can_patient_manage( $appointment_id, $user_id = 0 ) {
 		$user_id = $user_id ? absint( $user_id ) : get_current_user_id();
-		return $user_id
-			&& self::TYPE === get_post_type( absint( $appointment_id ) )
+		if ( ! $user_id || ! class_exists( 'WCA_Authorization' ) ) {
+			return false;
+		}
+		$claims = WCA_Authorization::claims( $user_id );
+		if ( is_wp_error( $claims ) ) {
+			return false;
+		}
+		return self::TYPE === get_post_type( absint( $appointment_id ) )
 			&& absint( get_post_field( 'post_author', $appointment_id ) ) === $user_id;
 	}
 
 	public static function can_view( $id ) {
-		return self::can_patient_manage( $id ) || self::can_doctor_manage( $id ) || current_user_can( 'manage_worldwide_clinic' );
+		if ( ! class_exists( 'WCA_Authorization' ) ) {
+			return false;
+		}
+		return ! is_wp_error( WCA_Authorization::can_view_appointment( absint( $id ), get_current_user_id() ) );
 	}
 
 	public static function timezones() {
