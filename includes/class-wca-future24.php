@@ -236,11 +236,17 @@ final class WCA_Future24 {
 		return self::rate( $scope, $write ? 90 : 240, HOUR_IN_SECONDS );
 	}
 
+	private static function input_id( $data, $key, $required = true, $default = 0 ) {
+		if ( ! is_array( $data ) || ! array_key_exists( $key, $data ) ) { return $required ? new WP_Error( 'wca_future24_identifier', __( 'A required integer identifier is missing.', 'worldwide-clinic-appointments' ), array( 'status' => 400, 'field' => $key ) ) : $default; }
+		if ( ! $required && in_array( $data[ $key ], array( null, '', 0, '0' ), true ) ) { return 0; }
+		$id=WCA_Service::strict_id($data[$key]); return null===$id ? new WP_Error('wca_future24_identifier',__('Object identifiers must be positive integers.','worldwide-clinic-appointments'),array('status'=>400,'field'=>$key)) : $id;
+	}
+
 	/** Resolve patient/guardian scheduling intent and recheck File 00 age/guardian truth. */
 	private static function patient_context( $data, $actor = 0 ) {
 		$actor = absint( $actor ?: get_current_user_id() );
-		$patient_id  = absint( isset( $data['patient_user_id'] ) ? $data['patient_user_id'] : $actor );
-		$guardian_id = absint( isset( $data['guardian_user_id'] ) ? $data['guardian_user_id'] : 0 );
+		$patient_id=array_key_exists('patient_user_id',$data)?self::input_id($data,'patient_user_id'):$actor; if(is_wp_error($patient_id)){return $patient_id;}
+		$guardian_id=array_key_exists('guardian_user_id',$data)?self::input_id($data,'guardian_user_id',false,0):0; if(is_wp_error($guardian_id)){return $guardian_id;}
 		$guard = WCA_Authorization::guardian_context( $patient_id, $guardian_id, $actor );
 		if ( is_wp_error( $guard ) ) { return $guard; }
 		return array( 'patient_user_id' => $patient_id, 'guardian_user_id' => $guardian_id, 'actor_user_id' => $actor );
@@ -710,7 +716,7 @@ final class WCA_Future24 {
 	/* FUT-01 */
 	public static function join_waitlist( $data, $actor = 0 ) {
 		global $wpdb;
-		$clinic_id = absint( isset( $data['clinic_id'] ) ? $data['clinic_id'] : 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		if ( ! $clinic_id || ! WCA_Repository::get_clinic( $clinic_id, true ) ) { return new WP_Error( 'wca_waitlist_clinic', __( 'An active clinic is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$context = self::patient_context( $data, $actor );
 		if ( is_wp_error( $context ) ) { return $context; }
@@ -757,7 +763,7 @@ final class WCA_Future24 {
 	/* FUT-02 */
 	public static function save_windows( $data, $actor = 0 ) {
 		global $wpdb;
-		$clinic_id = absint( isset( $data['clinic_id'] ) ? $data['clinic_id'] : 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		if ( ! $clinic_id || ! WCA_Repository::get_clinic( $clinic_id, true ) ) {
 			return new WP_Error( 'wca_windows_clinic', __( 'An active clinic is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
@@ -774,15 +780,13 @@ final class WCA_Future24 {
 		$latest_end = 0;
 		$now = time();
 		foreach ( $raw_windows as $window ) {
-			if ( ! is_array( $window ) ) { continue; }
+			if ( ! is_array( $window ) ) { return new WP_Error( 'wca_windows_member_invalid', __( 'Every scheduling window must be a structured start/end object.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 			$start = self::utc( isset( $window['start'] ) ? $window['start'] : '' );
 			$end = self::utc( isset( $window['end'] ) ? $window['end'] : '' );
 			$start_ts = $start ? strtotime( $start . ' UTC' ) : 0;
 			$end_ts = $end ? strtotime( $end . ' UTC' ) : 0;
-			if ( $start && $end && $end > $start && $start_ts >= $now - 5 * MINUTE_IN_SECONDS && $end_ts > $now && $start_ts <= $now + 180 * DAY_IN_SECONDS && $end_ts - $start_ts <= 14 * DAY_IN_SECONDS ) {
-				$windows[] = $start . '/' . $end;
-				$latest_end = max( $latest_end, $end_ts );
-			}
+			if(!$start||!$end||$end<=$start||$start_ts<$now-5*MINUTE_IN_SECONDS||$end_ts<=$now||$start_ts>$now+180*DAY_IN_SECONDS||$end_ts-$start_ts>14*DAY_IN_SECONDS){return new WP_Error('wca_windows_member_invalid',__('Every scheduling window must be valid and within the supported horizon.','worldwide-clinic-appointments'),array('status'=>400));}
+			$windows[]=$start.'/'.$end; $latest_end=max($latest_end,$end_ts);
 		}
 		$windows = array_values( array_unique( $windows ) );
 		if ( ! $windows ) { return new WP_Error( 'wca_windows_required', __( 'At least one valid future appointment window is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
@@ -851,7 +855,7 @@ final class WCA_Future24 {
 
 	/* FUT-04 */
 	public static function create_resource( $data, $actor = 0 ) {
-		$clinic_id = absint( $data['clinic_id'] ?? 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$type = sanitize_key( $data['resource_type'] ?? 'room' );
@@ -913,7 +917,7 @@ self::release_semantic_lock( $lock );
 
 	/* FUT-05 */
 	public static function create_group_session( $data, $actor = 0 ) {
-		$clinic_id = absint( isset( $data['clinic_id'] ) ? $data['clinic_id'] : 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$start = self::utc( isset( $data['start_utc'] ) ? $data['start_utc'] : '' );
@@ -1070,7 +1074,7 @@ self::release_semantic_lock( $lock );
 
 	/* FUT-07 */
 	public static function set_buffers( $data, $actor = 0 ) {
-		$clinic_id = absint( isset( $data['clinic_id'] ) ? $data['clinic_id'] : 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$before = filter_var( isset( $data['buffer_before'] ) ? $data['buffer_before'] : 0, FILTER_VALIDATE_INT );
@@ -1356,15 +1360,15 @@ self::release_semantic_lock( $lock );
 
 	/* FUT-11 */
 	public static function save_questionnaire( $data, $actor = 0 ) {
-		$clinic_id = absint( $data['clinic_id'] ?? 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$service = self::service_for_clinic( $clinic_id, isset( $data['service_ref'] ) ? $data['service_ref'] : '' );
 		if ( is_wp_error( $service ) ) { return $service; }
 		$service_ref = $service ? strtolower( (string) $service['public_ref'] ) : '';
 		$allowed = array( 'reason', 'category', 'symptoms_summary', 'medications_summary', 'allergies_summary', 'accessibility_needs', 'preferred_language', 'notes' );
-		$fields = array_values( array_intersect( array_map( 'sanitize_key', (array) ( $data['fields'] ?? array() ) ), $allowed ) );
-		if ( ! $fields ) { return new WP_Error( 'wca_questionnaire_fields', __( 'At least one approved secure intake field is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$raw_fields=$data['fields']??null; if(!is_array($raw_fields)||!$raw_fields){return new WP_Error('wca_questionnaire_fields',__('At least one approved secure intake field is required.','worldwide-clinic-appointments'),array('status'=>400));}
+		$fields=array(); foreach($raw_fields as $field){if(!is_scalar($field)){return new WP_Error('wca_questionnaire_field_invalid',__('Questionnaire fields must be approved identifiers.','worldwide-clinic-appointments'),array('status'=>400));}$key=sanitize_key((string)$field);if(!in_array($key,$allowed,true)||in_array($key,$fields,true)){return new WP_Error('wca_questionnaire_field_invalid',__('Questionnaire contains an unsupported or duplicate field.','worldwide-clinic-appointments'),array('status'=>400));}$fields[]=$key;}
 		return self::put_record( 'F08-FUT-11', array( 'clinic_id' => $clinic_id, 'status' => 'template_active', 'payload' => array( 'service_ref' => $service_ref, 'fields' => $fields, 'answers_owner' => 'WCA_Continuity encrypted intake', 'automated_diagnosis' => false ) ), $actor );
 	}
 
@@ -1458,7 +1462,7 @@ self::release_semantic_lock( $lock );
 
 	/* FUT-13 */
 	public static function save_prerequisites( $data, $actor = 0 ) {
-		$clinic_id = absint( $data['clinic_id'] ?? 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$service_ref = strtolower( sanitize_text_field( $data['service_ref'] ?? '' ) );
@@ -1468,12 +1472,12 @@ self::release_semantic_lock( $lock );
 		if ( count( $raw_requirements ) > 20 ) { return new WP_Error( 'wca_prerequisite_rules_limit', __( 'No more than 20 prerequisite rules may be saved in one policy.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) ); }
 		$requirements = array();
 		foreach ( $raw_requirements as $item ) {
-			if ( ! is_array( $item ) ) { continue; }
+			if ( ! is_array( $item ) ) { return new WP_Error( 'wca_prerequisite_rule_invalid', __( 'Every prerequisite rule must be a structured object.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 			$type = sanitize_key( $item['type'] ?? 'document' );
 			$label = substr( sanitize_text_field( $item['label'] ?? '' ), 0, 120 );
-			if ( ! $label ) { continue; }
+			if ( ! $label ) { return new WP_Error( 'wca_prerequisite_rule_invalid', __( 'Each prerequisite rule requires a label.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 			$behavior = sanitize_key( $item['missing_behavior'] ?? ( $data['missing_behavior'] ?? 'provisional' ) );
-			if ( ! in_array( $behavior, array( 'provisional','block' ), true ) ) { $behavior = 'provisional'; }
+			if ( ! in_array( $behavior, array( 'provisional','block' ), true ) ) { return new WP_Error( 'wca_prerequisite_behavior_invalid', __( 'Prerequisite missing behavior must be provisional or block.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 			$requirements[] = array( 'key' => $type . ':' . $label, 'type' => $type, 'label' => $label, 'missing_behavior' => $behavior );
 		}
 		if ( ! $requirements ) { return new WP_Error( 'wca_prerequisite_rules_empty', __( 'At least one valid prerequisite rule is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
@@ -1617,7 +1621,7 @@ self::release_semantic_lock( $lock );
 
 	/* FUT-17 */
 	public static function create_disruption( $data, $actor = 0 ) {
-		$clinic_id = absint( $data['clinic_id'] ?? 0 );
+		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$start=self::utc($data['start_utc'] ?? ''); $end=self::utc($data['end_utc'] ?? '');

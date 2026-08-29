@@ -227,13 +227,13 @@ final class WCA_REST {
 	public static function submit_clinic_review( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'clinic_review', 20, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		return self::respond( WCA_Service::submit_clinic_for_review( absint( $request['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
+		return self::respond( WCA_Service::submit_clinic_for_review( absint( $request['id'] ), $request->get_param( 'expected_version' ) ) );
 	}
 
 	public static function activate_clinic( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'clinic_activate', 20, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		return self::respond( WCA_Service::activate_clinic( absint( $request['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
+		return self::respond( WCA_Service::activate_clinic( absint( $request['id'] ), $request->get_param( 'expected_version' ) ) );
 	}
 
 	public static function create_branch( WP_REST_Request $request ) {
@@ -246,14 +246,14 @@ final class WCA_REST {
 		$rate = self::rate_limit( 'service_mutation', 60, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) { return $rate; }
 		$data = self::data( $request );
-		return self::respond( WCA_Service::save_service( $data, absint( $data['service_id'] ?? 0 ), absint( $data['expected_version'] ?? 0 ) ), empty( $data['service_id'] ) ? 201 : 200 );
+		return self::respond( WCA_Service::save_service( $data, $data['service_id'] ?? 0, $data['expected_version'] ?? 0 ), empty( $data['service_id'] ) ? 201 : 200 );
 	}
 
 	public static function save_availability( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'availability_mutation', 60, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) { return $rate; }
 		$data = self::data( $request );
-		return self::respond( WCA_Service::set_availability( $data, absint( $data['rule_id'] ?? 0 ), absint( $data['expected_version'] ?? 0 ) ), empty( $data['rule_id'] ) ? 201 : 200 );
+		return self::respond( WCA_Service::set_availability( $data, $data['rule_id'] ?? 0, $data['expected_version'] ?? 0 ), empty( $data['rule_id'] ) ? 201 : 200 );
 	}
 
 	public static function slots( WP_REST_Request $request ) {
@@ -364,7 +364,7 @@ final class WCA_REST {
 
 	public static function complaint_detail( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_read',60,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} return self::respond(WCA_Service::complaint_projection($request['ref'],get_current_user_id())); }
 
-	public static function complaint_appeal( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_appeal',10,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} $data=self::data($request); return self::respond(self::protected_mutation_projection(WCA_Service::appeal_complaint($request['ref'],absint($data['expected_version']??0),get_current_user_id()),'complaint')); }
+	public static function complaint_appeal( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_appeal',10,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} $data=self::data($request); return self::respond(self::protected_mutation_projection(WCA_Service::appeal_complaint($request['ref'],$data['expected_version']??null,get_current_user_id()),'complaint')); }
 
 	public static function health() {
 		return self::respond( WCA_Observability::health() );

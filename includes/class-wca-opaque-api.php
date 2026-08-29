@@ -127,7 +127,7 @@ final class WCA_Opaque_API {
 		$read_error = WCA_Repository::consume_read_error();
 		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
-		return self::respond( WCA_Service::submit_clinic_for_review( absint( $clinic['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
+		return self::respond( WCA_Service::submit_clinic_for_review( absint( $clinic['id'] ), $request->get_param( 'expected_version' ) ) );
 	}
 
 	public static function activate_clinic( WP_REST_Request $request ) {
@@ -136,7 +136,7 @@ final class WCA_Opaque_API {
 		$read_error = WCA_Repository::consume_read_error();
 		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
-		return self::respond( WCA_Service::activate_clinic( absint( $clinic['id'] ), absint( $request->get_param( 'expected_version' ) ) ) );
+		return self::respond( WCA_Service::activate_clinic( absint( $clinic['id'] ), $request->get_param( 'expected_version' ) ) );
 	}
 
 	public static function strip_native_ids( $response, $server, $request ) {
