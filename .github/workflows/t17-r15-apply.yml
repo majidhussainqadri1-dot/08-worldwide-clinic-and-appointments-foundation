@@ -1,0 +1,44 @@
+name: File 08 T17 R15 Apply Frozen Capacity Ledger
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r15-apply.yml
+permissions:
+  contents: write
+jobs:
+  apply-correct-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze reviewed head
+        run: git rev-parse HEAD
+      - name: Apply complete frozen R15 defect ledger
+        run: python3 .github/scripts/t17-r15-capacity-correct.py
+      - name: Full source regression gate
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r15-php-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r15-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r15-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit only after full retest passes
+        run: |
+          set -euo pipefail
+          git config user.name 'Sabri File 08 Review Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-plan-guard.php includes/class-wca-repository.php includes/class-wca-service.php tests/run-all.php tests/seventeenth-r15-capacity-concurrency-regressions.php
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No R15 correction diff found.' >&2
+            exit 1
+          fi
+          git commit -m 'fix(file08): enforce capacity-aware slot concurrency and buffers'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+          git rev-parse HEAD
