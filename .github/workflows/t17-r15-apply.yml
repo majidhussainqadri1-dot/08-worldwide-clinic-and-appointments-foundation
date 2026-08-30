@@ -25,14 +25,19 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          p = Path('tests/second-ten-review-regressions.php')
-          s = p.read_text()
-          old = 's210has(\'core schema unchanged\',$contracts,"SCHEMA_VERSION                  = \'3.2.0\'");'
-          new = 's210has(\'core schema current\',$contracts,"SCHEMA_VERSION                  = \'3.3.0\'");'
-          if new not in s:
-              if s.count(old) != 1:
-                  raise SystemExit('R15 historical schema assertion anchor is not unique')
-              p.write_text(s.replace(old, new, 1))
+          # Historical source-contract gates that deliberately froze schema 3.2.0
+          # are advanced together because R15 intentionally adds canonical slot
+          # capacity/buffer evidence and therefore requires schema 3.3.0.
+          old_schema = "SCHEMA_VERSION                  = '3.2.0'"
+          new_schema = "SCHEMA_VERSION                  = '3.3.0'"
+          changed = 0
+          for p in Path('tests').glob('*.php'):
+              s = p.read_text()
+              if old_schema in s:
+                  p.write_text(s.replace(old_schema, new_schema))
+                  changed += 1
+          if changed < 1:
+              raise SystemExit('R15 expected at least one historical 3.2.0 schema assertion')
 
           p = Path('tests/seventeenth-r15-capacity-concurrency-regressions.php')
           s = p.read_text()
@@ -57,7 +62,7 @@ jobs:
           set -euo pipefail
           git config user.name 'Sabri File 08 Review Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-plan-guard.php includes/class-wca-repository.php includes/class-wca-service.php tests/run-all.php tests/second-ten-review-regressions.php tests/seventeenth-r15-capacity-concurrency-regressions.php
+          git add includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-plan-guard.php includes/class-wca-repository.php includes/class-wca-service.php tests/
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'No R15 correction diff found.' >&2
