@@ -312,7 +312,8 @@ final class WCA_Continuity {
 		$table = WCA_Schema::tables()['consents'];
 		$result = WCA_Repository::transaction( function () use ( $table, $appointment_id, $scope, $actor_user_id ) {
 			global $wpdb;
-			$changed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',revoked_at=%s WHERE appointment_id=%d AND scope=%s AND actor_user_id=%d AND status='granted'", WCA_Repository::now(), $appointment_id, $scope, $actor_user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			// Withdrawal is scope-wide for the appointment: the current patient/current verified guardian may revoke a grant created by a prior authorized actor.
+			$changed = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',revoked_at=%s WHERE appointment_id=%d AND scope=%s AND status='granted'", WCA_Repository::now(), $appointment_id, $scope ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( false === $changed ) { return new WP_Error( 'wca_consent_revoke', __( 'Consent could not be revoked.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			if ( 0 === (int) $changed ) { return new WP_Error( 'wca_consent_not_active', __( 'No active consent matched this revocation request.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 			$event = WCA_Repository::append_event( 'AppointmentConsentRevoked.v1', 'appointment', self::appointment_ref( $appointment_id ), array( 'appointment_ref' => self::appointment_ref( $appointment_id ), 'scope' => $scope ), $actor_user_id, WCA_Observability::trace_id() );
@@ -881,7 +882,15 @@ final class WCA_Continuity {
 	private static function patient_id( $appointment_id ) { return absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ); }
 	private static function appointment_ref( $appointment_id ) { $ref=(string)SWC_Helpers::meta(absint($appointment_id),'public_ref',''); return preg_match('/^[0-9a-f-]{36}$/i',$ref)?strtolower($ref):''; }
 	private static function appointment_id( $ref ) { $ref=sanitize_text_field($ref); if(!preg_match('/^[0-9a-f-]{36}$/i',$ref)){return 0;} $ids=get_posts(array('post_type'=>SWC_Helpers::TYPE,'post_status'=>'any','fields'=>'ids','posts_per_page'=>2,'no_found_rows'=>true,'meta_key'=>'_swc_public_ref','meta_value'=>$ref)); if(1!==count($ids)){$ids=get_posts(array('post_type'=>SWC_Helpers::TYPE,'post_status'=>'any','fields'=>'ids','posts_per_page'=>2,'no_found_rows'=>true,'meta_key'=>'public_ref','meta_value'=>$ref));} return 1===count($ids)?absint($ids[0]):0; }
-	private static function followup_actor_allowed( $appointment_id, $user_id ) { $user_id=absint($user_id); if('doctor'===WCA_Authorization::appointment_actor($appointment_id,$user_id)){return true;} $clinic_id=absint(SWC_Helpers::meta($appointment_id,'clinic_id',0)); $delegated=(array)get_user_meta($user_id,'_wca_clinic_delegations',true); $entry=isset($delegated[$clinic_id])&&is_array($delegated[$clinic_id])?$delegated[$clinic_id]:array(); $allowed=!empty($entry['active'])&&(!empty($entry['clinical_followup'])||!empty($entry['clinical'])); return (bool)apply_filters('wca_followup_actor_allowed',$allowed,$appointment_id,$user_id); }
+	private static function followup_actor_allowed( $appointment_id, $user_id ) {
+		$user_id = absint( $user_id );
+		$claims = WCA_Authorization::claims( $user_id );
+		if ( is_wp_error( $claims ) ) { return false; }
+		if ( 'doctor' === WCA_Authorization::appointment_actor( $appointment_id, $user_id ) ) { return true; }
+		$allowed = WCA_Authorization::can_staff_access_appointment( $appointment_id, $user_id, 'clinical_followup' );
+		$filtered = (bool) apply_filters( 'wca_followup_actor_allowed', $allowed, $appointment_id, $user_id );
+		return $allowed && $filtered;
+	}
 	private static function legal_hold( $type, $row ) { return (bool)apply_filters('wca_continuity_legal_hold',false,sanitize_key($type),(array)$row); }
 	private static function not_found() { return new WP_Error('wca_appointment_not_found',__('Appointment was not found.','worldwide-clinic-appointments'),array('status'=>404)); }
 

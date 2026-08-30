@@ -128,10 +128,12 @@ final class WCA_Authorization {
 		if ( is_wp_error( $claims ) ) { return $claims; }
 		if ( SWC_Helpers::can_patient_manage( $appointment_id, $user_id ) || SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) { return true; }
 		$guardian_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );
-		if ( $guardian_id === $user_id && ! empty( $claims['guardian'] ) ) {
+		if ( ! empty( $claims['guardian'] ) && class_exists( 'WCA_Central_Governance' ) ) {
 			$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
-			$guardian = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_id, $guardian_id, $user_id ) : true;
-			return is_wp_error( $guardian ) ? $guardian : true;
+			$guardian = WCA_Central_Governance::validate_patient_guardian( $patient_id, $user_id, $user_id );
+			if ( ! is_wp_error( $guardian ) ) { return true; }
+			// A guardian stored on the appointment must fail closed if File 00 no longer confirms the relationship.
+			if ( $guardian_id === $user_id ) { return $guardian; }
 		}
 		if ( self::can_staff_access_appointment( $appointment_id, $user_id, 'appointments' ) ) {
 			return true;
@@ -174,7 +176,12 @@ final class WCA_Authorization {
 		if ( user_can( $user_id, 'manage_worldwide_clinic' ) ) { return 'admin'; }
 		if ( SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) { return 'doctor'; }
 		if ( self::can_staff_access_appointment( $appointment_id, $user_id, 'appointments' ) ) { return 'clinic_staff'; }
-		if ( absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) ) === $user_id ) { return 'guardian'; }
+		$claims = self::claims( $user_id );
+		if ( ! is_wp_error( $claims ) && ! empty( $claims['guardian'] ) && class_exists( 'WCA_Central_Governance' ) ) {
+			$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
+			$guardian = WCA_Central_Governance::validate_patient_guardian( $patient_id, $user_id, $user_id );
+			if ( ! is_wp_error( $guardian ) ) { return 'guardian'; }
+		}
 		return 'patient';
 	}
 
@@ -186,6 +193,8 @@ final class WCA_Authorization {
 		$user_id   = absint( $user_id ?: get_current_user_id() );
 		$clinic_id = absint( SWC_Helpers::meta( $appointment_id, 'clinic_id', 0 ) );
 		if ( ! $user_id || ! $clinic_id ) { return false; }
+		$claims = self::claims( $user_id );
+		if ( is_wp_error( $claims ) ) { return false; }
 		$entry = self::clinic_delegation( $user_id, $clinic_id );
 		return $entry ? self::delegation_allows_scope( $entry, sanitize_key( $scope ) ) : false;
 	}
@@ -193,6 +202,8 @@ final class WCA_Authorization {
 	/** @return array<int,int> */
 	public static function delegated_clinic_ids( $user_id = 0, $scope = 'appointments' ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
+		$claims = self::claims( $user_id );
+		if ( is_wp_error( $claims ) ) { return array(); }
 		$out = array();
 		foreach ( self::delegations( $user_id ) as $clinic_id => $entry ) {
 			$clinic_id = absint( $clinic_id );
@@ -225,7 +236,7 @@ final class WCA_Authorization {
 	public static function has_active_clinic_delegation( $user_id = 0 ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
 		foreach ( self::delegations( $user_id ) as $entry ) {
-			if ( is_array( $entry ) && ! empty( $entry['active'] ) ) { return true; }
+			if ( self::delegation_is_current( $entry ) ) { return true; }
 		}
 		return false;
 	}
@@ -236,15 +247,34 @@ final class WCA_Authorization {
 		return is_array( $value ) ? $value : array();
 	}
 
+	private static function delegation_is_current( $entry ) {
+		if ( ! is_array( $entry ) || empty( $entry['active'] ) || ! empty( $entry['revoked_at'] ) || ! empty( $entry['revoked'] ) ) { return false; }
+		$status = isset( $entry['status'] ) ? sanitize_key( $entry['status'] ) : '';
+		if ( $status && ! in_array( $status, array( 'active', 'granted' ), true ) ) { return false; }
+		$starts = trim( (string) ( $entry['starts_at_utc'] ?? $entry['starts_at'] ?? '' ) );
+		if ( $starts ) {
+			$starts_ts = strtotime( $starts );
+			if ( false === $starts_ts || $starts_ts > time() ) { return false; }
+		}
+		$expires = trim( (string) ( $entry['expires_at_utc'] ?? $entry['expires_at'] ?? '' ) );
+		if ( '' === $expires ) {
+			// Legacy indefinite grants are denied unless an authoritative compatibility adapter proves currentness.
+			return true === apply_filters( 'wca_legacy_clinic_delegation_is_current', false, $entry );
+		}
+		$expires_ts = strtotime( $expires );
+		if ( false === $expires_ts || $expires_ts <= time() ) { return false; }
+		return true;
+	}
+
 	/** @return array<string,mixed> */
 	private static function clinic_delegation( $user_id, $clinic_id ) {
 		$all = self::delegations( absint( $user_id ) );
 		$entry = isset( $all[ absint( $clinic_id ) ] ) && is_array( $all[ absint( $clinic_id ) ] ) ? $all[ absint( $clinic_id ) ] : array();
-		return ! empty( $entry['active'] ) ? $entry : array();
+		return self::delegation_is_current( $entry ) ? $entry : array();
 	}
 
 	private static function delegation_allows_scope( $entry, $scope ) {
-		if ( ! is_array( $entry ) || empty( $entry['active'] ) ) { return false; }
+		if ( ! self::delegation_is_current( $entry ) ) { return false; }
 		$scope = sanitize_key( $scope );
 		$scopes = isset( $entry['scopes'] ) && is_array( $entry['scopes'] ) ? array_map( 'sanitize_key', $entry['scopes'] ) : array();
 		$direct = ! empty( $entry[ $scope ] ) || in_array( $scope, $scopes, true );
