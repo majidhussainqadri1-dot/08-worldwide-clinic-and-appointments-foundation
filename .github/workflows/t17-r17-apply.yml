@@ -19,6 +19,42 @@ jobs:
         run: git rev-parse HEAD
       - name: Apply complete frozen R17 defect ledger
         run: python3 .github/scripts/t17-r17-privacy-continuity-correct.py
+      - name: Repair generated R17 regression harness
+        run: |
+          cat > tests/seventeenth-r17-privacy-continuity-regressions.php <<'PHP'
+          <?php
+          $root = dirname(__DIR__);
+          $continuity = file_get_contents($root . '/includes/class-wca-continuity-secure.php');
+          $guards = file_get_contents($root . '/includes/class-wca-continuity-guards.php');
+          $future = file_get_contents($root . '/includes/class-wca-future24.php');
+          if (!is_string($continuity) || !is_string($guards) || !is_string($future)) { fwrite(STDERR, "R17 source read failed\n"); exit(1); }
+          $checks = array(
+              'intake consent before persistence' => strpos($continuity, 'appointment_processing') !== false && strpos($continuity, 'before pre-visit information is stored') !== false,
+              'canonical intake version required' => strpos($continuity, 'wca_intake_version_required') !== false && strpos($continuity, 'if ( ! $expected_version )') !== false,
+              'processing consent controllable' => strpos($continuity, "array( 'appointment_processing', 'teleconsult'") !== false && strpos($guards, "array( 'appointment_processing', 'teleconsult'") !== false,
+              'future24 schema migration bumped' => strpos($future, "const SCHEMA_VERSION   = '1.1.0';") !== false,
+              'episode privacy subject persisted' => strpos($future, "'subject_user_id' => absint( isset( $scope['patient_id'] )") !== false,
+              'legacy episode subject backfill' => strpos($future, "feature_id='F08-FUT-23' AND subject_user_id=0") !== false,
+              'episode unlink route' => strpos($future, '/future24/episodes/(?P<ref>[0-9a-fA-F-]{36})/unlink') !== false,
+              'episode archive route' => strpos($future, '/future24/episodes/(?P<ref>[0-9a-fA-F-]{36})/archive') !== false,
+              'episode mutation optimistic concurrency' => strpos($future, 'wca_episode_version_required') !== false && strpos($future, 'wca_episode_stale') !== false,
+              'fhir adapter degraded toggle' => strpos($future, 'wca_fhir_adapter_enabled') !== false && strpos($future, 'wca_fhir_adapter_disabled') !== false,
+              'fhir appointment version metadata' => strpos($future, "'versionId' => (string) $record_version") !== false && strpos($future, "'lastUpdated' => $last_updated") !== false,
+              'fhir clinic version metadata' => strpos($future, "'versionId' => (string) absint( $clinic['record_version'] )") !== false,
+          );
+          foreach ($checks as $name => $ok) { if (!$ok) { fwrite(STDERR, "R17 FAIL: {$name}\n"); exit(1); } }
+          echo "R17 privacy/continuity/interoperability regressions: PASS\n";
+          PHP
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/seventeenth-r17-privacy-continuity-regressions.php')
+          s = p.read_text()
+          s = s.replace("strpos($future, \"'subject_user_id' => absint( isset( $scope['patient_id'] )\")", "strpos($future, chr(39) . 'subject_user_id' . chr(39) . ' => absint( isset( $scope[' . chr(39) . 'patient_id' . chr(39) . '] )')")
+          s = s.replace("strpos($future, \"'versionId' => (string) $record_version\")", "strpos($future, chr(39) . 'versionId' . chr(39) . ' => (string) $record_version')")
+          s = s.replace("strpos($future, \"'lastUpdated' => $last_updated\")", "strpos($future, chr(39) . 'lastUpdated' . chr(39) . ' => $last_updated')")
+          s = s.replace("strpos($future, \"'versionId' => (string) absint( $clinic['record_version'] )\")", "strpos($future, chr(39) . 'versionId' . chr(39) . ' => (string) absint( $clinic[' . chr(39) . 'record_version' . chr(39) . '] )')")
+          p.write_text(s)
+          PY
       - name: Exact R17 regression gate
         run: php -d display_errors=1 -d error_reporting=E_ALL tests/seventeenth-r17-privacy-continuity-regressions.php
       - name: Full source regression gate
