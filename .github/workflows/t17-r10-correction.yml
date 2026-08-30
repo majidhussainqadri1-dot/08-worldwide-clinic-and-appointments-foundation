@@ -1,0 +1,88 @@
+name: File 08 T17 R10 Frozen-Ledger Correction
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r10-correction.yml
+permissions:
+  contents: write
+jobs:
+  correct-and-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze exact pre-correction head
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+      - name: Apply complete frozen R10 correction set
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('includes/class-wca-service.php')
+          s = p.read_text()
+          old = "\t\t$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $actor_user_id );"
+          new = "\t\t$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $patient_user_id );"
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one guardian hold owner call, found {s.count(old)}')
+          p.write_text(s.replace(old, new, 1))
+
+          test = Path('tests/seventeenth-r10-slot-guardian-regressions.php')
+          test.write_text(r'''<?php
+$service = file_get_contents( __DIR__ . '/../includes/class-wca-service.php' );
+$guard   = file_get_contents( __DIR__ . '/../includes/class-wca-plan-guard.php' );
+if ( false === $service || false === $guard ) { fwrite( STDERR, "R10 sources missing.\n" ); exit( 1 ); }
+$required = array(
+    'WCA_Plan_Guard::canonical_slot_hold( $data, $patient_user_id )',
+    'WCA_Authorization::guardian_context( $patient_user_id, $guardian_user_id, $actor_user_id )',
+    "validate_bookable_hold( $hold, $patient_user_id )",
+    "'patient_user_id' => absint( $patient_user_id )",
+);
+foreach ( $required as $needle ) {
+    $haystack = false !== strpos( $needle, "'patient_user_id'") ? $guard : $service;
+    if ( false === strpos( $haystack, $needle ) ) { fwrite( STDERR, "R10 regression missing: {$needle}\n" ); exit( 1 ); }
+}
+if ( false !== strpos( $service, 'WCA_Plan_Guard::canonical_slot_hold( $data, $actor_user_id )' ) ) {
+    fwrite( STDERR, "R10 guardian actor is still being persisted as slot patient owner.\n" ); exit( 1 );
+}
+echo "T17 R10 guardian slot ownership regressions passed.\n";
+''')
+
+          run = Path('tests/run-all.php')
+          r = run.read_text()
+          marker = "'seventeenth-r8-privacy-legal-hold-regressions.php'"
+          addition = marker + ", 'seventeenth-r10-slot-guardian-regressions.php'"
+          if 'seventeenth-r10-slot-guardian-regressions.php' not in r:
+              if r.count(marker) != 1:
+                  raise SystemExit('run-all R8 marker not unique')
+              r = r.replace(marker, addition, 1)
+              run.write_text(r)
+          PY
+      - name: R10 full correction retest
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r10-correction-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r10-correction-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r10-correction-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit correction only after full retest passes
+        run: |
+          set -euo pipefail
+          git config user.name 'Sabri File 08 Review Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add includes/class-wca-service.php tests/run-all.php tests/seventeenth-r10-slot-guardian-regressions.php
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No R10 source correction diff found.' >&2
+            exit 1
+          fi
+          git commit -m 'fix(file08): preserve patient ownership for guardian slot holds'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+          git rev-parse HEAD
