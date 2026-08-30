@@ -1,0 +1,8 @@
+.wca-future24{display:grid;gap:1rem;max-width:72rem;margin-inline:auto}
+.wca-future24 h2,.wca-future24 h3{margin-block:.25rem}
+.wca-future24 [data-wca-f24-readiness],.wca-future24 [data-wca-f24-family]{padding:1rem;border:1px solid currentColor;border-radius:.75rem}
+.wca-future24 [data-wca-status]{min-height:1.5em}
+.wca-future24 [data-wca-status].is-error{font-weight:700}
+@media (prefers-reduced-motion:reduce){.wca-future24 *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+@media (forced-colors:active){.wca-future24 [data-wca-f24-readiness],.wca-future24 [data-wca-f24-family]{border:1px solid CanvasText}}
+[dir="rtl"] .wca-future24{text-align:right}

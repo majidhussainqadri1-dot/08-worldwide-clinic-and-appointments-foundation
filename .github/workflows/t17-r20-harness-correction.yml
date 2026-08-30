@@ -1,0 +1,55 @@
+name: File 08 T17 R20 Harness Correction
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r20-harness-correction.yml
+permissions:
+  contents: write
+jobs:
+  correct-frozen-r20-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - name: Apply only the frozen R20 harness corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/t17-r6-r20-resume.yml')
+          s = p.read_text()
+
+          cleanup_anchor = "          cat build/t17-r19-a/*-candidate.sha256\n"
+          cleanup_replacement = cleanup_anchor + "          rm -rf build/t17-r19-a build/t17-r19-b\n"
+          if cleanup_replacement not in s:
+              if cleanup_anchor not in s:
+                  raise SystemExit('R19 cleanup anchor missing')
+              s = s.replace(cleanup_anchor, cleanup_replacement, 1)
+
+          old = "          ! grep -RInE \"permission_callback[[:space:]]*=>[[:space:]]*['\\\"]__return_true['\\\"]\" includes --include='*.php'\n"
+          new = """          mapfile -t public_callbacks < <(grep -RInE \"permission_callback[[:space:]]*=>[[:space:]]*['\\\"]__return_true['\\\"]\" includes --include='*.php' || true)\n          test \"${#public_callbacks[@]}\" -eq 9\n          test \"$(grep -Ec \"permission_callback[[:space:]]*=>[[:space:]]*['\\\"]__return_true['\\\"]\" includes/class-wca-calendar-link.php)\" -eq 2\n          test \"$(grep -Ec \"permission_callback[[:space:]]*=>[[:space:]]*['\\\"]__return_true['\\\"]\" includes/class-wca-central-governance.php)\" -eq 2\n          test \"$(grep -Ec \"permission_callback[[:space:]]*=>[[:space:]]*['\\\"]__return_true['\\\"]\" includes/class-wca-rest.php)\" -eq 4\n          test \"$(grep -Ec \"permission_callback[[:space:]]*=>[[:space:]]*['\\\"]__return_true['\\\"]\" includes/class-wca-ten-review-hardening.php)\" -eq 1\n          test -z \"$(printf '%s\\n' \"${public_callbacks[@]}\" | grep -Ev '^(includes/class-wca-calendar-link.php|includes/class-wca-central-governance.php|includes/class-wca-rest.php|includes/class-wca-ten-review-hardening.php):' || true)\"\n          grep -q 'wca_calendar_provider_verify_webhook' includes/class-wca-calendar-link.php\n          grep -q 'hash_equals( $expected, $sig )' includes/class-wca-calendar-link.php\n          grep -q 'WCA_Service::public_clinic_projection' includes/class-wca-central-governance.php\n          grep -q \"rate_limit( 'public_clinics'\" includes/class-wca-rest.php\n          grep -q \"rate_limit( 'public_clinic'\" includes/class-wca-rest.php\n          grep -q \"rate_limit( 'slot_search'\" includes/class-wca-rest.php\n          grep -q \"rate_limit_hit( 'tenreview_slot_search'\" includes/class-wca-ten-review-hardening.php\n"""
+          if new not in s:
+              if old not in s:
+                  raise SystemExit('R20 permission gate anchor missing')
+              s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+          git diff --check
+          git diff -- .github/workflows/t17-r6-r20-resume.yml
+      - name: Commit corrected review harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .github/workflows/t17-r6-r20-resume.yml
+          git diff --cached --check
+          git commit -m 'fix(review): close frozen T17 R20 harness defects'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026

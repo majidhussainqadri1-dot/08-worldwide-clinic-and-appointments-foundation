@@ -1,0 +1,95 @@
+name: File 08 T17 R15 Apply Frozen Capacity Ledger
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r15-apply.yml
+permissions:
+  contents: write
+jobs:
+  apply-correct-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze reviewed head
+        run: git rev-parse HEAD
+      - name: Apply complete frozen R15 defect ledger
+        run: python3 .github/scripts/t17-r15-capacity-correct.py
+      - name: Update regression gates for intentional schema migration
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old_schema = "SCHEMA_VERSION                  = '3.2.0'"
+          new_schema = "SCHEMA_VERSION                  = '3.3.0'"
+          changed = 0
+          for p in Path('tests').glob('*.php'):
+              s = p.read_text()
+              if old_schema in s:
+                  p.write_text(s.replace(old_schema, new_schema))
+                  changed += 1
+          if changed < 1:
+              raise SystemExit('R15 expected at least one historical 3.2.0 schema assertion')
+
+          p = Path('tests/fifteenth-twenty-review-regressions.php')
+          s = p.read_text()
+          replacements = {
+              "t15h('R1 active hold read fails closed','includes/class-wca-service.php',\"return (bool) \\$hold_id;\");":
+              "t15h('R1 active hold read fails closed','includes/class-wca-service.php',\"return is_wp_error( \\$available ) || ! \\$available;\");",
+              "t15h('R1 slot conflict query failure explicit','includes/class-wca-repository.php','wca_slot_conflict_query_failed');":
+              "t15h('R1 slot capacity query failure explicit','includes/class-wca-repository.php','wca_slot_capacity_count_failed');",
+          }
+          for old, new in replacements.items():
+              if new not in s:
+                  if s.count(old) != 1:
+                      raise SystemExit('R15 historical fail-closed assertion anchor is not unique: ' + old)
+                  s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('tests/sixteenth-twenty-review-regressions.php')
+          s = p.read_text()
+          old = "t16h('R13 atomic hold rechecks buffered conflict window','includes/class-wca-repository.php','$conflict_duration = max');"
+          new = "t16h('R13 atomic hold rechecks stored buffered conflict window','includes/class-wca-repository.php','DATE_SUB(start_utc, INTERVAL buffer_before MINUTE)');"
+          if new not in s:
+              if s.count(old) != 1:
+                  raise SystemExit('R15 historical buffered-conflict assertion anchor is not unique')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('tests/seventeenth-r15-capacity-concurrency-regressions.php')
+          s = p.read_text()
+          old = '"SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN (\'held\',\'booked\') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1"'
+          new = '"SELECT id FROM {\\$table} WHERE doctor_user_id=%d AND status IN (\'held\',\'booked\') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1"'
+          if new not in s:
+              if s.count(old) != 1:
+                  raise SystemExit('R15 generated regression interpolation anchor is not unique')
+              p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Full source regression gate
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r15-php-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r15-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r15-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit only after full retest passes
+        run: |
+          set -euo pipefail
+          git config user.name 'Sabri File 08 Review Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-plan-guard.php includes/class-wca-repository.php includes/class-wca-service.php tests/
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No R15 correction diff found.' >&2
+            exit 1
+          fi
+          git commit -m 'fix(file08): enforce capacity-aware slot concurrency and buffers'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+          git rev-parse HEAD

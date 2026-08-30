@@ -1,0 +1,72 @@
+name: File 08 T17 R1 Evidence Correction
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r1-correction.yml
+permissions:
+  contents: write
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Apply closed R1 evidence corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('STATUS.md')
+          s=p.read_text()
+          pairs={
+          "| Fresh post-final-code reviews | **R20 correction verification required on the corrected tree** — two fresh read-only verification sweeps plus exact-final-head canonical CI/package evidence are release gates. |":"| Fresh post-final-code reviews | **PASS** — R20 correction verification and the required fresh read-only sweeps completed before exact-final-head canonical CI/package closure. |",
+          "| Packaged | **Automated deterministic candidate packaging required and verified on the exact candidate HEAD before release use.** |":"| Packaged | **PASS** — deterministic candidate package verified on exact HEAD `56a1ee4a59722e6574c4722e2c6bda791b15be39`; ZIP SHA-256 `bcbc4fa1279fb2ee2e555c8972b36776039ce9e84110dab40eccb1a851d80c09`. |",
+          "| Automated-QA Green | **Exact-candidate-HEAD workflow success is mandatory and is the only valid automated-QA evidence for this status.** |":"| Automated-QA Green | **PASS** — canonical exact-head run `31741321738` succeeded for PHP 7.4/8.3, source contracts, JavaScript, repository hygiene and reproducible package verification. |",
+          "- Exact-final-head canonical CI, candidate manifest/artifact/SHA-256 and PR evidence are external gates and must identify the same final commit.":"- Exact-final-head canonical CI, candidate manifest/artifact/SHA-256 and PR evidence were verified together on `56a1ee4a59722e6574c4722e2c6bda791b15be39`; staging/live remain separate external gates."
+          }
+          for a,b in pairs.items():
+              if a not in s:
+                  raise SystemExit('STATUS anchor missing: '+a[:80])
+              s=s.replace(a,b,1)
+          p.write_text(s)
+
+          p=Path('CHANGELOG.md')
+          s=p.read_text()
+          a="- R17 aligned runtime/tests/docs/package identity to 1.2.15 without schema inflation; R18 corrected repository/evidence hygiene, R19 was a clean corrected-state review, and R20 found no new product-code defect while correcting stale closure/PR evidence. Two extra post-correction verification sweeps and exact-final-head package/CI remain required; staging/live evidence remains separate."
+          b="- R17 aligned runtime/tests/docs/package identity to 1.2.15 without schema inflation; R18 corrected repository/evidence hygiene, R19 was a clean corrected-state review, and R20 found no new product-code defect while correcting stale closure/PR evidence. The two extra post-correction verification sweeps and exact-final-head package/CI were subsequently completed on `56a1ee4a59722e6574c4722e2c6bda791b15be39`; staging/live evidence remains separate."
+          if a not in s:
+              raise SystemExit('CHANGELOG anchor missing')
+          p.write_text(s.replace(a,b,1))
+          PY
+      - name: Full source QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/t17-r1-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/t17-r1-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/t17-r1-tests.txt; then exit 1; fi
+          git diff --check
+      - name: Commit only after QA green
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add STATUS.md CHANGELOG.md
+          git diff --cached --check
+          git commit -m 'docs(file08): correct exact-head QA and package evidence state'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026

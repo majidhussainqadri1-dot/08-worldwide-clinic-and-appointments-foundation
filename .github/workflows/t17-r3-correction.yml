@@ -1,0 +1,85 @@
+name: File 08 T17 R3 Post-Review Correction
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r3-correction.yml
+permissions:
+  contents: write
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: codex/file08-new-governing-plans-completion-2026
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Apply frozen R3 authorization correction batch
+        run: python3 tools/t17-r3-correct.py
+      - name: Add permanent R3 authorization regression gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > tests/seventeenth-r3-authorization-regressions.php <<'PHP'
+          <?php
+          $root = dirname( __DIR__ );
+          $helpers = file_get_contents( $root . '/includes/class-swc-helpers.php' );
+          $appointments = file_get_contents( $root . '/includes/class-swc-appointments.php' );
+          $legacy_admin = file_get_contents( $root . '/includes/class-swc-admin.php' );
+          $admin = file_get_contents( $root . '/includes/class-wca-admin.php' );
+          $continuity = file_get_contents( $root . '/includes/class-wca-continuity-secure.php' );
+          $assertions = array(
+              'legacy doctor management revalidates central claims' => substr_count( $helpers, 'WCA_Authorization::claims( $user_id )' ) >= 2,
+              'legacy patient management revalidates central claims' => false !== strpos( $helpers, 'public static function can_patient_manage' ) && false !== strpos( $helpers, 'return ! is_wp_error( WCA_Authorization::can_view_appointment' ),
+              'legacy booking revalidates membership claims' => false !== strpos( $appointments, 'WCA_Authorization::claims( $user_id )' ),
+              'legacy booking enforces patient guardian context' => false !== strpos( $appointments, 'WCA_Authorization::guardian_context( $user_id, 0, $user_id )' ),
+              'legacy clinic admin revalidates File 00 claims' => false !== strpos( $legacy_admin, 'WCA_Authorization::claims( get_current_user_id() )' ),
+              'legacy clinic admin requires step up' => false !== strpos( $legacy_admin, "require_step_up( 'appointment_operations'" ),
+              'operations page revalidates File 00 claims' => false !== strpos( $admin, 'WCA_Authorization::claims( get_current_user_id() )' ),
+              'operations mutation requires step up' => false !== strpos( $admin, "require_step_up( 'clinic_operations'" ),
+              'continuity operations health revalidates File 00 claims' => false !== strpos( $continuity, 'wca_admin_membership' ) && false !== strpos( $continuity, 'WCA_Authorization::claims( get_current_user_id() )' ),
+              'legacy can_view no longer trusts native capability alone' => false === strpos( $helpers, "self::can_patient_manage( \$id ) || self::can_doctor_manage( \$id ) || current_user_can( 'manage_worldwide_clinic' )" ),
+          );
+          $failed = array_keys( array_filter( $assertions, static function ( $ok ) { return ! $ok; } ) );
+          foreach ( $assertions as $name => $ok ) { echo ( $ok ? '[PASS] ' : '[FAIL] ' ) . $name . PHP_EOL; }
+          if ( $failed ) { fwrite( STDERR, 'R3 authorization regression failures: ' . implode( ', ', $failed ) . PHP_EOL ); exit( 1 ); }
+          echo 'R3 authorization assertions: ' . count( $assertions ) . '/' . count( $assertions ) . ' PASS' . PHP_EOL;
+          PHP
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/run-all.php'); s=p.read_text()
+          needle="'seventeenth-twenty-review-regressions.php'"
+          if "'seventeenth-r3-authorization-regressions.php'" not in s:
+              if needle not in s: raise SystemExit('run-all anchor missing')
+              s=s.replace(needle, needle + ", 'seventeenth-r3-authorization-regressions.php'", 1)
+              p.write_text(s)
+          PY
+      - name: Full warning-free QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/t17-r3-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/t17-r3-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          if grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/t17-r3-tests.txt; then exit 1; fi
+          git diff --check
+      - name: Commit corrected product only after QA green
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f T17-R3-QA-FAILURE.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add includes/class-swc-helpers.php includes/class-swc-appointments.php includes/class-swc-admin.php includes/class-wca-admin.php includes/class-wca-continuity-secure.php tests/run-all.php tests/seventeenth-r3-authorization-regressions.php
+          git add -A T17-R3-QA-FAILURE.txt
+          git diff --cached --check
+          git commit -m 'fix(file08): close legacy and operations authorization bypasses'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026

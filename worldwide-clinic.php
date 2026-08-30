@@ -1,0 +1,127 @@
+<?php
+/**
+ * Plugin Name: Worldwide Clinic and Appointments
+ * Plugin URI: https://www.sabrihomeopathy.com/
+ * Description: Canonical worldwide clinic identity, branches, services, fees, availability, slot holds, appointments, consent, lifecycle, calendar, complaints, review eligibility, privacy, observability, migration, secure continuity, and Future Clinic Intelligence & Interoperability 24 for the Sabri Social Homeopathy Platform.
+ * Version: 1.2.15
+ * Requires at least: 6.6
+ * Requires PHP: 7.4
+ * Author: Dr. Allamah Majid Hussain Sabri Muhaddith Mursheed
+ * License: GPL-2.0-or-later
+ * Text Domain: worldwide-clinic-appointments
+ * Domain Path: /languages
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+define( 'WCA_VERSION', '1.2.15' );
+define( 'WCA_FILE', __FILE__ );
+define( 'WCA_DIR', plugin_dir_path( __FILE__ ) );
+define( 'WCA_URL', plugin_dir_url( __FILE__ ) );
+
+// Stable compatibility aliases for the audited foundation.
+define( 'SWC_VERSION', WCA_VERSION );
+define( 'SWC_PUBLIC_CLINIC_CONTRACT_VERSION', '1.1.0' );
+define( 'SWC_CF01_CARE_CONTEXT_VERSION', '1.1.0' );
+define( 'SWC_FILE', WCA_FILE );
+define( 'SWC_DIR', WCA_DIR );
+define( 'SWC_URL', WCA_URL );
+
+$wca_files = array(
+	'includes/class-wca-contracts.php',
+	'includes/class-wca-schema.php',
+	'includes/class-wca-observability.php',
+	'includes/class-swc-helpers.php',
+	'includes/class-swc-doctor-authority.php',
+	'includes/class-wca-authorization.php',
+	'includes/class-wca-central-governance.php',
+	'includes/class-wca-repository.php',
+	'includes/class-wca-idempotency.php',
+	'includes/class-wca-plan-guard.php',
+	'includes/class-wca-service.php',
+	'includes/class-wca-appointment-command.php',
+	'includes/class-wca-compatibility.php',
+	'includes/class-wca-outbox.php',
+	'includes/class-wca-continuity-secure.php',
+	'includes/class-wca-continuity-guards.php',
+	'includes/class-wca-verification-reconciliation.php',
+	'includes/class-wca-privacy.php',
+	'includes/class-wca-rest.php',
+	'includes/class-wca-opaque-api.php',
+	'includes/class-wca-calendar-link.php',
+	'includes/class-wca-future24.php',
+	'includes/class-wca-ten-review-hardening.php',
+	'includes/class-wca-second-ten-review-hardening.php',
+	'includes/class-wca-routes.php',
+	'includes/class-wca-frontend.php',
+	'includes/class-wca-admin.php',
+	'includes/class-wca-cli.php',
+	'includes/class-wca-plugin.php',
+	'includes/class-swc-public-clinic.php',
+	'includes/class-swc-cf01-care-context.php',
+	'includes/class-swc-activator.php',
+	'includes/class-swc-appointments.php',
+	'includes/class-swc-frontend.php',
+	'includes/class-swc-admin.php',
+	'includes/class-swc-privacy.php',
+	'includes/class-swc-plugin.php',
+);
+foreach ( $wca_files as $wca_relative_file ) {
+	require_once WCA_DIR . $wca_relative_file;
+}
+unset( $wca_files, $wca_relative_file );
+
+register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) );
+register_deactivation_hook( WCA_FILE, array( 'SWC_Activator', 'deactivate' ) );
+
+function wca_start_plugin() {
+	if ( ! SWC_Activator::dependencies_ready() ) {
+		add_action( 'admin_notices', function () {
+			if ( current_user_can( 'activate_plugins' ) ) {
+				echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic:', 'worldwide-clinic-appointments' ) . '</strong> ' . esc_html( SWC_Activator::dependency_message() ) . '</p></div>';
+			}
+		} );
+		return;
+	}
+	try {
+		$legacy_upgrade = SWC_Activator::maybe_upgrade();
+		if ( is_wp_error( $legacy_upgrade ) ) { throw new RuntimeException( $legacy_upgrade->get_error_message() ); }
+		WCA_Continuity::maybe_upgrade();
+		WCA_Future24::maybe_upgrade();
+	} catch ( Throwable $wca_migration_error ) {
+		WCA_Observability::log( 'error', 'runtime_migration_failed', array( 'message' => sanitize_text_field( $wca_migration_error->getMessage() ) ) );
+		$failure = array( 'status' => 'failed', 'failed_at' => current_time( 'mysql', true ), 'message' => sanitize_text_field( $wca_migration_error->getMessage() ), 'runtime_version' => WCA_VERSION );
+		$failure_written = SWC_Helpers::update_option_strict( 'wca_runtime_migration_failure', $failure, 'wca_runtime_migration_failure_write' );
+		if ( is_wp_error( $failure_written ) ) {
+			WCA_Observability::log( 'critical', 'runtime_migration_failure_state_persistence_failed', array( 'code' => $failure_written->get_error_code() ) );
+		}
+		add_action( 'admin_notices', static function () use ( $wca_migration_error ) { if ( current_user_can( 'activate_plugins' ) ) { echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic migration paused:', 'worldwide-clinic-appointments' ) . '</strong> ' . esc_html( $wca_migration_error->getMessage() ) . '</p></div>'; } } );
+		return;
+	}
+	$failure_cleared = SWC_Helpers::delete_option_strict( 'wca_runtime_migration_failure', 'wca_runtime_migration_failure_clear' );
+	if ( is_wp_error( $failure_cleared ) ) {
+		WCA_Observability::log( 'critical', 'runtime_migration_failure_state_clear_failed', array( 'code' => $failure_cleared->get_error_code() ) );
+		add_action( 'admin_notices', static function () { if ( current_user_can( 'activate_plugins' ) ) { echo '<div class="notice notice-error"><p><strong>' . esc_html__( 'Worldwide Clinic migration state is inconsistent:', 'worldwide-clinic-appointments' ) . '</strong> ' . esc_html__( 'The previous failure marker could not be cleared safely; File 08 remains paused.', 'worldwide-clinic-appointments' ) . '</p></div>'; } } );
+		return;
+	}
+	WCA_Plugin::boot();
+	WCA_Central_Governance::boot();
+	WCA_Continuity::boot();
+	WCA_Continuity_Guards::boot();
+	WCA_Verification_Reconciliation::boot();
+	WCA_Opaque_API::boot();
+	WCA_Calendar_Link::boot();
+	WCA_Appointment_Command::boot();
+	WCA_Future24::boot();
+	( new SWC_Plugin() )->run();
+	WCA_Ten_Review_Hardening::boot();
+	WCA_Second_Ten_Review_Hardening::boot();
+}
+add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
+
+/** Canonical public contract helpers for cross-file consumers. */
+function wca_contract_manifest() { return WCA_Contracts::contract_manifest(); }
+function wca_get_public_clinic_projection( $id_or_slug ) { return WCA_Service::public_clinic_projection( $id_or_slug ); }
+function wca_get_cf01_scheduling_context( $appointment_id, $actor_user_id = 0 ) { return swc_get_cf01_care_context( $appointment_id, $actor_user_id ); }
+function wca_get_central_governance_manifest() { return WCA_Central_Governance::manifest(); }
+function wca_get_file26_clinic_projection( $clinic_ref ) { return WCA_Central_Governance::file26_clinic_projection( $clinic_ref ); }

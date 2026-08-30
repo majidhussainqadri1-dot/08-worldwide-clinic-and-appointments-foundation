@@ -1,0 +1,35 @@
+<?php
+$root = dirname(__DIR__); $pass=0; $fail=array();
+function t13_has($label,$path,$needle){ global $root,$pass,$fail; $s=file_get_contents($root.'/'.$path); if(is_string($s)&&false!==strpos($s,$needle)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' missing: '.$needle;} }
+t13_has('R1 appointment meta persistence','includes/class-wca-service.php','wca_appointment_meta_write');
+t13_has('R2 reschedule proposal persistence','includes/class-wca-service.php','wca_reschedule_proposal_write');
+t13_has('R3 previous slot release failure','includes/class-wca-service.php','wca_reschedule_old_slot_release');
+t13_has('R4 accepted reschedule persistence','includes/class-wca-service.php','wca_reschedule_accept_write');
+t13_has('R5 checkin persistence','includes/class-wca-service.php','wca_checkin_write');
+t13_has('R5 completion persistence','includes/class-wca-service.php','wca_completion_write');
+t13_has('R6 terminal slot release failure','includes/class-wca-service.php','wca_terminal_slot_release');
+t13_has('R6 strict version bump','includes/class-swc-helpers.php','bump_version_strict');
+t13_has('R7 Future24 user record transaction','includes/class-wca-future24.php','wca_future24_record_transaction');
+t13_has('R8 Future24 system record transaction','includes/class-wca-future24.php','wca_future24_system_record_transaction');
+t13_has('R9 Future24 maintenance failure metric','includes/class-wca-future24.php','future24_maintenance_failure_total');
+t13_has('R10 maintenance failure propagation','includes/class-wca-outbox.php','wca_maintenance_incomplete');
+t13_has('R11 admin maintenance failure visibility','includes/class-wca-admin.php','manual_maintenance_failed');
+t13_has('R12 Future24 export query failure','includes/class-wca-privacy.php','wca_privacy_export_future24_query');
+t13_has('R12 continuity decrypt failure','includes/class-wca-continuity-secure.php','wca_continuity_export_intake_decrypt');
+t13_has('R13 appointment author erasure failure','includes/class-wca-privacy.php','wca_privacy_author_anonymize');
+t13_has('R14 Future24 erasure retry evidence','includes/class-wca-privacy.php','Future24 privacy erasure encountered');
+t13_has('R15 continuity guardian erasure','includes/class-wca-continuity-secure.php','Guardian continuity references could not be anonymized safely');
+t13_has('R16 guard guardian erasure','includes/class-wca-continuity-guards.php','Guardian continuity references could not be anonymized safely');
+t13_has('R17 legacy erasure transaction','includes/class-swc-privacy.php','swc_privacy_erase_transaction');
+t13_has('R18 Future24 retention failure','includes/class-wca-privacy.php','wca_retention_future24');
+t13_has('R18 intake retention failure','includes/class-wca-continuity-secure.php','wca_intake_retention_delete');
+t13_has('R19 payment amount strict validation','includes/class-wca-repository.php','wca_payment_amount_invalid');
+t13_has('R19 expired review persistence','includes/class-wca-repository.php','wca_review_expiry_persist');
+t13_has('R20 strict Future24 capacity','includes/class-wca-future24.php','strict_capacity');
+t13_has('post-final legacy mutation durability','includes/class-swc-helpers.php','apply_meta_mutations');
+t13_has('post-final legacy purge failure','includes/class-swc-activator.php','swc_purge_usermeta');
+t13_has('post-final canonical purge failure','includes/class-wca-schema.php','wca_purge_table_failed');
+t13_has('release plugin 1.2.13','worldwide-clinic.php','Version: 1.2.15');
+t13_has('release runtime constant 1.2.13','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
+t13_has('evidence main 20 complete','THIRTEENTH-TWENTY-REVIEW-EVIDENCE.md','All 20 main review rounds contained a supported repository defect/gap');
+if($fail){fwrite(STDERR,"File 08 thirteenth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);} echo 'File 08 thirteenth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";

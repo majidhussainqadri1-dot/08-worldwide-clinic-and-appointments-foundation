@@ -1,0 +1,55 @@
+name: File 08 T17 R7 Guardian Consent Delegation Deep Review
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r7-deep-review.yml
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Exact head
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+      - name: Full source QA before R7 classification
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r7-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r7-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r7-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Delegation ownership and currentness inventory
+        run: |
+          set -euo pipefail
+          echo '=== delegation meta references ==='
+          grep -RIn --exclude-dir=.git --exclude='*.md' --exclude='*.yml' --exclude='*.yaml' '_wca_clinic_delegations\|clinic_delegation\|delegation_allows_scope\|delegated_clinic_ids' . || true
+          echo '=== delegation persistence writers ==='
+          grep -RIn --exclude-dir=.git 'update_user_meta\|add_user_meta\|delete_user_meta' includes assets tests tools | grep -Ei 'delegat|clinic' || true
+          echo '=== delegation expiry/currentness tokens ==='
+          grep -RIn --exclude-dir=.git -Ei 'delegat.{0,80}(expires_at|expiry|expired|valid_until|revok)|expires_at.{0,80}delegat' includes tests tools || true
+      - name: Guardian authority and invalidation inventory
+        run: |
+          set -euo pipefail
+          echo '=== guardian authority helpers ==='
+          grep -RIn --exclude-dir=.git -E 'smc_user_is_verified_guardian|smc_guardian_may_act_for|wca_guardian_may_act_for_patient|wca_user_is_verified_guardian|validate_patient_guardian' includes tests tools || true
+          echo '=== guardian change/revocation hooks ==='
+          grep -RIn --exclude-dir=.git -Ei 'guardian.*(revok|withdraw|replace|success|change|invalidat)|(?:revok|withdraw|replace|success|change|invalidat).*guardian' includes tests tools || true
+      - name: Consent lifecycle inventory
+        run: |
+          set -euo pipefail
+          echo '=== consent grants/revokes/active checks ==='
+          grep -RIn --exclude-dir=.git -E 'record_consent|revoke_context_consent|revoke_consent|active_consent|appointment_processing|privacy_notice|teleconsult|recording|messaging|followup' includes tests tools | head -n 500 || true
+          echo '=== consent actor/guardian predicates ==='
+          grep -RIn --exclude-dir=.git -E 'actor_user_id.*scope|guardian_user_id.*scope|scope.*actor_user_id|scope.*guardian_user_id' includes tests tools || true
+      - name: File00 event and reconciliation inventory
+        run: |
+          set -euo pipefail
+          grep -RIn --exclude-dir=.git -Ei 'smc_|File00|membership|identity.*changed|guardian.*changed|revocation.*event|outbox.*guardian' includes tests tools | head -n 500 || true
