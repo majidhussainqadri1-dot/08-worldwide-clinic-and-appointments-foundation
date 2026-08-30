@@ -1036,25 +1036,51 @@ final class WCA_Repository {
 	}
 
 	/** Trusted CF03 fact -> File08 local projection. Financial ledger truth remains CF03-owned. */
-	public static function project_payment_status( $payment_ref, $status, $provider_ref = '' ) {
+	public static function project_payment_status( $payment_ref, $status, $provider_ref = '', $source_version = 0, $source_event_id = '', $source_occurred_at = '' ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['payment_intents'];
 		$status = sanitize_key( $status );
+		$source_version = WCA_Service::strict_id( $source_version );
+		$source_event_id = sanitize_text_field( $source_event_id );
+		$source_occurred_at = WCA_Plan_Guard::strict_utc( $source_occurred_at );
 		if ( ! in_array( $status, WCA_Contracts::payment_statuses(), true ) || 'pending' === $status ) { return new WP_Error( 'wca_payment_status_untrusted', __( 'The financial owner supplied an unsupported payment status.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( null === $source_version || ! preg_match( '/^[A-Za-z0-9._:-]{8,191}$/', $source_event_id ) || ! $source_occurred_at ) { return new WP_Error( 'wca_payment_source_order_invalid', __( 'The financial owner supplied incomplete payment ordering evidence.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_ref=%s LIMIT 1 FOR UPDATE", sanitize_text_field( $payment_ref ) ), ARRAY_A );
 		if ( null === $row && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_status_read_failed', __( 'Payment projection could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $row ) { return new WP_Error( 'wca_payment_status_not_found', __( 'Payment intent was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$provider_ref = sanitize_text_field( $provider_ref );
 		if ( $provider_ref && ! empty( $row['provider_ref'] ) && ! hash_equals( (string) $row['provider_ref'], $provider_ref ) ) { return new WP_Error( 'wca_payment_provider_ref_conflict', __( 'Payment provider identity does not match the existing projection.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		if ( (string) $row['status'] === $status && ( ! $provider_ref || (string) $row['provider_ref'] === $provider_ref ) ) { return $row; }
-		$update = array( 'status' => $status, 'version' => absint( $row['version'] ) + 1, 'updated_at' => self::now() );
+		$current_source_version = absint( $row['source_version'] ?? 0 );
+		if ( $source_version < $current_source_version ) {
+			$row['_projection_action'] = 'stale_ignored';
+			return $row;
+		}
+		if ( $source_version === $current_source_version && $current_source_version > 0 ) {
+			$same_status = (string) $row['status'] === $status;
+			$same_provider = ! $provider_ref || ! (string) $row['provider_ref'] || hash_equals( (string) $row['provider_ref'], $provider_ref );
+			if ( $same_status && $same_provider ) {
+				$row['_projection_action'] = 'same_version_replay';
+				return $row;
+			}
+			return new WP_Error( 'wca_payment_source_version_conflict', __( 'The same financial source version carries conflicting payment state. Reconciliation is required.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'reconciliation_required' => true ) );
+		}
+		$update = array(
+			'status'             => $status,
+			'version'            => absint( $row['version'] ) + 1,
+			'source_version'     => $source_version,
+			'source_event_id'    => $source_event_id,
+			'source_occurred_at' => $source_occurred_at,
+			'updated_at'         => self::now(),
+		);
 		if ( $provider_ref && empty( $row['provider_ref'] ) ) { $update['provider_ref'] = $provider_ref; }
-		$changed = $wpdb->update( $table, $update, array( 'id' => absint( $row['id'] ), 'version' => absint( $row['version'] ) ) );
+		$changed = $wpdb->update( $table, $update, array( 'id' => absint( $row['id'] ), 'version' => absint( $row['version'] ), 'source_version' => $current_source_version ) );
 		if ( false === $changed ) { return new WP_Error( 'wca_payment_status_write_failed', __( 'Payment status projection could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( 1 !== (int) $changed ) { return new WP_Error( 'wca_payment_status_stale', __( 'Payment status changed concurrently. Reconciliation is required.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$updated = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id=%d LIMIT 1", absint( $row['id'] ) ), ARRAY_A );
 		if ( null === $updated && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_status_readback_failed', __( 'Updated payment status could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-		return $updated ?: new WP_Error( 'wca_payment_status_readback_missing', __( 'Updated payment projection could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		if ( ! $updated ) { return new WP_Error( 'wca_payment_status_readback_missing', __( 'Updated payment projection could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$updated['_projection_action'] = 'applied';
+		return $updated;
 	}
 
 	/** Provider calendar projection only; appointment truth remains File08 canonical state. */

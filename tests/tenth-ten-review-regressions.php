@@ -16,5 +16,5 @@ t10has('signed cursor decode',$rest,'hex2bin( $matches[1] )');
 t10lacks('no transient cursor read',$rest,"get_transient( 'wca_clinic_cursor_'");
 t10lacks('no transient cursor write',$rest,"set_transient( 'wca_clinic_cursor_'");
 t10has('next cursor',$rest,"'next_cursor'"); t10has('conditional request',$rest,"get_header( 'If-None-Match' )"); t10has('etag header',$rest,"header( 'ETag'"); t10has('cursor keyset repository',$repo,'c.updated_at<%s OR (c.updated_at=%s AND c.id<%d)');
-t10has('plugin 1.2.15',$boot,'Version: 1.2.15'); t10has('runtime 1.2.15',$contracts,"RUNTIME_VERSION                 = '1.2.15'"); t10has('schema stays 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.3.0'");
+t10has('plugin 1.2.15',$boot,'Version: 1.2.15'); t10has('runtime 1.2.15',$contracts,"RUNTIME_VERSION                 = '1.2.15'"); t10has('schema stays 3.2.0',$contracts,"SCHEMA_VERSION                  = '3.4.0'");
 $runtime=implode("\n",array($boot,$contracts,$repo,$service,$rest,$hard)); foreach(array('eval(','base64_decode(','shell_exec(','unserialize(') as $t){t10lacks('forbidden runtime primitive',$runtime,$t);} if($failures){fwrite(STDERR,"File 08 tenth-ten-review regression gate failed:\n- ".implode("\n- ",$failures)."\n");exit(1);} echo 'File 08 tenth fresh ten-round regression assertions passed: '.$checks.'/'.$checks.".\n";

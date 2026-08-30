@@ -39,7 +39,7 @@ t610has('followup keyset cursor',$continuity,'WHERE appointment_id=%d AND id>%d 
 t610lacks('no followup limit100',$continuity,'WHERE appointment_id=%d ORDER BY due_at ASC,id ASC LIMIT 100');
 t610has('plugin 1.2.13',$bootstrap,'Version: 1.2.15');
 t610has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
-t610has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.3.0'");
+t610has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.4.0'");
 t610has('readme stable 1.2.13',$readme,'Stable tag: 1.2.15');
 t610has('repository readme 1.2.13',$repo_readme,'Runtime candidate: **1.2.15**');
 t610has('status 1.2.13',$status,'Runtime candidate: **1.2.15**');

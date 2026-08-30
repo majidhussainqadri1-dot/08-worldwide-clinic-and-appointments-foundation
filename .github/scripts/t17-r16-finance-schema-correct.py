@@ -118,7 +118,7 @@ s = service.read_text()
 method_start = s.find("\tpublic static function consume_payment_status_event( $event ) {")
 if method_start < 0:
     raise SystemExit('R16 consume payment event method not found')
-method_end_marker = "\n\tprivate static function approved_payment_provider( $provider )"
+method_end_marker = "\n}"
 method_end = s.find(method_end_marker, method_start)
 if method_end < 0:
     raise SystemExit('R16 consume payment event end not found')

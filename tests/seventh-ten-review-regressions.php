@@ -38,7 +38,7 @@ t710has('no-show complete traversal marker',$future,'time() - 365 * DAY_IN_SECON
 t710lacks('no no-show 2000 cap',$future,'clinic_appointments( $clinic_id, 365, 2000 )');
 t710has('plugin 1.2.13',$bootstrap,'Version: 1.2.15');
 t710has('runtime 1.2.13',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
-t710has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.3.0'");
+t710has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.4.0'");
 t710has('readme stable 1.2.13',$readme,'Stable tag: 1.2.15');
 t710has('repository readme 1.2.13',$repo_readme,'Runtime candidate: **1.2.15**');
 t710has('status 1.2.13',$status,'Runtime candidate: **1.2.15**');
