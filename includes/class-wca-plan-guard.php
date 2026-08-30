@@ -92,6 +92,20 @@ final class WCA_Plan_Guard {
 
 	/** @return array<string,mixed>|WP_Error */
 	public static function canonical_slot_hold( $data, $patient_user_id ) {
+		$patient_user_id = absint( $patient_user_id );
+		$requested_patient_id = absint( $data['patient_user_id'] ?? 0 );
+		if ( $requested_patient_id && $requested_patient_id !== $patient_user_id ) {
+			$guardian_user_id = absint( $data['guardian_user_id'] ?? 0 );
+			if ( ! $guardian_user_id || $guardian_user_id !== $patient_user_id ) {
+				return new WP_Error( 'wca_slot_patient_owner_mismatch', __( 'The requested patient does not match the authenticated slot owner.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
+			}
+			$guardian = WCA_Authorization::guardian_context( $requested_patient_id, $guardian_user_id, $patient_user_id );
+			if ( is_wp_error( $guardian ) ) { return $guardian; }
+			$patient_user_id = $requested_patient_id;
+		}
+		if ( ! $patient_user_id ) {
+			return new WP_Error( 'wca_slot_patient_required', __( 'A valid patient is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		$query = self::resolve_public_slot_query( $data );
 		if ( is_wp_error( $query ) ) {
 			return $query;
