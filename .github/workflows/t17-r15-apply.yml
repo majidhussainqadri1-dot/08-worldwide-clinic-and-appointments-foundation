@@ -36,9 +36,6 @@ jobs:
           if changed < 1:
               raise SystemExit('R15 expected at least one historical 3.2.0 schema assertion')
 
-          # Earlier T15 regression gates intentionally pinned the former single-
-          # occupant implementation. Preserve the fail-closed guarantees while
-          # asserting the new capacity-aware equivalents instead of obsolete code.
           p = Path('tests/fifteenth-twenty-review-regressions.php')
           s = p.read_text()
           replacements = {
@@ -52,6 +49,16 @@ jobs:
                   if s.count(old) != 1:
                       raise SystemExit('R15 historical fail-closed assertion anchor is not unique: ' + old)
                   s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          p = Path('tests/sixteenth-twenty-review-regressions.php')
+          s = p.read_text()
+          old = "t16h('R13 atomic hold rechecks buffered conflict window','includes/class-wca-repository.php','\$conflict_duration = max');"
+          new = "t16h('R13 atomic hold rechecks stored buffered conflict window','includes/class-wca-repository.php','DATE_SUB(start_utc, INTERVAL buffer_before MINUTE)');"
+          if new not in s:
+              if s.count(old) != 1:
+                  raise SystemExit('R15 historical buffered-conflict assertion anchor is not unique')
+              s = s.replace(old, new, 1)
           p.write_text(s)
 
           p = Path('tests/seventeenth-r15-capacity-concurrency-regressions.php')
