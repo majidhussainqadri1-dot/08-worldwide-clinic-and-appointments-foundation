@@ -147,6 +147,9 @@ final class WCA_Schema {
 				service_id bigint(20) unsigned NOT NULL DEFAULT 0,
 				doctor_user_id bigint(20) unsigned NOT NULL,
 				patient_user_id bigint(20) unsigned NOT NULL,
+				capacity smallint(5) unsigned NOT NULL DEFAULT 1,
+				buffer_before smallint(5) unsigned NOT NULL DEFAULT 0,
+				buffer_after smallint(5) unsigned NOT NULL DEFAULT 0,
 				start_utc datetime NOT NULL,
 				end_utc datetime NOT NULL,
 				status varchar(20) NOT NULL DEFAULT 'held',
@@ -299,6 +302,9 @@ final class WCA_Schema {
 				platform_commission_minor bigint(20) unsigned NOT NULL DEFAULT 0,
 				status varchar(30) NOT NULL DEFAULT 'pending',
 				version bigint(20) unsigned NOT NULL DEFAULT 1,
+				source_version bigint(20) unsigned NOT NULL DEFAULT 0,
+				source_event_id varchar(191) NOT NULL DEFAULT '',
+				source_occurred_at datetime NULL,
 				metadata_json longtext NOT NULL,
 				created_at datetime NOT NULL,
 				updated_at datetime NOT NULL,
@@ -307,6 +313,7 @@ final class WCA_Schema {
 				UNIQUE KEY provider_ref (provider,provider_ref),
 				UNIQUE KEY appointment_request (appointment_id,provider,request_key),
 				KEY appointment_id (appointment_id),
+				KEY source_order (source_version,source_occurred_at),
 				KEY status (status)
 			) {$collate};",
 			"CREATE TABLE {$tables['calendar_mappings']} (

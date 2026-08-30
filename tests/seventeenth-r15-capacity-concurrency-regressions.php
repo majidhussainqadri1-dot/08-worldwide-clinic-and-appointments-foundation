@@ -7,7 +7,7 @@ $service = file_get_contents( __DIR__ . '/../includes/class-wca-service.php' );
 $future = file_get_contents( __DIR__ . '/../includes/class-wca-future24.php' );
 foreach ( array( $contracts,$schema,$guard,$repo,$service,$future ) as $source ) { if ( false === $source ) { fwrite( STDERR, "T17 R15 source missing.\n" ); exit( 1 ); } }
 $required = array(
-    array( $contracts, "SCHEMA_VERSION                  = '3.3.0'" ),
+    array( $contracts, "SCHEMA_VERSION                  = '3.4.0'" ),
     array( $schema, 'rule_ref char(36) NOT NULL' ),
     array( $schema, 'capacity smallint(5) unsigned NOT NULL DEFAULT 1' ),
     array( $schema, 'buffer_before smallint(5) unsigned NOT NULL DEFAULT 0' ),

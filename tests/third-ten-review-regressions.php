@@ -73,7 +73,7 @@ t310has('doctor scheduling delegation',$auth,'delegated_clinic_ids( $doctor_user
 t310has('plugin header 1.2.15',$bootstrap,'Version: 1.2.15');
 t310has('runtime constant 1.2.15',$bootstrap,"WCA_VERSION', '1.2.15");
 t310has('contract runtime 1.2.15',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
-t310has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.3.0'");
+t310has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.4.0'");
 t310has('continuity schema unchanged',$continuity,"const SCHEMA_VERSION = '1.1.0'");
 t310has('future schema unchanged',$future,"const SCHEMA_VERSION   = '1.0.0'");
 t310has('readme stable 1.2.15',$readme,'Stable tag: 1.2.15');

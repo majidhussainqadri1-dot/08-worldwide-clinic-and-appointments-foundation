@@ -1190,22 +1190,34 @@ final class WCA_Service {
 		$payment_ref = sanitize_text_field( $event['payment_intent_ref'] ?? '' );
 		$status = sanitize_key( $event['status'] ?? '' );
 		$provider_ref = sanitize_text_field( $event['provider_ref'] ?? '' );
-		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,191}$/', $event_id ) || ! preg_match( '/^[0-9a-fA-F-]{36}$/', $payment_ref ) || ! in_array( $status, WCA_Contracts::payment_statuses(), true ) || 'pending' === $status ) { return new WP_Error( 'wca_payment_status_event_invalid', __( 'The verified financial event is malformed or unsupported.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$claim = WCA_Repository::claim_idempotency( 'payment_status_event', $event_id, 0, array( 'payment_intent_ref' => $payment_ref, 'status' => $status, 'provider_ref' => $provider_ref ) );
+		$source_version = self::strict_id( $event['source_version'] ?? null );
+		$occurred_raw = trim( (string) ( $event['occurred_at'] ?? '' ) );
+		$source_occurred_at = '';
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/', $occurred_raw ) ) {
+			try { $source_occurred_at = ( new DateTimeImmutable( $occurred_raw ) )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' ); } catch ( Exception $e ) { $source_occurred_at = ''; }
+		}
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,191}$/', $event_id ) || ! preg_match( '/^[0-9a-fA-F-]{36}$/', $payment_ref ) || ! in_array( $status, WCA_Contracts::payment_statuses(), true ) || 'pending' === $status || null === $source_version || ! $source_occurred_at ) { return new WP_Error( 'wca_payment_status_event_invalid', __( 'The verified financial event is malformed, unsupported, or lacks ordering evidence.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$fingerprint = array( 'payment_intent_ref' => $payment_ref, 'status' => $status, 'provider_ref' => $provider_ref, 'source_version' => $source_version, 'occurred_at' => $source_occurred_at );
+		$claim = WCA_Repository::claim_idempotency( 'payment_status_event', $event_id, 0, $fingerprint );
 		if ( is_wp_error( $claim ) ) { return $claim; }
 		if ( 'completed' === (string) ( $claim['status'] ?? '' ) ) { return $claim['response']; }
 		if ( empty( $claim['claimed_new'] ) ) { return new WP_Error( 'wca_payment_status_event_in_progress', __( 'This payment status fact is already being reconciled.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		$result = WCA_Repository::transaction( function () use ( $payment_ref, $status, $provider_ref, $event_id, $claim ) {
-			$projected = WCA_Repository::project_payment_status( $payment_ref, $status, $provider_ref );
+		$result = WCA_Repository::transaction( function () use ( $payment_ref, $status, $provider_ref, $event_id, $source_version, $source_occurred_at, $claim ) {
+			$projected = WCA_Repository::project_payment_status( $payment_ref, $status, $provider_ref, $source_version, $event_id, $source_occurred_at );
 			if ( is_wp_error( $projected ) ) { return $projected; }
+			$action = sanitize_key( $projected['_projection_action'] ?? 'applied' );
+			unset( $projected['_projection_action'] );
 			$trace = WCA_Observability::trace_id();
-			$audit = WCA_Repository::append_event( 'PaymentStatusProjected.v1', 'payment_intent', $payment_ref, array( 'event_id' => WCA_Repository::uuid(), 'source_event_id' => $event_id, 'payment_intent_ref' => $payment_ref, 'status' => $status, 'trace_id' => $trace ), 0, $trace );
+			$audit_type = 'stale_ignored' === $action ? 'PaymentStatusStaleIgnored.v1' : ( 'same_version_replay' === $action ? 'PaymentStatusEquivalentReplay.v1' : 'PaymentStatusProjected.v1' );
+			$audit = WCA_Repository::append_event( $audit_type, 'payment_intent', $payment_ref, array( 'event_id' => WCA_Repository::uuid(), 'source_event_id' => $event_id, 'source_version' => $source_version, 'source_occurred_at' => $source_occurred_at, 'payment_intent_ref' => $payment_ref, 'status' => $status, 'projection_action' => $action, 'trace_id' => $trace ), 0, $trace );
 			if ( is_wp_error( $audit ) ) { return $audit; }
-			$response = array_intersect_key( $projected, array_flip( array( 'public_ref','status','currency','amount_minor','platform_commission_minor','version','updated_at' ) ) );
+			$response = array_intersect_key( $projected, array_flip( array( 'public_ref','status','currency','amount_minor','platform_commission_minor','version','source_version','source_occurred_at','updated_at' ) ) );
+			$response['projection_action'] = $action;
 			if ( ! WCA_Repository::complete_idempotency( $claim['id'], 200, $response ) ) { return new WP_Error( 'wca_payment_status_idempotency_complete', __( 'Payment status reconciliation could not be finalized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			return $response;
 		}, 'wca_payment_status_projection_transaction' );
 		if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); }
 		return $result;
 	}
+
 }
