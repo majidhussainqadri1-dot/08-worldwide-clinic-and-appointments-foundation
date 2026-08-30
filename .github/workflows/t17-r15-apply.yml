@@ -53,7 +53,7 @@ jobs:
 
           p = Path('tests/sixteenth-twenty-review-regressions.php')
           s = p.read_text()
-          old = "t16h('R13 atomic hold rechecks buffered conflict window','includes/class-wca-repository.php','\$conflict_duration = max');"
+          old = "t16h('R13 atomic hold rechecks buffered conflict window','includes/class-wca-repository.php','$conflict_duration = max');"
           new = "t16h('R13 atomic hold rechecks stored buffered conflict window','includes/class-wca-repository.php','DATE_SUB(start_utc, INTERVAL buffer_before MINUTE)');"
           if new not in s:
               if s.count(old) != 1:
