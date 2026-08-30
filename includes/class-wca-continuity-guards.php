@@ -136,7 +136,7 @@ final class WCA_Continuity_Guards {
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_consent_state_read_failed', __( 'Current consent state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$rows = (array) $rows_raw;
-		$scopes = array( 'teleconsult', 'recording', 'messaging', 'privacy_notice', 'followup' );
+		$scopes = array( 'appointment_processing', 'teleconsult', 'recording', 'messaging', 'privacy_notice', 'followup' );
 		$state  = array();
 		foreach ( $scopes as $scope ) {
 			$state[ $scope ] = array( 'status' => 'not_granted', 'terms_version' => '', 'granted_at' => '', 'revoked_at' => '' );

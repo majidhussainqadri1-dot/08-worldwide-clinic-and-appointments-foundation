@@ -13,8 +13,8 @@
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Future24 {
-	const CONTRACT_VERSION = '1.0.0';
-	const SCHEMA_VERSION   = '1.0.0';
+	const CONTRACT_VERSION = '1.1.0';
+	const SCHEMA_VERSION   = '1.1.0';
 	const SCHEMA_OPTION    = 'wca_future24_schema_version';
 	const POLICY_VERSION   = '2026-08-10.1';
 	const MAX_PAYLOAD      = 16384;
@@ -115,6 +115,23 @@ final class WCA_Future24 {
 		if ( is_wp_error( $verified ) ) { throw new RuntimeException( $verified->get_error_message() ); }
 		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 		if ( $exists !== $table ) { throw new RuntimeException( 'File 08 Future24 operational table could not be created.' ); }
+
+		$cursor = 0;
+		do {
+			$legacy_episodes = $wpdb->get_results( $wpdb->prepare( "SELECT id,appointment_id FROM {$table} WHERE feature_id='F08-FUT-23' AND subject_user_id=0 AND appointment_id>0 AND id>%d ORDER BY id ASC LIMIT 200", $cursor ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $legacy_episodes && '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'File 08 Future24 episode privacy migration could not read legacy rows.' ); }
+			foreach ( (array) $legacy_episodes as $legacy_episode ) {
+				$episode_id = absint( $legacy_episode['id'] );
+				$appointment_id = absint( $legacy_episode['appointment_id'] );
+				$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
+				if ( $patient_id ) {
+					$changed = $wpdb->update( $table, array( 'subject_user_id' => $patient_id ), array( 'id' => $episode_id, 'subject_user_id' => 0 ), array( '%d' ), array( '%d','%d' ) );
+					if ( false === $changed ) { throw new RuntimeException( 'File 08 Future24 episode privacy migration could not persist a patient subject.' ); }
+				}
+				$cursor = max( $cursor, $episode_id );
+			}
+		} while ( 200 === count( (array) $legacy_episodes ) );
+
 		$written = SWC_Helpers::update_option_strict( self::SCHEMA_OPTION, self::SCHEMA_VERSION, 'wca_future24_schema_version_write' );
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 Future24 schema version could not be persisted.' ); }
 	}
@@ -209,6 +226,8 @@ final class WCA_Future24 {
 			'/future24/smart/book' => array( 'POST', 'rest_smart_book' ),
 			'/future24/external-calendar/busy' => array( 'POST', 'rest_external_busy' ),
 			'/future24/episodes' => array( 'POST', 'rest_episode' ),
+			'/future24/episodes/(?P<ref>[0-9a-fA-F-]{36})/unlink' => array( 'POST', 'rest_episode_unlink' ),
+			'/future24/episodes/(?P<ref>[0-9a-fA-F-]{36})/archive' => array( 'POST', 'rest_episode_archive' ),
 			'/future24/governance' => array( 'GET', 'rest_governance' ),
 		);
 		foreach ( $routes as $path => $definition ) {
@@ -1769,16 +1788,25 @@ self::release_semantic_lock( $lock );
 	/* FUT-20 */
 	public static function fhir_projection( $type, $ref, $actor = 0 ) {
 		$type = sanitize_key( $type ); $ref = strtolower( sanitize_text_field( $ref ) );
+		if ( true !== apply_filters( 'wca_fhir_adapter_enabled', true, $type, $ref ) ) {
+			return new WP_Error( 'wca_fhir_adapter_disabled', __( 'FHIR interoperability is temporarily unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'degraded' => true ) );
+		}
 		if ( 'appointment' === $type ) {
 			$id = self::require_appointment( $ref, $actor ); if ( is_wp_error( $id ) ) { return $id; }
 			$start = self::utc( SWC_Helpers::meta( $id, 'preferred_at_utc', '' ) );
 			$end = self::utc( SWC_Helpers::meta( $id, 'appointment_end_utc', '' ) );
 			if ( ! $start || ! $end || $end <= $start ) { return new WP_Error( 'wca_fhir_time', __( 'Appointment scheduling times are unavailable or invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-			return array( 'resourceType' => 'Appointment', 'id' => $ref, 'status' => self::fhir_status( SWC_Helpers::status( $id ) ), 'start' => gmdate( 'c', strtotime( $start . ' UTC' ) ), 'end' => gmdate( 'c', strtotime( $end . ' UTC' ) ), 'meta' => array( 'profile' => array( 'wca.future24/fhir-appointment/' . self::CONTRACT_VERSION ) ) );
+			$record_version = max( 1, absint( SWC_Helpers::record_version( $id ) ) );
+			$last_updated = get_post_modified_time( 'c', true, $id );
+			if ( ! is_string( $last_updated ) || '' === $last_updated ) { return new WP_Error( 'wca_fhir_freshness', __( 'Appointment interoperability freshness metadata is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'degraded' => true ) ); }
+			return array( 'resourceType' => 'Appointment', 'id' => $ref, 'status' => self::fhir_status( SWC_Helpers::status( $id ) ), 'start' => gmdate( 'c', strtotime( $start . ' UTC' ) ), 'end' => gmdate( 'c', strtotime( $end . ' UTC' ) ), 'meta' => array( 'versionId' => (string) $record_version, 'lastUpdated' => $last_updated, 'profile' => array( 'wca.future24/fhir-appointment/' . self::CONTRACT_VERSION ) ) );
 		}
 		if ( 'clinic' === $type ) {
-			$clinic = WCA_Service::public_clinic_projection( $ref ); if ( ! $clinic ) { return new WP_Error( 'wca_fhir_clinic', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
-			return array( 'resourceType' => 'HealthcareService', 'id' => (string) $clinic['public_ref'], 'active' => 'active' === $clinic['status'], 'name' => (string) $clinic['name'], 'communication' => array_values( (array) $clinic['languages'] ), 'extension' => array( array( 'url' => 'wca-zero-commission', 'valueBoolean' => true ) ) );
+			$clinic = WCA_Service::public_clinic_projection( $ref ); if ( is_wp_error( $clinic ) ) { return $clinic; } if ( ! $clinic ) { return new WP_Error( 'wca_fhir_clinic', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+			$updated_raw = (string) ( $clinic['updated_at'] ?? '' );
+			$updated_ts = $updated_raw ? strtotime( $updated_raw . ' UTC' ) : false;
+			if ( false === $updated_ts || empty( $clinic['record_version'] ) ) { return new WP_Error( 'wca_fhir_freshness', __( 'Clinic interoperability freshness metadata is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'degraded' => true ) ); }
+			return array( 'resourceType' => 'HealthcareService', 'id' => (string) $clinic['public_ref'], 'active' => 'active' === $clinic['status'], 'name' => (string) $clinic['name'], 'communication' => array_values( (array) $clinic['languages'] ), 'meta' => array( 'versionId' => (string) absint( $clinic['record_version'] ), 'lastUpdated' => gmdate( 'c', $updated_ts ), 'profile' => array( 'wca.future24/fhir-healthcare-service/' . self::CONTRACT_VERSION ) ), 'extension' => array( array( 'url' => 'wca-zero-commission', 'valueBoolean' => true ) ) );
 		}
 		return new WP_Error( 'wca_fhir_type', __( 'Unsupported interoperability resource type.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 	}
@@ -1869,10 +1897,61 @@ self::release_semantic_lock( $lock );
 		return self::put_record( 'F08-FUT-23', array(
 			'appointment_id' => self::appointment_id( $refs[0] ),
 			'clinic_id' => absint( isset( $scope['clinic_id'] ) ? $scope['clinic_id'] : 0 ),
+			'subject_user_id' => absint( isset( $scope['patient_id'] ) ? $scope['patient_id'] : 0 ),
 			'status' => 'episode_open',
-			'payload' => array( 'appointment_refs' => $refs, 'clinical_narrative_stored' => false, 'public_timeline' => false, 'scope_consistency' => 'same_patient_doctor_clinic' ),
+			'payload' => array( 'appointment_refs' => $refs, 'clinical_narrative_stored' => false, 'public_timeline' => false, 'scope_consistency' => 'same_patient_doctor_clinic', 'unlink_supported' => true, 'archive_supported' => true ),
 		), $actor );
 	}
+
+	private static function mutate_episode( $episode_ref, $data, $action, $actor = 0 ) {
+		global $wpdb;
+		$actor = absint( $actor ?: get_current_user_id() );
+		$row = self::get_record( $episode_ref, 'F08-FUT-23' );
+		if ( is_wp_error( $row ) ) { return $row; }
+		if ( ! $row ) { return new WP_Error( 'wca_episode_missing', __( 'Episode was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+		$anchor_ref = self::appointment_ref( absint( $row['appointment_id'] ) );
+		$anchor_id = self::require_appointment( $anchor_ref, $actor );
+		if ( is_wp_error( $anchor_id ) ) { return $anchor_id; }
+		$expected_version = WCA_Service::strict_id( $data['expected_version'] ?? null );
+		if ( null === $expected_version ) { return new WP_Error( 'wca_episode_version_required', __( 'Current episode version is required before changing episode links.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( $expected_version !== absint( $row['version'] ) ) { return new WP_Error( 'wca_episode_stale', __( 'Episode changed. Refresh before updating it.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'current_version' => absint( $row['version'] ) ) ); }
+		$payload = json_decode( (string) $row['payload_json'], true );
+		$payload = is_array( $payload ) ? $payload : array();
+		$refs = array_values( array_unique( array_filter( array_map( 'strtolower', array_map( 'sanitize_text_field', (array) ( $payload['appointment_refs'] ?? array() ) ) ) ) ) );
+		$status = (string) $row['status'];
+		$expires_at = $row['expires_at'];
+		if ( 'archive' === $action ) {
+			if ( 'episode_archived' === $status ) { return self::public_record( $row ); }
+			$status = 'episode_archived';
+			$expires_at = WCA_Repository::now();
+			$payload['archived'] = true;
+		} elseif ( 'unlink' === $action ) {
+			if ( 'episode_open' !== $status ) { return new WP_Error( 'wca_episode_state', __( 'Only an open episode may be unlinked.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			$unlink_ref = strtolower( sanitize_text_field( $data['appointment_ref'] ?? '' ) );
+			if ( ! preg_match( '/^[0-9a-f-]{36}$/', $unlink_ref ) || ! in_array( $unlink_ref, $refs, true ) ) { return new WP_Error( 'wca_episode_unlink_ref', __( 'A currently linked appointment reference is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+			$authorized = self::require_appointment( $unlink_ref, $actor ); if ( is_wp_error( $authorized ) ) { return $authorized; }
+			$refs = array_values( array_diff( $refs, array( $unlink_ref ) ) );
+			$payload['appointment_refs'] = $refs;
+			if ( ! $refs ) { $status = 'episode_archived'; $expires_at = WCA_Repository::now(); $payload['archived'] = true; }
+		} else {
+			return new WP_Error( 'wca_episode_action', __( 'Unsupported episode action.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$encoded = wp_json_encode( $payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		if ( ! is_string( $encoded ) || strlen( $encoded ) > self::MAX_PAYLOAD ) { return new WP_Error( 'wca_episode_payload', __( 'Episode linkage metadata is too large.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) ); }
+		$table = self::tables()['records'];
+		return WCA_Repository::transaction( function () use ( $wpdb, $table, $row, $expected_version, $status, $expires_at, $encoded, $actor, $action ) {
+			$changed = $wpdb->update( $table, array( 'status' => $status, 'payload_json' => $encoded, 'expires_at' => $expires_at, 'version' => $expected_version + 1, 'updated_at' => WCA_Repository::now() ), array( 'id' => absint( $row['id'] ), 'version' => $expected_version ), array( '%s','%s','%s','%d','%s' ), array( '%d','%d' ) );
+			if ( false === $changed ) { return new WP_Error( 'wca_episode_update_failed', __( 'Episode change could not be persisted safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			if ( 1 !== (int) $changed ) { return new WP_Error( 'wca_episode_stale', __( 'Episode changed concurrently. Refresh before updating it.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			$audit = self::audit( 'F08-FUT-23', 'episode_' . $action, (string) $row['public_ref'], array( 'status' => $status, 'expected_version' => $expected_version ), $actor, false );
+			if ( is_wp_error( $audit ) ) { return $audit; }
+			$updated = self::get_record( (string) $row['public_ref'], 'F08-FUT-23' );
+			return is_wp_error( $updated ) ? $updated : ( $updated ? self::public_record( $updated ) : new WP_Error( 'wca_episode_readback_missing', __( 'Updated episode could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ) );
+		}, 'wca_episode_mutation_transaction' );
+	}
+
+	public static function unlink_episode_appointment( $episode_ref, $data, $actor = 0 ) { return self::mutate_episode( $episode_ref, is_array( $data ) ? $data : array(), 'unlink', $actor ); }
+	public static function archive_episode( $episode_ref, $data, $actor = 0 ) { return self::mutate_episode( $episode_ref, is_array( $data ) ? $data : array(), 'archive', $actor ); }
 
 	/* FUT-24 */
 	public static function governance_log( $actor = 0 ) {
@@ -1970,6 +2049,8 @@ self::release_semantic_lock( $lock );
 	public static function rest_smart_book( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'smart_book','smart_book',array($d),201); }
 	public static function rest_external_busy( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'external_busy','save_external_busy',array($d),201); }
 	public static function rest_episode( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'episode','create_episode',array($d),201); }
+	public static function rest_episode_unlink( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'episode_unlink','unlink_episode_appointment',array($r['ref'],$d),200); }
+	public static function rest_episode_archive( WP_REST_Request $r ){ $d=self::data($r); return self::mutate($r,'episode_archive','archive_episode',array($r['ref'],$d),200); }
 	public static function rest_governance(){ return self::respond(self::governance_log()); }
 }
 

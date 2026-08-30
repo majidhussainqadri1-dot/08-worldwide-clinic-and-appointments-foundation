@@ -75,7 +75,7 @@ t310has('runtime constant 1.2.15',$bootstrap,"WCA_VERSION', '1.2.15");
 t310has('contract runtime 1.2.15',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
 t310has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.4.0'");
 t310has('continuity schema unchanged',$continuity,"const SCHEMA_VERSION = '1.1.0'");
-t310has('future schema unchanged',$future,"const SCHEMA_VERSION   = '1.0.0'");
+t310has('future schema migrated for R17 privacy lifecycle',$future,"const SCHEMA_VERSION   = '1.1.0'");
 t310has('readme stable 1.2.15',$readme,'Stable tag: 1.2.15');
 t310has('repository readme 1.2.15',$repo_readme,'Runtime candidate: **1.2.15**');
 t310has('status 1.2.15',$status,'Runtime candidate: **1.2.15**');

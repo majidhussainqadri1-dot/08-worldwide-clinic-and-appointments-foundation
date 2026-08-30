@@ -174,11 +174,9 @@ final class WCA_Continuity {
 			WCA_Observability::metric( 'previsit_emergency_diversion_total', 1, array( 'category' => $red_flag['category'] ) );
 			return new WP_Error( 'wca_emergency_diversion', $red_flag['message'], array( 'status' => 422, 'emergency' => true, 'category' => $red_flag['category'] ) );
 		}
-		if ( $submit ) {
-			$active_consent = self::active_consent( $appointment_id, 'appointment_processing' );
-			if ( is_wp_error( $active_consent ) ) { return $active_consent; }
-			if ( ! $active_consent ) { return new WP_Error( 'wca_intake_consent', __( 'Current appointment-processing consent is required before intake submission.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		}
+		$active_consent = self::active_consent( $appointment_id, 'appointment_processing' );
+		if ( is_wp_error( $active_consent ) ) { return $active_consent; }
+		if ( ! $active_consent ) { return new WP_Error( 'wca_intake_consent', __( 'Current appointment-processing consent is required before pre-visit information is stored.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$sealed = self::seal( $sanitized );
 		if ( is_wp_error( $sealed ) ) { return $sealed; }
 		$table   = self::tables()['intake'];
@@ -203,8 +201,11 @@ final class WCA_Continuity {
 			$row = $row;
 			$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d LIMIT 1 FOR UPDATE", $appointment_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( $current ) {
-				if ( $expected_version && $expected_version !== absint( $current['version'] ) ) {
-					return new WP_Error( 'wca_intake_stale', __( 'Pre-visit intake changed. Refresh before saving.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+				if ( ! $expected_version ) {
+					return new WP_Error( 'wca_intake_version_required', __( 'This pre-visit record already exists. Refresh it before saving changes.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'current_version' => absint( $current['version'] ) ) );
+				}
+				if ( $expected_version !== absint( $current['version'] ) ) {
+					return new WP_Error( 'wca_intake_stale', __( 'Pre-visit intake changed. Refresh before saving.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'current_version' => absint( $current['version'] ) ) );
 				}
 				$row['version'] = absint( $current['version'] ) + 1;
 				$changed = $wpdb->update( $table, $row, array( 'id' => absint( $current['id'] ), 'version' => absint( $current['version'] ) ) );
@@ -895,7 +896,7 @@ final class WCA_Continuity {
 	private static function payload_size_ok( $value ) { return strlen( self::stable_json( $value ) ) <= self::MAX_PAYLOAD_BYTES; }
 	private static function bounded_text( $value, $max ) { $value=sanitize_text_field($value); return function_exists('mb_substr')?mb_substr($value,0,$max):substr($value,0,$max); }
 	private static function bounded_textarea( $value, $max ) { $value=sanitize_textarea_field($value); return function_exists('mb_substr')?mb_substr($value,0,$max):substr($value,0,$max); }
-	private static function context_consent_scopes() { return array( 'teleconsult', 'recording', 'messaging', 'privacy_notice', 'followup' ); }
+	private static function context_consent_scopes() { return array( 'appointment_processing', 'teleconsult', 'recording', 'messaging', 'privacy_notice', 'followup' ); }
 	private static function request_data( WP_REST_Request $request ) { $data=$request->get_json_params(); return is_array($data)?$data:$request->get_params(); }
 	private static function rate_limit( $scope, $limit=30, $window=300 ) { return SWC_Helpers::rate_limit_hit('continuity_'.sanitize_key($scope),absint(get_current_user_id()),$limit,$window)?new WP_Error('wca_rate_limit',__('Too many requests. Please try again later.','worldwide-clinic-appointments'),array('status'=>429,'retry_after'=>$window)):true; }
 	private static function no_store( $result, $status=200 ) { if(is_wp_error($result)){return $result;} $response=rest_ensure_response($result); $response->set_status($status); $response->header('Cache-Control','private, no-store, max-age=0'); $response->header('X-Robots-Tag','noindex, noarchive, nofollow'); $response->header('X-Request-ID',WCA_Observability::trace_id()); return $response; }
