@@ -9,6 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class WCA_Repository {
 	private static $transaction_depth = 0;
+	private static $transaction_state_uncertain = false;
 	private static $read_error = null;
 
 	public static function clear_read_error() { self::$read_error = null; }
@@ -55,6 +56,7 @@ final class WCA_Repository {
 				self::$transaction_depth--;
 			}
 		}
+		self::$transaction_state_uncertain = false;
 		$started = $wpdb->query( 'START TRANSACTION' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		if ( false === $started ) {
 			return new WP_Error( sanitize_key( $error_code . '_start' ), __( 'The mutation transaction could not be started safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
@@ -64,19 +66,19 @@ final class WCA_Repository {
 			$result = call_user_func( $callback );
 			if ( is_wp_error( $result ) ) {
 				$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				if ( false === $rolled_back ) { return new WP_Error( 'wca_transaction_rollback_failed', __( 'The mutation failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
+				if ( false === $rolled_back ) { self::$transaction_state_uncertain = true; return new WP_Error( 'wca_transaction_rollback_failed', __( 'The mutation failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 				return $result;
 			}
 			$committed = $wpdb->query( 'COMMIT' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			if ( false === $committed ) {
 				$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-				if ( false === $rolled_back ) { return new WP_Error( 'wca_transaction_commit_rollback_failed', __( 'Commit failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
+				if ( false === $rolled_back ) { self::$transaction_state_uncertain = true; return new WP_Error( 'wca_transaction_commit_rollback_failed', __( 'Commit failed and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 				return new WP_Error( sanitize_key( $error_code . '_commit' ), __( 'The mutation transaction could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 			}
 			return $result;
 		} catch ( Throwable $error ) {
 			$rolled_back = $wpdb->query( 'ROLLBACK' ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			if ( false === $rolled_back ) { return new WP_Error( 'wca_transaction_exception_rollback_failed', __( 'The mutation raised an error and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
+			if ( false === $rolled_back ) { self::$transaction_state_uncertain = true; return new WP_Error( 'wca_transaction_exception_rollback_failed', __( 'The mutation raised an error and rollback could not be verified; storage state is uncertain.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'state_uncertain' => true ) ); }
 			return new WP_Error( sanitize_key( $error_code ), __( 'The mutation could not be committed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 		} finally {
 			self::$transaction_depth = 0;
@@ -1190,6 +1192,10 @@ final class WCA_Repository {
 
 	public static function release_idempotency( $id ) {
 		global $wpdb;
+		if ( self::$transaction_state_uncertain ) {
+			if ( class_exists( 'WCA_Observability' ) ) { WCA_Observability::metric( 'idempotency_release_uncertain_transaction_blocked_total', 1 ); WCA_Observability::log( 'error', 'idempotency_release_uncertain_transaction_blocked', array( 'reservation_id' => absint( $id ) ) ); }
+			return false;
+		}
 		$table = WCA_Schema::tables()['idempotency'];
 		$deleted = $wpdb->delete( $table, array( 'id' => absint( $id ), 'status' => 'processing' ) );
 		if ( false === $deleted && class_exists( 'WCA_Observability' ) ) { WCA_Observability::metric( 'idempotency_release_db_failed_total', 1 ); WCA_Observability::log( 'error', 'idempotency_release_db_failed', array( 'reservation_id' => absint( $id ) ) ); }
