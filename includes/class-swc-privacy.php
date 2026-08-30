@@ -9,6 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class SWC_Privacy {
 	const PAGE_SIZE = 50;
+	const CURSOR_TTL = HOUR_IN_SECONDS;
 
 	public function hooks() {
 		add_filter( 'wp_privacy_personal_data_exporters', array( $this, 'exporters' ) );
@@ -109,19 +110,30 @@ final class SWC_Privacy {
 	 * Erasure always processes the first remaining batch because each batch stops
 	 * matching once identifiers are anonymized. This avoids page-offset skips.
 	 */
-	public function erase( $email_address, $page = 1 ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+	public function erase( $email_address, $page = 1 ) {
 		global $wpdb;
 		$user = get_user_by( 'email', $email_address );
 		if ( ! $user ) {
 			return array( 'items_removed' => false, 'items_retained' => false, 'messages' => array(), 'done' => true );
 		}
-		$ids      = $this->related_ids( $user->ID, 1 );
+		$page = max( 1, absint( $page ) );
+		$base = 'swc_privacy_erase_' . substr( hash( 'sha256', strtolower( sanitize_email( $email_address ) ) ), 0, 24 );
+		$cursor_key = $base . '_appointments';
+		if ( 1 === $page ) { delete_transient( $cursor_key ); }
+		$cursor = absint( get_transient( $cursor_key ) );
+		$ids = $this->related_ids_after( $user->ID, $cursor, self::PAGE_SIZE );
 		if ( is_wp_error( $ids ) ) { return array( 'items_removed' => false, 'items_retained' => false, 'messages' => array( __( 'Appointment privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' ) ), 'done' => false ); }
-		$removed  = false;
+		$removed = false;
 		$retained = false;
 		$messages = array();
-		$failed   = false;
+		$failed = false;
+		$last_id = $cursor;
 		foreach ( $ids as $appointment_id ) {
+			if ( class_exists( 'WCA_Privacy' ) && WCA_Privacy::legal_hold( $appointment_id ) ) {
+				$retained = true;
+				$last_id = max( $last_id, absint( $appointment_id ) );
+				continue;
+			}
 			$result = WCA_Repository::transaction( function () use ( $appointment_id, $user, $wpdb ) {
 				$is_patient = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ) === $user->ID;
 				$is_doctor  = absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) === $user->ID;
@@ -166,17 +178,36 @@ final class SWC_Privacy {
 			}
 			$removed = $removed || ! empty( $result['changed'] );
 			$retained = $retained || ! empty( $result['retained'] );
+			$last_id = max( $last_id, absint( $appointment_id ) );
 		}
-		$remaining = $this->related_count( $user->ID );
-		if ( is_wp_error( $remaining ) ) { $messages[] = __( 'Appointment privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $failed = true; $remaining = 1; }
-		$done = ! $failed && 0 === $remaining;
-		if ( $retained ) { $messages[] = __( 'A minimal anonymized appointment and status record was retained for integrity, security, and accountability. Direct identifiers, contact details, private notes, consent details, scheduling times, and user-linked audit content were removed.', 'worldwide-clinic-appointments' ); }
+		if ( $last_id > $cursor ) { set_transient( $cursor_key, $last_id, self::CURSOR_TTL ); }
+		$more = $this->related_ids_after( $user->ID, $last_id, 1 );
+		if ( is_wp_error( $more ) ) { $messages[] = __( 'Appointment privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $failed = true; $more = array( 1 ); }
+		$done = ! $failed && ! $more;
+		if ( $done ) { delete_transient( $cursor_key ); }
+		if ( $retained ) { $messages[] = __( 'One or more appointment records were retained unchanged under an active legal hold.', 'worldwide-clinic-appointments' ); }
 		return array(
 			'items_removed'  => $removed,
 			'items_retained' => $retained,
 			'messages'       => array_unique( $messages ),
 			'done'           => $done,
 		);
+	}
+
+	private function related_ids_after( $user_id, $cursor, $limit ) {
+		global $wpdb;
+		$limit = min( self::PAGE_SIZE, max( 1, absint( $limit ) ) );
+		$sql = "SELECT DISTINCT p.ID
+			FROM {$wpdb->posts} p
+			LEFT JOIN {$wpdb->postmeta} patient ON patient.post_id=p.ID AND patient.meta_key='_swc_patient_user_id'
+			LEFT JOIN {$wpdb->postmeta} doctor ON doctor.post_id=p.ID AND doctor.meta_key='_swc_doctor_id'
+			LEFT JOIN {$wpdb->postmeta} proposed ON proposed.post_id=p.ID AND proposed.meta_key='_swc_proposed_doctor_id'
+			WHERE p.post_type=%s AND p.post_status IN ('publish','private') AND p.ID>%d
+			AND (p.post_author=%d OR patient.meta_value=%s OR doctor.meta_value=%s OR proposed.meta_value=%s)
+			ORDER BY p.ID ASC LIMIT %d";
+		$raw = $wpdb->get_col( $wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $cursor ), absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_privacy_related_after_read_failed', __( 'Appointment privacy records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		return array_map( 'absint', (array) $raw );
 	}
 
 	private function related_ids( $user_id, $page ) {

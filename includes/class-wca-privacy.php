@@ -249,13 +249,18 @@ final class WCA_Privacy {
 	}
 
 	public static function legal_hold( $appointment_id ) {
-		return (bool) apply_filters( 'wca_appointment_legal_hold', (bool) get_post_meta( $appointment_id, '_swc_legal_hold', true ), absint( $appointment_id ) );
+		$appointment_id = absint( $appointment_id );
+		$native = (bool) get_post_meta( $appointment_id, '_swc_legal_hold', true );
+		$filtered = (bool) apply_filters( 'wca_appointment_legal_hold', $native, $appointment_id );
+		// Extension/assurance integrations may add a hold, never remove owner-native evidence.
+		return $native || $filtered;
 	}
 
 	public static function future24_legal_hold( $row ) {
 		$row = is_array( $row ) ? $row : array();
-		$default = ! empty( $row['appointment_id'] ) && self::legal_hold( absint( $row['appointment_id'] ) );
-		return (bool) apply_filters( 'wca_future24_legal_hold', $default, $row );
+		$native = ! empty( $row['appointment_id'] ) && self::legal_hold( absint( $row['appointment_id'] ) );
+		$filtered = (bool) apply_filters( 'wca_future24_legal_hold', $native, $row );
+		return $native || $filtered;
 	}
 
 	/**

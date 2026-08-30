@@ -634,6 +634,7 @@ final class WCA_Continuity {
 		if ( 1 === $page ) {
 			delete_transient( $base . '_intake' );
 			delete_transient( $base . '_followups' );
+			delete_transient( $base . '_guardian' );
 		}
 		$removed = false;
 		$retained = false;
@@ -674,12 +675,39 @@ final class WCA_Continuity {
 			elseif ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
 		}
 		$intake_table = self::tables()['intake'];
-		$guardian_update = $wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d' ) );
-		if ( false === $guardian_update ) { $messages[] = __( 'Guardian continuity references could not be anonymized safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
-		elseif ( 0 === (int) $guardian_update ) {
-			$guardian_remaining = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$intake_table} WHERE guardian_user_id=%d LIMIT 1", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $guardian_remaining && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Guardian continuity references could not be verified safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
-			elseif ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+		$guardian_cursor_key = $base . '_guardian';
+		$guardian_cursor = absint( get_transient( $guardian_cursor_key ) );
+		$guardian_rows_raw = $wpdb->get_results( $wpdb->prepare( "SELECT id,public_ref,appointment_id FROM {$intake_table} WHERE guardian_user_id=%d AND id>%d ORDER BY id ASC LIMIT 100", $user_id, $guardian_cursor ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $guardian_rows_raw && '' !== (string) $wpdb->last_error ) {
+			$messages[] = __( 'Guardian continuity references could not be read safely and will retry.', 'worldwide-clinic-appointments' );
+			$done = false;
+		} else {
+			$guardian_last = $guardian_cursor;
+			foreach ( (array) $guardian_rows_raw as $guardian_row ) {
+				$row_id = absint( $guardian_row['id'] );
+				if ( self::legal_hold( 'intake', $guardian_row ) ) {
+					$retained = true;
+					$guardian_last = max( $guardian_last, $row_id );
+					continue;
+				}
+				$guardian_update = $wpdb->update( $intake_table, array( 'guardian_user_id' => 0 ), array( 'id' => $row_id, 'guardian_user_id' => $user_id ), array( '%d' ), array( '%d', '%d' ) );
+				if ( false === $guardian_update ) {
+					$messages[] = __( 'Guardian continuity references could not be anonymized safely and will retry.', 'worldwide-clinic-appointments' );
+					$done = false;
+					break;
+				}
+				if ( 0 === (int) $guardian_update ) {
+					$guardian_remaining = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$intake_table} WHERE id=%d AND guardian_user_id=%d", $row_id, $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					if ( null === $guardian_remaining && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Guardian continuity references could not be verified safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; break; }
+					if ( $guardian_remaining ) { $messages[] = __( 'Guardian continuity references remain linked and will retry.', 'worldwide-clinic-appointments' ); $done = false; break; }
+				}
+				$guardian_last = max( $guardian_last, $row_id );
+				$removed = true;
+			}
+			if ( $guardian_last > $guardian_cursor ) { set_transient( $guardian_cursor_key, $guardian_last, HOUR_IN_SECONDS ); }
+			$guardian_more = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$intake_table} WHERE guardian_user_id=%d AND id>%d ORDER BY id ASC LIMIT 1", $user_id, $guardian_last ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			if ( null === $guardian_more && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Guardian continuity references could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; }
+			elseif ( $guardian_more ) { $done = false; } else { delete_transient( $guardian_cursor_key ); }
 		}
 		if ( $retained ) { $messages[] = __( 'Some clinic continuity records are retained under an active legal, safety or professional record hold.', 'worldwide-clinic-appointments' ); }
 		return array( 'items_removed' => $removed, 'items_retained' => $retained, 'messages' => $messages, 'done' => $done );
@@ -891,7 +919,13 @@ final class WCA_Continuity {
 		$filtered = (bool) apply_filters( 'wca_followup_actor_allowed', $allowed, $appointment_id, $user_id );
 		return $allowed && $filtered;
 	}
-	private static function legal_hold( $type, $row ) { return (bool)apply_filters('wca_continuity_legal_hold',false,sanitize_key($type),(array)$row); }
+	private static function legal_hold( $type, $row ) {
+		$row = is_array( $row ) ? $row : array();
+		$appointment_id = absint( $row['appointment_id'] ?? 0 );
+		$native = $appointment_id && class_exists( 'WCA_Privacy' ) ? WCA_Privacy::legal_hold( $appointment_id ) : false;
+		$filtered = (bool) apply_filters( 'wca_continuity_legal_hold', $native, sanitize_key( $type ), $row );
+		return $native || $filtered;
+	}
 	private static function not_found() { return new WP_Error('wca_appointment_not_found',__('Appointment was not found.','worldwide-clinic-appointments'),array('status'=>404)); }
 
 	/** @return array<int,array<string,string>> */
