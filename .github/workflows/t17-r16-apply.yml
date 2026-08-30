@@ -17,6 +17,19 @@ jobs:
           fetch-depth: 0
       - name: Freeze reviewed head
         run: git rev-parse HEAD
+      - name: Repair isolated correction helper anchor
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/scripts/t17-r16-finance-schema-correct.py')
+          s = p.read_text()
+          old = 'method_end_marker = "\\n\\tprivate static function approved_payment_provider( $provider )"'
+          new = 'method_end_marker = "\\n}"'
+          if s.count(old) != 1:
+              raise SystemExit('R16 correction-helper end anchor is not unique')
+          p.write_text(s.replace(old, new, 1))
+          PY
       - name: Apply complete frozen R16 defect ledger
         run: python3 .github/scripts/t17-r16-finance-schema-correct.py
       - name: Update current-schema regression assertions
@@ -50,7 +63,7 @@ jobs:
           set -euo pipefail
           git config user.name 'Sabri File 08 Review Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-repository.php includes/class-wca-service.php tests/
+          git add .github/scripts/t17-r16-finance-schema-correct.py includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-repository.php includes/class-wca-service.php tests/
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'No R16 correction diff found.' >&2
