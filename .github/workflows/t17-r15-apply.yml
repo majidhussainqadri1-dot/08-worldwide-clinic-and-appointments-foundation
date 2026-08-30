@@ -25,9 +25,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          # Historical source-contract gates that deliberately froze schema 3.2.0
-          # are advanced together because R15 intentionally adds canonical slot
-          # capacity/buffer evidence and therefore requires schema 3.3.0.
           old_schema = "SCHEMA_VERSION                  = '3.2.0'"
           new_schema = "SCHEMA_VERSION                  = '3.3.0'"
           changed = 0
@@ -38,6 +35,24 @@ jobs:
                   changed += 1
           if changed < 1:
               raise SystemExit('R15 expected at least one historical 3.2.0 schema assertion')
+
+          # Earlier T15 regression gates intentionally pinned the former single-
+          # occupant implementation. Preserve the fail-closed guarantees while
+          # asserting the new capacity-aware equivalents instead of obsolete code.
+          p = Path('tests/fifteenth-twenty-review-regressions.php')
+          s = p.read_text()
+          replacements = {
+              "t15h('R1 active hold read fails closed','includes/class-wca-service.php',\"return (bool) \\$hold_id;\");":
+              "t15h('R1 active hold read fails closed','includes/class-wca-service.php',\"return is_wp_error( \\$available ) || ! \\$available;\");",
+              "t15h('R1 slot conflict query failure explicit','includes/class-wca-repository.php','wca_slot_conflict_query_failed');":
+              "t15h('R1 slot capacity query failure explicit','includes/class-wca-repository.php','wca_slot_capacity_count_failed');",
+          }
+          for old, new in replacements.items():
+              if new not in s:
+                  if s.count(old) != 1:
+                      raise SystemExit('R15 historical fail-closed assertion anchor is not unique: ' + old)
+                  s = s.replace(old, new, 1)
+          p.write_text(s)
 
           p = Path('tests/seventeenth-r15-capacity-concurrency-regressions.php')
           s = p.read_text()
