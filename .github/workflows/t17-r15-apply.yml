@@ -19,6 +19,30 @@ jobs:
         run: git rev-parse HEAD
       - name: Apply complete frozen R15 defect ledger
         run: python3 .github/scripts/t17-r15-capacity-correct.py
+      - name: Update regression gates for intentional schema migration
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('tests/second-ten-review-regressions.php')
+          s = p.read_text()
+          old = 's210has(\'core schema unchanged\',$contracts,"SCHEMA_VERSION                  = \'3.2.0\'");'
+          new = 's210has(\'core schema current\',$contracts,"SCHEMA_VERSION                  = \'3.3.0\'");'
+          if new not in s:
+              if s.count(old) != 1:
+                  raise SystemExit('R15 historical schema assertion anchor is not unique')
+              p.write_text(s.replace(old, new, 1))
+
+          p = Path('tests/seventeenth-r15-capacity-concurrency-regressions.php')
+          s = p.read_text()
+          old = '"SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN (\'held\',\'booked\') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1"'
+          new = '"SELECT id FROM {\\$table} WHERE doctor_user_id=%d AND status IN (\'held\',\'booked\') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1"'
+          if new not in s:
+              if s.count(old) != 1:
+                  raise SystemExit('R15 generated regression interpolation anchor is not unique')
+              p.write_text(s.replace(old, new, 1))
+          PY
       - name: Full source regression gate
         run: |
           set -euo pipefail
@@ -33,7 +57,7 @@ jobs:
           set -euo pipefail
           git config user.name 'Sabri File 08 Review Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-plan-guard.php includes/class-wca-repository.php includes/class-wca-service.php tests/run-all.php tests/seventeenth-r15-capacity-concurrency-regressions.php
+          git add includes/class-wca-contracts.php includes/class-wca-schema.php includes/class-wca-plan-guard.php includes/class-wca-repository.php includes/class-wca-service.php tests/run-all.php tests/second-ten-review-regressions.php tests/seventeenth-r15-capacity-concurrency-regressions.php
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'No R15 correction diff found.' >&2
