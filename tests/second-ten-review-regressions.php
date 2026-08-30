@@ -81,7 +81,7 @@ s210has('Future24 expected version',$future,'expected_version');
 s210has('plugin header 1.2.15',$bootstrap,'Version: 1.2.15');
 s210has('runtime constant 1.2.15',$bootstrap,"WCA_VERSION', '1.2.15");
 s210has('contract runtime 1.2.15',$contracts,"RUNTIME_VERSION                 = '1.2.15'");
-s210has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.2.0'");
+s210has('core schema unchanged',$contracts,"SCHEMA_VERSION                  = '3.3.0'");
 s210has('readme stable 1.2.15',$readme,'Stable tag: 1.2.15');
 s210has('repository readme 1.2.15',$repo_readme,'Runtime candidate: **1.2.15**');
 s210has('status 1.2.15',$status,'Runtime candidate: **1.2.15**');

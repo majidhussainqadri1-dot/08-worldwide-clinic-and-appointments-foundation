@@ -141,6 +141,7 @@ final class WCA_Schema {
 				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 				hold_token char(64) NOT NULL,
 				idempotency_key char(64) NOT NULL,
+				rule_ref char(36) NOT NULL DEFAULT '',
 				clinic_id bigint(20) unsigned NOT NULL,
 				branch_id bigint(20) unsigned NOT NULL DEFAULT 0,
 				service_id bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -156,6 +157,7 @@ final class WCA_Schema {
 				PRIMARY KEY  (id),
 				UNIQUE KEY hold_token (hold_token),
 				UNIQUE KEY idempotency_key (idempotency_key),
+				KEY rule_window (rule_ref,start_utc,end_utc,status),
 				KEY resource_window (doctor_user_id,start_utc,end_utc,status),
 				KEY clinic_branch (clinic_id,branch_id),
 				KEY expires_at (expires_at)

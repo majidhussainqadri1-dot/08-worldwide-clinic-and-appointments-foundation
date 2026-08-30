@@ -4,9 +4,9 @@ function t15h($label,$path,$needle){global $root,$pass,$fail;$s=file_get_content
 function t15missing($label,$path){global $root,$pass,$fail;if(!file_exists($root.'/'.$path)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' unexpected file: '.$path;}}
 t15h('R1 appointment conflicts fail closed','includes/class-swc-helpers.php',"null === \$rows || '' !== (string) \$wpdb->last_error");
 t15h('R1 rate counter readback fails closed','includes/class-swc-helpers.php',"null === \$hits_raw || '' !== (string) \$wpdb->last_error");
-t15h('R1 active hold read fails closed','includes/class-wca-service.php',"return (bool) \$hold_id;");
+t15h('R1 active hold read fails closed','includes/class-wca-service.php',"return is_wp_error( \$available ) || ! \$available;");
 t15h('R1 slot hold read failure explicit','includes/class-wca-repository.php','wca_slot_hold_read_failed');
-t15h('R1 slot conflict query failure explicit','includes/class-wca-repository.php','wca_slot_conflict_query_failed');
+t15h('R1 slot capacity query failure explicit','includes/class-wca-repository.php','wca_slot_capacity_count_failed');
 t15h('R1 stale request replay read failure explicit','includes/class-wca-appointment-command.php','wca_idempotency_read_failed');
 t15h('R1 consent read failure explicit','includes/class-wca-appointment-command.php','wca_consent_read_failed');
 t15h('R1 waitlist offer read failure explicit','includes/class-wca-future24.php','wca_waitlist_offer_read_failed');

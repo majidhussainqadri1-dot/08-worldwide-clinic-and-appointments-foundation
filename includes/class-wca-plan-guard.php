@@ -153,6 +153,8 @@ final class WCA_Plan_Guard {
 				'branch_id'       => absint( $rule['branch_id'] ),
 				'doctor_user_id'  => $query['doctor_user_id'],
 				'patient_user_id' => absint( $patient_user_id ),
+				'rule_ref'        => strtolower( (string) $rule['public_ref'] ),
+				'capacity'        => min( 50, max( 1, absint( $rule['capacity'] ?? 1 ) ) ),
 				'start_utc'       => $start,
 				'end_utc'         => $end,
 				'buffer_before'   => min( 240, absint( $rule['buffer_before'] ?? 0 ) ),

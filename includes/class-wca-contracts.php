@@ -17,7 +17,7 @@ final class WCA_Contracts {
 	const FILE19_EVENT_CONTRACT_VERSION   = '1.0.0';
 	const ASSURANCE_CONTRACT_VERSION      = '1.0.0';
 	const FUTURE24_CONTRACT_VERSION       = '1.0.0';
-	const SCHEMA_VERSION                  = '3.2.0';
+	const SCHEMA_VERSION                  = '3.3.0';
 
 	/** @return array<string,string> */
 	public static function appointment_statuses() {

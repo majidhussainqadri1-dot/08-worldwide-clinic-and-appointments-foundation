@@ -73,7 +73,7 @@ t16h('R13 projected slot conflict expands buffer before','includes/class-wca-ser
 t16h('R13 projected slot conflict expands buffer after','includes/class-wca-service.php','$conflict_end   = $end_utc->modify');
 t16h('R13 canonical hold carries authoritative rule buffers','includes/class-wca-plan-guard.php',"'buffer_after'    => min( 240");
 t16h('R13 atomic hold validates buffer range','includes/class-wca-repository.php','wca_slot_buffer_range');
-t16h('R13 atomic hold rechecks buffered conflict window','includes/class-wca-repository.php','$conflict_duration = max');
+t16h('R13 atomic hold rechecks stored buffered conflict window','includes/class-wca-repository.php','DATE_SUB(start_utc, INTERVAL buffer_before MINUTE)');
 t16h('R14 appointment captures fee currency snapshot','includes/class-wca-service.php',"'fee_currency_snapshot'");
 t16h('R14 appointment captures fee amount snapshot','includes/class-wca-service.php',"'fee_amount_minor_snapshot'");
 t16h('R14 appointment captures policy snapshots','includes/class-wca-service.php',"'cancellation_policy_snapshot'");

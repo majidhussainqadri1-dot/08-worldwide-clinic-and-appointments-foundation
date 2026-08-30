@@ -589,6 +589,72 @@ final class WCA_Repository {
 		return $row;
 	}
 
+	/**
+	 * Capacity-aware canonical availability gate.
+	 *
+	 * Same-rule occupants may share a slot up to the versioned rule capacity. Any
+	 * overlapping hold from another/legacy rule remains exclusive. Existing hold
+	 * buffers are expanded as well as the candidate window, so a later request
+	 * cannot silently violate a buffer that was established by the earlier hold.
+	 * Legacy appointments that are not represented by a canonical booked hold are
+	 * also treated as exclusive compatibility conflicts.
+	 *
+	 * @return true|false|WP_Error
+	 */
+	public static function slot_capacity_available( $doctor_id, $rule_ref, $start_utc, $end_utc, $capacity = 1, $ignore_idempotency_key = '' ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['slot_holds'];
+		$doctor_id = absint( $doctor_id );
+		$rule_ref = strtolower( sanitize_text_field( $rule_ref ) );
+		$capacity = WCA_Service::strict_int( $capacity, 1, 50 );
+		$start_utc = WCA_Plan_Guard::strict_utc( $start_utc );
+		$end_utc = WCA_Plan_Guard::strict_utc( $end_utc );
+		if ( ! $doctor_id || ! preg_match( '/^[0-9a-f-]{36}$/', $rule_ref ) || null === $capacity || ! $start_utc || ! $end_utc || strtotime( $end_utc . ' UTC' ) <= strtotime( $start_utc . ' UTC' ) ) {
+			return new WP_Error( 'wca_slot_capacity_input', __( 'Canonical slot-capacity evidence is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$ignore_hash = '' !== (string) $ignore_idempotency_key ? hash( 'sha256', (string) $ignore_idempotency_key ) : '';
+		$ignore_sql = $ignore_hash ? ' AND idempotency_key<>%s' : '';
+		$overlap_sql = "doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND DATE_SUB(start_utc, INTERVAL buffer_before MINUTE)<%s AND DATE_ADD(end_utc, INTERVAL buffer_after MINUTE)>%s";
+
+		$params = array( $doctor_id, self::now(), $end_utc, $start_utc );
+		if ( $ignore_hash ) { $params[] = $ignore_hash; }
+		$params[] = $rule_ref;
+		$foreign = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE {$overlap_sql}{$ignore_sql} AND (rule_ref='' OR rule_ref<>%s) LIMIT 1", $params ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $foreign && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_capacity_foreign_read_failed', __( 'Cross-rule slot occupancy could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		if ( $foreign ) { return false; }
+
+		$params = array( $doctor_id, self::now(), $end_utc, $start_utc );
+		if ( $ignore_hash ) { $params[] = $ignore_hash; }
+		$params[] = $rule_ref;
+		$count_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE {$overlap_sql}{$ignore_sql} AND rule_ref=%s", $params ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $count_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_capacity_count_failed', __( 'Current slot capacity could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		if ( (int) $count_raw >= $capacity ) { return false; }
+
+		/* Compatibility gate: an older active appointment without a canonical booked
+		 * hold has no rule/capacity evidence, so it remains exclusive rather than being
+		 * silently admitted into a multi-capacity session. */
+		$from = gmdate( 'Y-m-d H:i:s', strtotime( $start_utc . ' UTC' ) - 480 * MINUTE_IN_SECONDS );
+		$sql = "SELECT p.ID,t.meta_value AS appointment_time,d.meta_value AS appointment_duration
+			FROM {$wpdb->posts} p
+			INNER JOIN {$wpdb->postmeta} st ON st.post_id=p.ID AND st.meta_key='_swc_status' AND st.meta_value IN ('requested','confirmed','checked_in','reschedule_pending')
+			INNER JOIN {$wpdb->postmeta} doc ON doc.post_id=p.ID AND doc.meta_key='_swc_doctor_id' AND doc.meta_value=%d
+			INNER JOIN {$wpdb->postmeta} t ON t.post_id=p.ID AND t.meta_key='_swc_preferred_at_utc' AND t.meta_value BETWEEN %s AND %s
+			LEFT JOIN {$wpdb->postmeta} d ON d.post_id=p.ID AND d.meta_key='_swc_appointment_duration'
+			LEFT JOIN {$table} h ON h.appointment_id=p.ID AND h.status='booked' AND h.expires_at>%s
+			WHERE p.post_type=%s AND h.id IS NULL";
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $doctor_id, $from, $end_utc, self::now(), SWC_Helpers::TYPE ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $rows || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_capacity_legacy_read_failed', __( 'Legacy appointment occupancy could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$candidate_start = strtotime( $start_utc . ' UTC' );
+		$candidate_end = strtotime( $end_utc . ' UTC' );
+		foreach ( (array) $rows as $row ) {
+			$other_start = strtotime( (string) $row->appointment_time . ' UTC' );
+			$other_duration = min( 480, max( 10, absint( $row->appointment_duration ) ) );
+			$other_end = $other_start + $other_duration * MINUTE_IN_SECONDS;
+			if ( $candidate_start < $other_end && $candidate_end > $other_start ) { return false; }
+		}
+		return true;
+	}
+
 	/** @return array<string,mixed>|WP_Error */
 	public static function hold_slot( $data ) {
 		global $wpdb;
@@ -602,6 +668,9 @@ final class WCA_Repository {
 		$clinic_id = absint( $data['clinic_id'] ?? 0 );
 		$branch_id = absint( $data['branch_id'] ?? 0 );
 		$service_id = absint( $data['service_id'] ?? 0 );
+		$rule_ref = strtolower( sanitize_text_field( $data['rule_ref'] ?? '' ) );
+		$capacity = WCA_Service::strict_int( $data['capacity'] ?? 1, 1, 50 );
+		if ( ! preg_match( '/^[0-9a-f-]{36}$/', $rule_ref ) || null === $capacity ) { return new WP_Error( 'wca_slot_capacity_evidence', __( 'A valid availability rule and capacity are required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		$idempotency_plain = sanitize_text_field( $data['idempotency_key'] ?? '' );
 		if ( ! $idempotency_plain ) {
 			return new WP_Error( 'wca_idempotency_required', __( 'An idempotency key is required to hold a slot.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
@@ -620,13 +689,17 @@ final class WCA_Repository {
 			return new WP_Error( 'wca_slot_time', __( 'Invalid canonical slot request.', 'worldwide-clinic-appointments' ) );
 		}
 
-		$replay = static function ( $row ) use ( $clinic_id, $branch_id, $service_id, $doctor_id, $patient_id, $start, $end ) {
+		$replay = static function ( $row ) use ( $clinic_id, $branch_id, $service_id, $doctor_id, $patient_id, $rule_ref, $capacity, $buffer_before, $buffer_after, $start, $end ) {
 			if ( ! $row ) { return null; }
 			$same = absint( $row['clinic_id'] ) === $clinic_id
 				&& absint( $row['branch_id'] ?? 0 ) === $branch_id
 				&& absint( $row['service_id'] ) === $service_id
 				&& absint( $row['doctor_user_id'] ) === $doctor_id
 				&& absint( $row['patient_user_id'] ) === $patient_id
+				&& strtolower( (string) ( $row['rule_ref'] ?? '' ) ) === $rule_ref
+				&& absint( $row['capacity'] ?? 1 ) === $capacity
+				&& absint( $row['buffer_before'] ?? 0 ) === $buffer_before
+				&& absint( $row['buffer_after'] ?? 0 ) === $buffer_after
 				&& (string) $row['start_utc'] === $start
 				&& (string) $row['end_utc'] === $end;
 			return $same ? $row : new WP_Error( 'wca_idempotency_conflict', __( 'This idempotency key was already used for a different slot request.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
@@ -652,19 +725,16 @@ final class WCA_Repository {
 			if ( is_wp_error( $existing ) || is_array( $existing ) ) { return $existing; }
 			$conflict_start = gmdate( 'Y-m-d H:i:s', strtotime( $start . ' UTC' ) - $buffer_before * 60 );
 			$conflict_end   = gmdate( 'Y-m-d H:i:s', strtotime( $end . ' UTC' ) + $buffer_after * 60 );
-			$conflict = $wpdb->get_var( $wpdb->prepare(
-				"SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1",
-				$doctor_id, self::now(), $conflict_end, $conflict_start
-			) );
-			if ( '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_slot_conflict_query_failed', __( 'Current slot conflicts could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			$conflict_duration = max( 1, (int) round( ( strtotime( $conflict_end . ' UTC' ) - strtotime( $conflict_start . ' UTC' ) ) / 60 ) );
-			if ( $conflict || SWC_Helpers::has_conflict( $doctor_id, $conflict_start, $conflict_duration, 0 ) ) {
-				return new WP_Error( 'wca_slot_conflict', __( 'The selected slot is no longer available.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+			$available = self::slot_capacity_available( $doctor_id, $rule_ref, $conflict_start, $conflict_end, $capacity, $idempotency_plain );
+			if ( is_wp_error( $available ) ) { return $available; }
+			if ( ! $available ) {
+				return new WP_Error( 'wca_slot_conflict', __( 'The selected slot has reached capacity or conflicts with another scheduling rule.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 			}
 			$hold_token = hash( 'sha256', self::uuid() . '|' . wp_salt( 'nonce' ) . '|' . microtime( true ) );
 			$row = array(
 				'hold_token'      => $hold_token,
 				'idempotency_key' => $idempotency_key,
+				'rule_ref'        => $rule_ref,
 				'clinic_id'       => $clinic_id,
 				'branch_id'       => $branch_id,
 				'service_id'      => $service_id,

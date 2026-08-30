@@ -462,7 +462,7 @@ final class WCA_Service {
 						$conflict_start = $start_utc->modify( '-' . $buffer_before . ' minutes' );
 						$conflict_end   = $end_utc->modify( '+' . $buffer_after . ' minutes' );
 						$conflict_minutes = max( 1, (int) ceil( ( $conflict_end->getTimestamp() - $conflict_start->getTimestamp() ) / 60 ) );
-						if ( $inside_display && $start_utc->getTimestamp() > time() + $buffer_before * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! SWC_Helpers::has_conflict( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_minutes, 0 ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_end->format( 'Y-m-d H:i:s' ), $ignore_hold_key ) ) {
+						if ( $inside_display && $start_utc->getTimestamp() > time() + $buffer_before * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_end->format( 'Y-m-d H:i:s' ), $ignore_hold_key, strtolower( (string) $rule['public_ref'] ), max( 1, absint( $rule['capacity'] ?? 1 ) ) ) ) {
 							$slots[] = array(
 								'slot_ref'       => hash( 'sha256', $rule['public_ref'] . '|' . $start_utc->format( 'c' ) . '|' . $duration ),
 								'rule_ref'       => $rule['public_ref'],
@@ -513,16 +513,9 @@ final class WCA_Service {
 		return false;
 	}
 
-	private static function has_active_hold( $doctor_id, $start_utc, $end_utc, $ignore_idempotency_key = '' ) {
-		global $wpdb;
-		$table = WCA_Schema::tables()['slot_holds'];
-		if ( $ignore_idempotency_key ) {
-			$hold_id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND idempotency_key<>%s AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1", absint( $doctor_id ), sanitize_text_field( $ignore_idempotency_key ), WCA_Repository::now(), $end_utc, $start_utc ) );
-		} else {
-			$hold_id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE doctor_user_id=%d AND status IN ('held','booked') AND expires_at>%s AND start_utc<%s AND end_utc>%s LIMIT 1", absint( $doctor_id ), WCA_Repository::now(), $end_utc, $start_utc ) );
-		}
-		if ( '' !== (string) $wpdb->last_error ) { return true; }
-		return (bool) $hold_id;
+	private static function has_active_hold( $doctor_id, $start_utc, $end_utc, $ignore_idempotency_key = '', $rule_ref = '', $capacity = 1 ) {
+		$available = WCA_Repository::slot_capacity_available( $doctor_id, $rule_ref, $start_utc, $end_utc, $capacity, $ignore_idempotency_key );
+		return is_wp_error( $available ) || ! $available;
 	}
 
 	/** Reproject one exact rule/day slot without enumerating an arbitrary first-N global projection. */
