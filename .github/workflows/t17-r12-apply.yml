@@ -1,0 +1,44 @@
+name: File 08 T17 R12 Apply Frozen Ledger
+on:
+  push:
+    branches:
+      - codex/file08-new-governing-plans-completion-2026
+    paths:
+      - .github/workflows/t17-r12-apply.yml
+permissions:
+  contents: write
+jobs:
+  apply-correct-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze reviewed head
+        run: git rev-parse HEAD
+      - name: Apply frozen R12 ledger
+        run: python3 .github/scripts/t17-r12-correct.py
+      - name: Full source regression gate
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r12-php-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r12-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r12-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit only after retest passes
+        run: |
+          set -euo pipefail
+          git config user.name 'Sabri File 08 Review Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add includes/class-wca-repository.php tests/run-all.php tests/seventeenth-r12-idempotency-uncertainty-regressions.php
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No R12 correction diff found.' >&2
+            exit 1
+          fi
+          git commit -m 'fix(file08): retain idempotency on uncertain rollback state'
+          git push origin HEAD:codex/file08-new-governing-plans-completion-2026
+          git rev-parse HEAD
