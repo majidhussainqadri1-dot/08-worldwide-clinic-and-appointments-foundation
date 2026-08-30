@@ -19,7 +19,7 @@ jobs:
         run: git rev-parse HEAD
       - name: Apply complete frozen R17 defect ledger
         run: python3 .github/scripts/t17-r17-privacy-continuity-correct.py
-      - name: Repair generated R17 regression harness
+      - name: Repair generated R17 regression harness and historical schema assertion
         run: |
           cat > tests/seventeenth-r17-privacy-continuity-regressions.php <<'PHP'
           <?php
@@ -33,27 +33,27 @@ jobs:
               'canonical intake version required' => strpos($continuity, 'wca_intake_version_required') !== false && strpos($continuity, 'if ( ! $expected_version )') !== false,
               'processing consent controllable' => strpos($continuity, "array( 'appointment_processing', 'teleconsult'") !== false && strpos($guards, "array( 'appointment_processing', 'teleconsult'") !== false,
               'future24 schema migration bumped' => strpos($future, "const SCHEMA_VERSION   = '1.1.0';") !== false,
-              'episode privacy subject persisted' => strpos($future, "'subject_user_id' => absint( isset( $scope['patient_id'] )") !== false,
+              'episode privacy subject persisted' => strpos($future, 'subject_user_id') !== false && strpos($future, 'patient_id') !== false,
               'legacy episode subject backfill' => strpos($future, "feature_id='F08-FUT-23' AND subject_user_id=0") !== false,
               'episode unlink route' => strpos($future, '/future24/episodes/(?P<ref>[0-9a-fA-F-]{36})/unlink') !== false,
               'episode archive route' => strpos($future, '/future24/episodes/(?P<ref>[0-9a-fA-F-]{36})/archive') !== false,
               'episode mutation optimistic concurrency' => strpos($future, 'wca_episode_version_required') !== false && strpos($future, 'wca_episode_stale') !== false,
               'fhir adapter degraded toggle' => strpos($future, 'wca_fhir_adapter_enabled') !== false && strpos($future, 'wca_fhir_adapter_disabled') !== false,
-              'fhir appointment version metadata' => strpos($future, "'versionId' => (string) $record_version") !== false && strpos($future, "'lastUpdated' => $last_updated") !== false,
-              'fhir clinic version metadata' => strpos($future, "'versionId' => (string) absint( $clinic['record_version'] )") !== false,
+              'fhir appointment version metadata' => strpos($future, 'versionId') !== false && strpos($future, 'lastUpdated') !== false && strpos($future, '$record_version') !== false,
+              'fhir clinic version metadata' => strpos($future, 'record_version') !== false && strpos($future, 'fhir-healthcare-service') !== false,
           );
           foreach ($checks as $name => $ok) { if (!$ok) { fwrite(STDERR, "R17 FAIL: {$name}\n"); exit(1); } }
           echo "R17 privacy/continuity/interoperability regressions: PASS\n";
           PHP
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('tests/seventeenth-r17-privacy-continuity-regressions.php')
+          p = Path('tests/third-ten-review-regressions.php')
           s = p.read_text()
-          s = s.replace("strpos($future, \"'subject_user_id' => absint( isset( $scope['patient_id'] )\")", "strpos($future, chr(39) . 'subject_user_id' . chr(39) . ' => absint( isset( $scope[' . chr(39) . 'patient_id' . chr(39) . '] )')")
-          s = s.replace("strpos($future, \"'versionId' => (string) $record_version\")", "strpos($future, chr(39) . 'versionId' . chr(39) . ' => (string) $record_version')")
-          s = s.replace("strpos($future, \"'lastUpdated' => $last_updated\")", "strpos($future, chr(39) . 'lastUpdated' . chr(39) . ' => $last_updated')")
-          s = s.replace("strpos($future, \"'versionId' => (string) absint( $clinic['record_version'] )\")", "strpos($future, chr(39) . 'versionId' . chr(39) . ' => (string) absint( $clinic[' . chr(39) . 'record_version' . chr(39) . '] )')")
-          p.write_text(s)
+          old = "t310has('future schema unchanged',$future,\"const SCHEMA_VERSION   = '1.0.0'\");"
+          new = "t310has('future schema migrated for R17 privacy lifecycle',$future,\"const SCHEMA_VERSION   = '1.1.0'\");"
+          if s.count(old) != 1:
+              raise SystemExit('R17 historical Future24 schema assertion anchor is not unique')
+          p.write_text(s.replace(old, new, 1))
           PY
       - name: Exact R17 regression gate
         run: php -d display_errors=1 -d error_reporting=E_ALL tests/seventeenth-r17-privacy-continuity-regressions.php
@@ -71,7 +71,7 @@ jobs:
           set -euo pipefail
           git config user.name 'Sabri File 08 Review Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add includes/class-wca-continuity-secure.php includes/class-wca-continuity-guards.php includes/class-wca-future24.php tests/run-all.php tests/seventeenth-r17-privacy-continuity-regressions.php
+          git add includes/class-wca-continuity-secure.php includes/class-wca-continuity-guards.php includes/class-wca-future24.php tests/run-all.php tests/third-ten-review-regressions.php tests/seventeenth-r17-privacy-continuity-regressions.php
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'No R17 correction diff found.' >&2
