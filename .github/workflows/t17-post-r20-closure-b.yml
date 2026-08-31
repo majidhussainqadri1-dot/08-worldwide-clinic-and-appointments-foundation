@@ -49,6 +49,7 @@ jobs:
           rest=txt('includes/class-wca-rest.php')
           future=txt('includes/class-wca-future24.php')
           continuity=txt('includes/class-wca-continuity-secure.php')
+          plugin=txt('includes/class-wca-plugin.php')
           css=txt('assets/css/clinic.css')
           clinicjs=txt('assets/js/clinic.js')
           readme=txt('readme.txt')
@@ -71,7 +72,12 @@ jobs:
           rec('protected REST responses apply noindex','noindex' in rest.lower())
           rec('continuity protected responses apply no-store','private, no-store, max-age=0' in continuity)
           rec('continuity protected responses apply X-Robots-Tag','X-Robots-Tag' in continuity)
-          rec('REST cookie authentication requires nonce','wp_verify_nonce' in rest or 'X-WP-Nonce' in rest or 'wp_rest' in rest)
+          rec(
+              'REST cookie path creates and sends WordPress REST nonce',
+              "wp_create_nonce( 'wp_rest' )" in plugin and
+              "headers['X-WP-Nonce'] = nonce" in clinicjs and
+              "credentials: 'same-origin'" in clinicjs
+          )
           rec('RTL styling remains present','[dir="rtl"]' in css)
           rec('reduced-motion styling remains present','prefers-reduced-motion' in css)
           rec('forced-colors support remains present','forced-colors' in css)
