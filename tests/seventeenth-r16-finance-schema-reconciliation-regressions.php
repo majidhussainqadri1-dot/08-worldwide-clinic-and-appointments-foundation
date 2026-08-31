@@ -18,7 +18,7 @@ $required_repo = array(
     'if ( $source_version < $current_source_version )',
     "'_projection_action'] = 'stale_ignored'",
     "'wca_payment_source_version_conflict'",
-    "'source_version' => $current_source_version",
+    "'source_version' => \$current_source_version",
 );
 foreach ( $required_repo as $needle ) { if ( false === strpos( $repo, $needle ) ) { fwrite( STDERR, "T17 R16 repository ordering invariant missing: {$needle}\n" ); exit( 1 ); } }
 $required_service = array( "'source_version'", "'occurred_at'", 'PaymentStatusStaleIgnored.v1', 'PaymentStatusEquivalentReplay.v1', "'projection_action'" );
