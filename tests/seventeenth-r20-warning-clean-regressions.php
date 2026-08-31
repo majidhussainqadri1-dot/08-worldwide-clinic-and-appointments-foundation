@@ -8,7 +8,7 @@ $checks = array(
 	'complete suite enables E_ALL' => false !== strpos( $run_all, 'error_reporting=E_ALL' ),
 	'complete suite scans diagnostics' => false !== strpos( $run_all, '$diagnostic_pattern' ) && false !== strpos( $run_all, 'preg_match( $diagnostic_pattern, $text )' ),
 	'complete suite rejects diagnostics' => false !== strpos( $run_all, 'source-level test suite emitted a PHP diagnostic' ),
-	'R16 current source version needle is literal' => false !== strpos( $r16, "'source_version' => \\$current_source_version" ),
+	'R16 current source version needle is literal' => false !== strpos( $r16, '\'source_version\' => $current_source_version' ),
 );
 foreach ( $checks as $label => $ok ) {
 	if ( ! $ok ) { fwrite( STDERR, "R20 warning-clean regression failed: {$label}\n" ); exit( 1 ); }
