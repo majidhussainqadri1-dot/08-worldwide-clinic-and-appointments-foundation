@@ -1,0 +1,48 @@
+name: File 08 T17 R20 Frozen Correction Final Retest
+on: push
+permissions:
+  contents: read
+jobs:
+  retest:
+    if: github.ref == 'refs/heads/tmp-file08-r20-correction-final-20260831'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze exact corrected source
+        run: |
+          set -euo pipefail
+          git checkout --detach 5f073e7412b834c1ad22e6c8dfb52f24591207fc
+          test "$(git rev-parse HEAD)" = "5f073e7412b834c1ad22e6c8dfb52f24591207fc"
+          test -z "$(git status --porcelain)"
+      - name: Full warning-clean source retest
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/seventeenth-r16-finance-schema-reconciliation-regressions.php 2>&1 | tee /tmp/r20-r16.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:|Fatal error:|Parse error:' /tmp/r20-r16.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/seventeenth-r20-warning-clean-regressions.php 2>&1 | tee /tmp/r20-specific.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:|Fatal error:|Parse error:' /tmp/r20-specific.txt
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/r20-all.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:|Fatal error:|Parse error:' /tmp/r20-all.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Deterministic candidate parity
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          epoch=$(git show -s --format=%ct HEAD)
+          rm -rf build/r20-final-a build/r20-final-b
+          php tools/build-candidate.php --output-dir=build/r20-final-a --commit="$sha" --source-date-epoch="$epoch"
+          php tools/build-candidate.php --output-dir=build/r20-final-b --commit="$sha" --source-date-epoch="$epoch"
+          cmp build/r20-final-a/*-candidate.zip build/r20-final-b/*-candidate.zip
+          cmp build/r20-final-a/*-candidate-manifest.json build/r20-final-b/*-candidate-manifest.json
+          cmp build/r20-final-a/*-candidate.sha256 build/r20-final-b/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/r20-final-a --commit="$sha"
+          php tools/verify-candidate.php --artifact=build/r20-final-b --commit="$sha"
+          cat build/r20-final-a/*-candidate.sha256
+          rm -rf build/r20-final-a build/r20-final-b
+          echo "R20 FROZEN CORRECTION: FULL RETEST PASS at $sha"
