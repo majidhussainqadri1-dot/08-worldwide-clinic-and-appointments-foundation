@@ -1,0 +1,61 @@
+name: File 08 T17 R18 Complete Accessibility UX Review
+on:
+  push:
+    branches:
+      - tmp-file08-r18-accessibility-20260831
+    paths:
+      - .github/workflows/t17-r18-review.yml
+permissions:
+  contents: read
+jobs:
+  review-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze production-source review parent
+        run: |
+          set -euo pipefail
+          echo "R18_WORKFLOW_HEAD=$(git rev-parse HEAD)"
+          echo "R18_SOURCE_PARENT=$(git rev-parse HEAD^)"
+          test "$(git rev-parse HEAD^)" = "dc157fd8602d4cb15780bf498176e97151d0f6b7"
+      - name: Complete source regression baseline
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r18-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r18-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r18-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: R18 full accessibility RTL privacy-cache UX audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f assets/css/clinic.css
+          grep -q 'prefers-reduced-motion' assets/css/clinic.css
+          grep -q 'forced-colors' assets/css/clinic.css
+          grep -q '\[dir="rtl"\]' assets/css/clinic.css
+          grep -RInE 'aria-|role=|tabindex|focus|keyboard|accessib|rtl|reduced-motion|forced-colors|no-store|noindex|X-Robots-Tag|Cache-Control|emergency' assets includes --include='*.php' --include='*.js' --include='*.css' | tee /tmp/r18-evidence.txt
+          test "$(wc -l </tmp/r18-evidence.txt)" -gt 20
+          ! grep -RInE '<(div|span)[^>]*onclick=|javascript:' includes assets --include='*.php' --include='*.js'
+          ! grep -RInE 'outline[[:space:]]*:[[:space:]]*(0|none)' assets --include='*.css'
+          ! grep -RInE 'user-scalable[[:space:]]*=[[:space:]]*no|maximum-scale[[:space:]]*=[[:space:]]*1' . --include='*.php' --include='*.html'
+          ! grep -RInE 'target="_blank"' includes assets --include='*.php' --include='*.js' | grep -v 'noopener' || false
+          grep -q "private, no-store, max-age=0" includes/class-wca-continuity-secure.php
+          grep -q "X-Robots-Tag" includes/class-wca-continuity-secure.php
+          grep -q "private, no-store, max-age=0" includes/class-wca-rest.php
+          grep -q "noindex" includes/class-wca-rest.php
+          grep -q 'aria-live' includes/class-wca-continuity-secure.php
+          grep -q 'role="status"' includes/class-wca-continuity-secure.php
+          grep -q 'role="note"' includes/class-wca-continuity-secure.php
+          grep -q 'Do not wait here for an emergency' includes/class-wca-continuity-secure.php
+      - name: Review repository-visible UI strings for unsafe untranslated raw output
+        run: |
+          set -euo pipefail
+          ! grep -RInE 'echo[[:space:]]+\$_(GET|POST|REQUEST)|print[[:space:]]+\$_(GET|POST|REQUEST)' includes worldwide-clinic.php --include='*.php'
+          ! grep -RInE 'innerHTML[[:space:]]*=[[:space:]]*[^;]*(response|data|message)' assets --include='*.js'
+      - name: Record clean R18 review result
+        run: echo 'R18 COMPLETE REVIEW: CLEAN — no supported defect in the audited repository/source scope.'
