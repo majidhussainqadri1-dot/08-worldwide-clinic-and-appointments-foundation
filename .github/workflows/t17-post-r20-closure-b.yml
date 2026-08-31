@@ -1,0 +1,122 @@
+name: File 08 Post-R20 Closure Verification B
+on: push
+permissions:
+  contents: read
+jobs:
+  closure-b:
+    if: github.ref == 'refs/heads/tmp-file08-post-r20-closure-b-20260831'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze exact source independently
+        run: |
+          set -euo pipefail
+          git checkout --detach 5f073e7412b834c1ad22e6c8dfb52f24591207fc
+          test "$(git rev-parse HEAD)" = "5f073e7412b834c1ad22e6c8dfb52f24591207fc"
+          test -z "$(git status --porcelain)"
+      - name: Complete independent closure review B and freeze ledger
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import glob, json, re, subprocess, sys
+
+          defects=[]
+          def rec(label,ok,detail=''):
+              print(('PASS' if ok else 'FAIL')+': '+label+((' :: '+detail) if detail else ''))
+              if not ok: defects.append(label)
+              return ok
+          def run(label,cmd,capture=False):
+              p=subprocess.run(cmd,shell=True,text=True,stdout=subprocess.PIPE if capture else None,stderr=subprocess.STDOUT if capture else None)
+              if capture and p.stdout: print(p.stdout,end='')
+              rec(label,p.returncode==0,('rc='+str(p.returncode)) if p.returncode else '')
+              return p
+          def txt(p): return Path(p).read_text(errors='replace')
+
+          print('--- B1: INDEPENDENT COMPLETE BUILD / TEST BASELINE ---')
+          run('all PHP sources lint independently',"find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/b-lint.txt")
+          suite=run('complete File08 source suite independently passes','php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php',True)
+          diag=re.compile(r'(?:PHP\s+)?(?:Warning|Notice|Deprecated|Fatal error|Parse error)\s*:',re.I)
+          rec('independent full suite is PHP-diagnostic-free',not any(diag.search(x) for x in (suite.stdout or '').splitlines()))
+          for js in ('assets/js/clinic.js','assets/js/continuity.js','assets/js/future24.js'):
+              run(js+' parses independently','node --check '+js)
+
+          print('--- B2: PLAN/ROUTE/STATE/SAFETY PARITY REVIEW ---')
+          contracts=txt('includes/class-wca-contracts.php')
+          service=txt('includes/class-wca-service.php')
+          rest=txt('includes/class-wca-rest.php')
+          future=txt('includes/class-wca-future24.php')
+          continuity=txt('includes/class-wca-continuity-secure.php')
+          css=txt('assets/css/clinic.css')
+          clinicjs=txt('assets/js/clinic.js')
+          readme=txt('readme.txt')
+          bootstrap=txt('worldwide-clinic.php')
+          required_routes=['/clinic/{clinic_slug}','/appointments/book/{doctor_or_clinic}','/appointments','/clinic/dashboard','/appointment/{public_ref}']
+          rec('all five canonical route contracts remain declared',all(r in contracts for r in required_routes))
+          states=['requested','confirmed','declined','reschedule_pending','checked_in','completed','cancelled','no_show']
+          rec('all eight appointment states remain contracted',all(s in contracts for s in states))
+          rec('completed remains terminal','completed' in contracts and 'terminal' in contracts.lower())
+          rec('emergency diversion remains explicit','emergency' in service.lower() and ('diversion' in service.lower() or 'urgent' in service.lower()))
+          rec('review eligibility remains completion-bound','ReviewEligibilityGranted.v1' in service or 'ReviewEligibilityGranted.v1' in contracts)
+          rec('zero platform commission is still immutable',"'commission_percent' => 0" in contracts)
+          rec('automated diagnosis remains prohibited',"'automated_diagnosis' => false" in contracts)
+          rec('automated prescribing remains prohibited',"'automated_prescribing' => false" in contracts)
+          rec('Future24 advertises all 24 approved capabilities',sum(1 for i in range(1,25) if f'F08-FUT-{i:02d}' in future)>=24)
+          rec('continuity explicitly denies AI treatment generation','does not generate treatment with AI' in continuity)
+
+          print('--- B3: PUBLIC/PROTECTED API, CACHE AND UX REVIEW ---')
+          rec('protected REST responses apply no-store','private, no-store, max-age=0' in rest)
+          rec('protected REST responses apply noindex','noindex' in rest.lower())
+          rec('continuity protected responses apply no-store','private, no-store, max-age=0' in continuity)
+          rec('continuity protected responses apply X-Robots-Tag','X-Robots-Tag' in continuity)
+          rec('REST cookie authentication requires nonce','wp_verify_nonce' in rest or 'X-WP-Nonce' in rest or 'wp_rest' in rest)
+          rec('RTL styling remains present','[dir="rtl"]' in css)
+          rec('reduced-motion styling remains present','prefers-reduced-motion' in css)
+          rec('forced-colors support remains present','forced-colors' in css)
+          rec('continuity surfaces have live status semantics','aria-live' in continuity and 'role="status"' in continuity)
+          rec('continuity emergency warning remains visible','Do not wait here for an emergency' in continuity)
+          rec('booking JS avoids unsafe raw HTML response assignment',not re.search(r'innerHTML\s*=\s*[^;]*(?:response|data|message)',clinicjs,re.I))
+          rec('CSS does not suppress focus outline globally',not re.search(r'outline\s*:\s*(?:0|none)',css,re.I))
+
+          print('--- B4: VERSION/RELEASE TRUTH REVIEW ---')
+          rec('plugin header runtime is 1.2.15','Version: 1.2.15' in bootstrap)
+          rec('runtime constant is 1.2.15',"WCA_VERSION', '1.2.15" in bootstrap)
+          rec('stable tag is 1.2.15','Stable tag: 1.2.15' in readme)
+          risky=[str(p) for p in Path('.').rglob('*') if p.is_file() and (p.name=='.env' or p.suffix in {'.pem','.key','.p12','.b64'})]
+          rec('release tree has no private-key/env artifacts',not risky,','.join(risky[:8]))
+          rec('release tree has no symlinks',not any(p.is_symlink() for p in Path('.').rglob('*')))
+          sha=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          epoch=subprocess.check_output(['git','show','-s','--format=%ct','HEAD'],text=True).strip()
+          subprocess.run('rm -rf build/closure-b-1 build/closure-b-2',shell=True)
+          run('independent candidate build one succeeds',f'php tools/build-candidate.php --output-dir=build/closure-b-1 --commit={sha} --source-date-epoch={epoch}',True)
+          run('independent candidate build two succeeds',f'php tools/build-candidate.php --output-dir=build/closure-b-2 --commit={sha} --source-date-epoch={epoch}',True)
+          def one(pat):
+              x=glob.glob(pat); return x[0] if len(x)==1 else None
+          za,zb=one('build/closure-b-1/*-candidate.zip'),one('build/closure-b-2/*-candidate.zip')
+          ma,mb=one('build/closure-b-1/*-candidate-manifest.json'),one('build/closure-b-2/*-candidate-manifest.json')
+          ha,hb=one('build/closure-b-1/*-candidate.sha256'),one('build/closure-b-2/*-candidate.sha256')
+          rec('both independent packages contain one ZIP manifest checksum',all([za,zb,ma,mb,ha,hb]))
+          if za and zb: rec('independent candidate ZIPs are byte-identical',Path(za).read_bytes()==Path(zb).read_bytes())
+          if ma and mb: rec('independent candidate manifests are byte-identical',Path(ma).read_bytes()==Path(mb).read_bytes())
+          if ha and hb: rec('independent checksum files are byte-identical',Path(ha).read_bytes()==Path(hb).read_bytes())
+          if za: run('independent candidate one verifies',f'php tools/verify-candidate.php --artifact=build/closure-b-1 --commit={sha}',True)
+          if zb: run('independent candidate two verifies',f'php tools/verify-candidate.php --artifact=build/closure-b-2 --commit={sha}',True)
+          if ma:
+              try:
+                  m=json.loads(Path(ma).read_text())
+                  rec('candidate manifest binds exact final source',m.get('commit')==sha,str(m.get('commit')))
+                  rec('candidate manifest does not claim staging accepted',not bool(m.get('staging_accepted')))
+                  rec('candidate manifest does not claim production accepted',not bool(m.get('production_accepted')))
+                  rec('candidate manifest keeps commission zero',int(m.get('commission_percent',-1))==0)
+              except Exception as e: rec('candidate manifest JSON is valid',False,repr(e))
+          subprocess.run('rm -rf build/closure-b-1 build/closure-b-2',shell=True)
+
+          print('=== POST-R20 CLOSURE B FROZEN DEFECT LEDGER ===')
+          if defects:
+              for i,d in enumerate(defects,1): print(f'{i}. {d}')
+          else: print('No supported defect found.')
+          print('CLOSURE_B_DEFECT_COUNT='+str(len(defects)))
+          sys.exit(1 if defects else 0)
+          PY
