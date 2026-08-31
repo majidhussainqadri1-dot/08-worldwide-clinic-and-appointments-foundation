@@ -1,0 +1,45 @@
+name: File 08 T17 R19 Complete Release Reproducibility Review
+on: push
+permissions:
+  contents: read
+jobs:
+  review:
+    if: github.ref == 'refs/heads/tmp-file08-r19-release-20260831'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze exact reviewed source
+        run: |
+          set -euo pipefail
+          git checkout --detach dc157fd8602d4cb15780bf498176e97151d0f6b7
+          test "$(git rev-parse HEAD)" = "dc157fd8602d4cb15780bf498176e97151d0f6b7"
+          test -z "$(git status --porcelain)"
+      - name: Complete R19 release and repository hygiene review
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r19-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php | tee /tmp/r19-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r19-tests.txt
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          sha=$(git rev-parse HEAD)
+          epoch=$(git show -s --format=%ct HEAD)
+          rm -rf build/t17-r19-a build/t17-r19-b
+          php tools/build-candidate.php --output-dir=build/t17-r19-a --commit="$sha" --source-date-epoch="$epoch" | tee /tmp/r19-build-a.txt
+          php tools/build-candidate.php --output-dir=build/t17-r19-b --commit="$sha" --source-date-epoch="$epoch" | tee /tmp/r19-build-b.txt
+          cmp build/t17-r19-a/*-candidate.zip build/t17-r19-b/*-candidate.zip
+          cmp build/t17-r19-a/*-candidate-manifest.json build/t17-r19-b/*-candidate-manifest.json
+          cmp build/t17-r19-a/*-candidate.sha256 build/t17-r19-b/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/t17-r19-a --commit="$sha"
+          php tools/verify-candidate.php --artifact=build/t17-r19-b --commit="$sha"
+          test "$(find build/t17-r19-a -maxdepth 1 -name '*-candidate.zip' | wc -l)" -eq 1
+          test "$(find build/t17-r19-a -maxdepth 1 -name '*-candidate-manifest.json' | wc -l)" -eq 1
+          test "$(find build/t17-r19-a -maxdepth 1 -name '*-candidate.sha256' | wc -l)" -eq 1
+          cat build/t17-r19-a/*-candidate.sha256
+          rm -rf build/t17-r19-a build/t17-r19-b
+          echo 'R19 COMPLETE REVIEW: CLEAN'
