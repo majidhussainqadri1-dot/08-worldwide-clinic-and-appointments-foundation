@@ -20,112 +20,160 @@ jobs:
       - name: Complete R20 review and freeze full defect ledger
         shell: bash
         run: |
-          set +e
-          FAIL=0
-          LEDGER=/tmp/r20-defects.txt
-          : > "$LEDGER"
-          audit() {
-            local label="$1"; shift
-            echo "=== AUDIT: $label ==="
-            bash -o pipefail -c "$*"
-            local rc=$?
-            if [ $rc -eq 0 ]; then
-              echo "PASS: $label"
-            else
-              echo "FAIL: $label (rc=$rc)"
-              printf '%s\n' "$label" >> "$LEDGER"
-              FAIL=$((FAIL+1))
-            fi
-            echo
+          python3 - <<'PY'
+          from pathlib import Path
+          import glob, json, os, re, subprocess, sys, hashlib
+
+          ROOT = Path('.')
+          defects = []
+          def record(label, ok, detail=''):
+              status = 'PASS' if ok else 'FAIL'
+              print(f'{status}: {label}' + (f' :: {detail}' if detail else ''))
+              if not ok:
+                  defects.append(label)
+              return ok
+
+          def run(label, cmd, capture=False):
+              p = subprocess.run(cmd, shell=True, text=True, stdout=subprocess.PIPE if capture else None,
+                                 stderr=subprocess.STDOUT if capture else None)
+              if capture and p.stdout:
+                  print(p.stdout, end='')
+              record(label, p.returncode == 0, f'rc={p.returncode}' if p.returncode else '')
+              return p
+
+          def text(path):
+              return Path(path).read_text(errors='replace')
+
+          print('--- R20 BASELINE / TEST-HARNESS REVIEW ---')
+          run('PHP syntax lint', "find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt")
+          suite = run('complete source suites return success', 'php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php', capture=True)
+          Path('/tmp/r20-tests.txt').write_text(suite.stdout or '')
+          warning_re = re.compile(r'PHP (?:Warning|Notice|Deprecated|Fatal|Parse)|(?:Warning|Notice|Deprecated):')
+          warnings = [line for line in (suite.stdout or '').splitlines() if warning_re.search(line)]
+          record('complete source suites are warning/notice/deprecation/fatal free', not warnings, ' | '.join(warnings[:4]))
+          run('clinic.js syntax', 'node --check assets/js/clinic.js')
+          run('continuity.js syntax', 'node --check assets/js/continuity.js')
+          run('future24.js syntax', 'node --check assets/js/future24.js')
+
+          print('--- R20 SECURITY / AUTHORIZATION / OWNERSHIP REVIEW ---')
+          runtime_files = [p for p in ROOT.rglob('*') if p.is_file() and (str(p).startswith('includes/') or str(p).startswith('assets/') or str(p) == 'worldwide-clinic.php') and p.suffix in {'.php','.js','.css'}]
+          runtime = '\n'.join(p.read_text(errors='replace') for p in runtime_files)
+          record('dangerous runtime primitives absent', not re.search(r'eval\(|base64_decode\(|shell_exec\(|passthru\(|proc_open\(|assert\(\s*\$', runtime))
+          record('unauthenticated write AJAX absent', not re.search(r'wp_ajax_nopriv_.*(?:save|create|delete|update|book|cancel|reschedule|complete|submit)', runtime))
+
+          callback_token = "'permission_callback' => '__return_true'"
+          public_hits = []
+          for p in Path('includes').glob('*.php'):
+              for n,line in enumerate(p.read_text(errors='replace').splitlines(),1):
+                  if callback_token in line:
+                      public_hits.append((p.name,n,line.strip()))
+          print('Public callback inventory:')
+          for hit in public_hits: print('  ', hit)
+          expected_counts = {
+              'class-wca-calendar-link.php': 2,
+              'class-wca-central-governance.php': 2,
+              'class-wca-rest.php': 4,
+              'class-wca-ten-review-hardening.php': 1,
+              'class-wca-future24.php': 1,
           }
+          actual_counts = {}
+          for f,_,_ in public_hits: actual_counts[f] = actual_counts.get(f,0)+1
+          record('public callback inventory is exactly the reviewed allowlist', actual_counts == expected_counts, f'actual={actual_counts}')
 
-          echo '--- R20 BASELINE / TEST-HARNESS REVIEW ---'
-          audit 'PHP syntax lint' "find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-lint.txt"
-          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/r20-tests.txt
-          test_rc=${PIPESTATUS[0]}
-          if [ $test_rc -ne 0 ]; then echo 'FAIL: complete source suites'; echo 'complete source suites' >> "$LEDGER"; FAIL=$((FAIL+1)); else echo 'PASS: complete source suites'; fi
-          if grep -En 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r20-tests.txt; then
-            echo 'FAIL: source suites emitted PHP warning/notice/deprecation/fatal output'
-            echo 'source suites emitted PHP warning/notice/deprecation/fatal output' >> "$LEDGER"
-            FAIL=$((FAIL+1))
-          else
-            echo 'PASS: source suites warning-free'
-          fi
-          audit 'clinic.js syntax' "node --check assets/js/clinic.js"
-          audit 'continuity.js syntax' "node --check assets/js/continuity.js"
-          audit 'future24.js syntax' "node --check assets/js/future24.js"
+          future = text('includes/class-wca-future24.php')
+          continuity = text('includes/class-wca-continuity-secure.php')
+          calendar = text('includes/class-wca-calendar-link.php')
+          governance = text('includes/class-wca-central-governance.php')
+          rest = text('includes/class-wca-rest.php')
+          ten = text('includes/class-wca-ten-review-hardening.php')
+          contracts = text('includes/class-wca-contracts.php')
 
-          echo '--- R20 SECURITY / AUTHORIZATION / OWNERSHIP REVIEW ---'
-          audit 'dangerous runtime primitives absent' "! grep -RInE 'eval\\(|base64_decode\\(|shell_exec\\(|passthru\\(|proc_open\\(|assert\\([[:space:]]*\\$' includes assets worldwide-clinic.php --include='*.php' --include='*.js'"
-          audit 'unauthenticated write AJAX absent' "! grep -RInE 'wp_ajax_nopriv_.*(save|create|delete|update|book|cancel|reschedule|complete|submit)' includes worldwide-clinic.php --include='*.php'"
-          audit 'Future24 and Continuity have no open permission callback' "! grep -RInE \"permission_callback[[:space:]]*=>[[:space:]]*['\\\"]__return_true['\\\"]\" includes/class-wca-future24.php includes/class-wca-continuity-secure.php"
-          echo 'Current intentional public callbacks:'
-          grep -RInF "'permission_callback' => '__return_true'" includes --include='*.php' | tee /tmp/r20-public-callbacks.txt || true
-          audit 'intentional public callback total is nine' "test \"$(wc -l </tmp/r20-public-callbacks.txt)\" -eq 9"
-          audit 'calendar public callback count is two' "test \"$(grep -Fc \"'permission_callback' => '__return_true'\" includes/class-wca-calendar-link.php)\" -eq 2"
-          audit 'central governance public callback count is two' "test \"$(grep -Fc \"'permission_callback' => '__return_true'\" includes/class-wca-central-governance.php)\" -eq 2"
-          audit 'core REST public callback count is four' "test \"$(grep -Fc \"'permission_callback' => '__return_true'\" includes/class-wca-rest.php)\" -eq 4"
-          audit 'ten-review slot-search public callback count is one' "test \"$(grep -Fc \"'permission_callback' => '__return_true'\" includes/class-wca-ten-review-hardening.php)\" -eq 1"
-          audit 'no unexpected public callback owner' "test -z \"$(grep -Ev '^(includes/class-wca-calendar-link.php|includes/class-wca-central-governance.php|includes/class-wca-rest.php|includes/class-wca-ten-review-hardening.php):' /tmp/r20-public-callbacks.txt || true)\""
-          audit 'calendar signed webhook verifier exists' "grep -q 'wca_calendar_provider_verify_webhook' includes/class-wca-calendar-link.php"
-          audit 'calendar signature constant-time check exists' "grep -Fq 'hash_equals( $expected, $sig )' includes/class-wca-calendar-link.php"
-          audit 'public clinic projection remains owner projection' "grep -q 'WCA_Service::public_clinic_projection' includes/class-wca-central-governance.php"
-          audit 'public clinic collection is rate limited' "grep -Fq \"rate_limit( 'public_clinics'\" includes/class-wca-rest.php"
-          audit 'public clinic detail is rate limited' "grep -Fq \"rate_limit( 'public_clinic'\" includes/class-wca-rest.php"
-          audit 'slot search is rate limited' "grep -Fq \"rate_limit( 'slot_search'\" includes/class-wca-rest.php"
-          audit 'legacy slot search is rate limited' "grep -Fq \"rate_limit_hit( 'tenreview_slot_search'\" includes/class-wca-ten-review-hardening.php"
-          audit 'zero commission invariant' "grep -Fq \"'commission_percent' => 0\" includes/class-wca-contracts.php"
-          audit 'donation visibility neutrality invariant' "grep -Fq \"'donation_visibility_link' => false\" includes/class-wca-contracts.php"
-          audit 'automated diagnosis remains disabled' "grep -Fq \"'automated_diagnosis' => false\" includes/class-wca-contracts.php"
-          audit 'automated prescribing remains disabled' "grep -Fq \"'automated_prescribing' => false\" includes/class-wca-contracts.php"
-          audit 'no direct foreign canonical table writes' "! grep -RInE 'CREATE TABLE[^[:cntrl:]]*(file17|file19|file20|file24|file26)|INSERT INTO[^[:cntrl:]]*(file17|file19|file20|file24|file26)' includes --include='*.php'"
+          manifest_match = re.search(r'public static function rest_manifest\(\)\s*\{(.*?)\n\t\}', future, re.S)
+          manifest_body = manifest_match.group(1) if manifest_match else ''
+          record('Future24 public manifest is a static non-patient capability projection', bool(manifest_match) and not re.search(r'\$wpdb|patient_|guardian_|appointment_id|get_current_user_id|SWC_Helpers::meta|WCA_Repository::', manifest_body) and "'capabilities' => self::capabilities()" in manifest_body)
+          record('Continuity has no unauthenticated public route', callback_token not in continuity)
+          record('calendar webhook uses approved signature-verification adapter', 'wca_calendar_provider_verify_webhook' in calendar and "true !== ( $verified['verified'] ?? false )" in calendar)
+          record('calendar webhook has replay-window validation', 'wca_calendar_webhook_replay_window' in calendar and '> 900' in calendar)
+          record('calendar webhook is idempotent', "claim_idempotency( 'calendar_provider_webhook'" in calendar)
+          record('signed ICS bearer is constant-time verified', 'hash_equals( $expected, $sig )' in calendar)
+          record('public clinic projection remains canonical owner projection', 'WCA_Service::public_clinic_projection' in governance)
+          record('public clinic collection is rate limited', "rate_limit( 'public_clinics'" in rest)
+          record('public clinic detail is rate limited', "rate_limit( 'public_clinic'" in rest)
+          record('slot search is rate limited', "rate_limit( 'slot_search'" in rest)
+          record('legacy slot search is rate limited', "rate_limit_hit( 'tenreview_slot_search'" in ten)
+          record('zero commission invariant', "'commission_percent' => 0" in contracts)
+          record('donation visibility neutrality invariant', "'donation_visibility_link' => false" in contracts)
+          record('automated diagnosis remains disabled', "'automated_diagnosis' => false" in contracts)
+          record('automated prescribing remains disabled', "'automated_prescribing' => false" in contracts)
+          foreign_write = re.search(r'(?:CREATE TABLE|INSERT INTO)[^\n]*(?:file17|file19|file20|file24|file26)', '\n'.join(text(p) for p in Path('includes').glob('*.php')), re.I)
+          record('no direct foreign canonical table writes', foreign_write is None)
 
-          echo '--- R20 FAILURE / PRIVACY / MIGRATION / CONCURRENCY REVIEW ---'
-          audit 'legal-hold-aware privacy test exists' "grep -q 'legal-hold-aware privacy lifecycle exists' tests/security-static.php"
-          audit 'optimistic concurrency test exists' "grep -q 'optimistic concurrency is enforced' tests/security-static.php"
-          audit 'idempotent mutation test exists' "grep -q 'idempotent write protection is implemented' tests/security-static.php"
-          audit 'notification fallback is privacy-minimal' "grep -q 'notification fallback is privacy-minimal' tests/security-static.php"
-          audit 'outbox fallback excludes clinical narrative' "grep -q 'outbox fallback never emails clinical narrative' tests/security-static.php"
-          audit 'R17 intake expected-version root guard exists' "grep -q 'wca_intake_version_required' includes/class-wca-continuity-secure.php"
-          audit 'R17 appointment-processing consent root guard exists' "grep -q 'appointment_processing' includes/class-wca-continuity-secure.php"
-          audit 'Future24 schema is migrated to 1.1.0' "grep -Fq \"const SCHEMA_VERSION   = '1.1.0'\" includes/class-wca-future24.php"
-          audit 'episode optimistic version guard exists' "grep -q 'wca_episode_version_required' includes/class-wca-future24.php"
-          audit 'FHIR adapter degraded/disable state exists' "grep -q 'wca_fhir_adapter_disabled' includes/class-wca-future24.php"
-          audit 'FHIR version metadata exists' "grep -q 'versionId' includes/class-wca-future24.php"
-          audit 'FHIR freshness metadata exists' "grep -q 'lastUpdated' includes/class-wca-future24.php"
-          audit 'unbounded WordPress query patterns absent' "! grep -RInE \"posts_per_page['\\\"]?[[:space:]]*=>[[:space:]]*-1|numberposts['\\\"]?[[:space:]]*=>[[:space:]]*-1|nopaging['\\\"]?[[:space:]]*=>[[:space:]]*true\" includes --include='*.php'"
+          print('--- R20 FAILURE / PRIVACY / MIGRATION / CONCURRENCY REVIEW ---')
+          security = text('tests/security-static.php')
+          record('legal-hold-aware privacy regression exists', 'legal-hold-aware privacy lifecycle exists' in security)
+          record('optimistic concurrency regression exists', 'optimistic concurrency is enforced' in security)
+          record('idempotent write regression exists', 'idempotent write protection is implemented' in security)
+          record('notification fallback privacy regression exists', 'notification fallback is privacy-minimal' in security)
+          record('outbox clinical-narrative exclusion regression exists', 'outbox fallback never emails clinical narrative' in security)
+          record('R17 intake expected-version root guard exists', 'wca_intake_version_required' in continuity)
+          record('R17 appointment-processing consent root guard exists', 'appointment_processing' in continuity)
+          record('Future24 schema migrated to 1.1.0', "const SCHEMA_VERSION   = '1.1.0'" in future)
+          record('episode optimistic version guard exists', 'wca_episode_version_required' in future and 'wca_episode_stale' in future)
+          record('FHIR adapter explicit degraded/disabled state exists', 'wca_fhir_adapter_disabled' in future and "'degraded' => true" in future)
+          record('FHIR version/freshness metadata exists', 'versionId' in future and 'lastUpdated' in future)
+          unbounded = []
+          ub_re = re.compile(r"posts_per_page['\"]?\s*=>\s*-1|numberposts['\"]?\s*=>\s*-1|nopaging['\"]?\s*=>\s*true")
+          for p in Path('includes').glob('*.php'):
+              if ub_re.search(text(p)): unbounded.append(p.name)
+          record('unbounded WordPress query patterns absent', not unbounded, ','.join(unbounded))
 
-          echo '--- R20 RELEASE TRUTH / HYGIENE / REPRODUCIBILITY REVIEW ---'
-          audit 'runtime TODO/FIXME/XXX/HACK markers absent' "! grep -RInE 'TODO|FIXME|XXX|HACK' includes assets worldwide-clinic.php --include='*.php' --include='*.js' --include='*.css'"
-          audit 'private key and env files absent' "test -z \"$(find . -type f \\( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \\) -print -quit)\""
-          audit 'repository symlinks absent' "test -z \"$(find . -type l -print -quit)\""
-          audit 'obvious embedded secret patterns absent' "! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git ."
+          print('--- R20 RELEASE TRUTH / HYGIENE / REPRODUCIBILITY REVIEW ---')
+          markers = []
+          for p in runtime_files:
+              if re.search(r'\b(?:TODO|FIXME|XXX|HACK)\b', p.read_text(errors='replace')): markers.append(str(p))
+          record('runtime TODO/FIXME/XXX/HACK markers absent', not markers, ','.join(markers[:8]))
+          risky_files = [str(p) for p in ROOT.rglob('*') if p.is_file() and (p.name in {'.env'} or p.suffix in {'.pem','.key','.p12','.b64'})]
+          record('private key and environment files absent', not risky_files, ','.join(risky_files[:8]))
+          symlinks = [str(p) for p in ROOT.rglob('*') if p.is_symlink()]
+          record('repository symlinks absent', not symlinks, ','.join(symlinks[:8]))
+          all_non_git = '\n'.join(p.read_text(errors='ignore') for p in ROOT.rglob('*') if p.is_file() and '.git' not in p.parts and p.stat().st_size < 2_000_000)
+          secret_match = re.search(r'BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}', all_non_git)
+          record('obvious embedded secret patterns absent', secret_match is None)
 
-          sha=$(git rev-parse HEAD)
-          epoch=$(git show -s --format=%ct HEAD)
-          rm -rf build/t17-r20-a build/t17-r20-b
-          audit 'candidate build A succeeds' "php tools/build-candidate.php --output-dir=build/t17-r20-a --commit='$sha' --source-date-epoch='$epoch' >/tmp/r20-build-a.txt"
-          audit 'candidate build B succeeds' "php tools/build-candidate.php --output-dir=build/t17-r20-b --commit='$sha' --source-date-epoch='$epoch' >/tmp/r20-build-b.txt"
-          audit 'candidate ZIP is byte reproducible' "cmp build/t17-r20-a/*-candidate.zip build/t17-r20-b/*-candidate.zip"
-          audit 'candidate manifest is byte reproducible' "cmp build/t17-r20-a/*-candidate-manifest.json build/t17-r20-b/*-candidate-manifest.json"
-          audit 'candidate checksum file is byte reproducible' "cmp build/t17-r20-a/*-candidate.sha256 build/t17-r20-b/*-candidate.sha256"
-          audit 'candidate A independently verifies' "php tools/verify-candidate.php --artifact=build/t17-r20-a --commit='$sha'"
-          audit 'candidate B independently verifies' "php tools/verify-candidate.php --artifact=build/t17-r20-b --commit='$sha'"
-          manifest=$(find build/t17-r20-a -maxdepth 1 -name '*-candidate-manifest.json' -print -quit)
-          if [ -n "$manifest" ]; then
-            audit 'manifest exact commit/staging/production/commission truth' "php -r '\$m=json_decode(file_get_contents(\$argv[1]),true); if(!is_array(\$m)){exit(2);} if((\$m[\"commit\"]??\"\")!==\$argv[2]){exit(3);} if(!empty(\$m[\"staging_accepted\"])||!empty(\$m[\"production_accepted\"])){exit(4);} if((int)(\$m[\"commission_percent\"]??-1)!==0){exit(5);}' '$manifest' '$sha'"
-          else
-            echo 'FAIL: candidate manifest exists'
-            echo 'candidate manifest exists' >> "$LEDGER"
-            FAIL=$((FAIL+1))
-          fi
-          rm -rf build/t17-r20-a build/t17-r20-b
+          sha = subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
+          epoch = subprocess.check_output(['git','show','-s','--format=%ct','HEAD'], text=True).strip()
+          subprocess.run('rm -rf build/t17-r20-a build/t17-r20-b', shell=True)
+          build_a = run('candidate build A succeeds', f"php tools/build-candidate.php --output-dir=build/t17-r20-a --commit={sha} --source-date-epoch={epoch}", capture=True)
+          build_b = run('candidate build B succeeds', f"php tools/build-candidate.php --output-dir=build/t17-r20-b --commit={sha} --source-date-epoch={epoch}", capture=True)
 
-          echo '=== R20 FROZEN DEFECT LEDGER ==='
-          if [ -s "$LEDGER" ]; then
-            nl -ba "$LEDGER"
-          else
-            echo 'No supported defect found.'
-          fi
-          echo "R20_DEFECT_COUNT=$FAIL"
-          test "$FAIL" -eq 0
+          def one(pattern):
+              xs = glob.glob(pattern)
+              return xs[0] if len(xs)==1 else None
+          za,zb = one('build/t17-r20-a/*-candidate.zip'),one('build/t17-r20-b/*-candidate.zip')
+          ma,mb = one('build/t17-r20-a/*-candidate-manifest.json'),one('build/t17-r20-b/*-candidate-manifest.json')
+          ha,hb = one('build/t17-r20-a/*-candidate.sha256'),one('build/t17-r20-b/*-candidate.sha256')
+          record('exactly one ZIP/manifest/checksum exists in each candidate', all([za,zb,ma,mb,ha,hb]))
+          if za and zb: record('candidate ZIP is byte reproducible', Path(za).read_bytes()==Path(zb).read_bytes())
+          if ma and mb: record('candidate manifest is byte reproducible', Path(ma).read_bytes()==Path(mb).read_bytes())
+          if ha and hb: record('candidate checksum file is byte reproducible', Path(ha).read_bytes()==Path(hb).read_bytes())
+          if za: run('candidate A independently verifies', f'php tools/verify-candidate.php --artifact=build/t17-r20-a --commit={sha}', capture=True)
+          if zb: run('candidate B independently verifies', f'php tools/verify-candidate.php --artifact=build/t17-r20-b --commit={sha}', capture=True)
+          if ma:
+              try:
+                  m=json.loads(Path(ma).read_text())
+                  record('manifest exact source commit', m.get('commit')==sha, str(m.get('commit')))
+                  record('manifest does not overclaim staging acceptance', not bool(m.get('staging_accepted')))
+                  record('manifest does not overclaim production acceptance', not bool(m.get('production_accepted')))
+                  record('manifest preserves zero commission', int(m.get('commission_percent',-1))==0)
+              except Exception as e:
+                  record('manifest is valid structured JSON', False, repr(e))
+          subprocess.run('rm -rf build/t17-r20-a build/t17-r20-b', shell=True)
+
+          print('=== R20 FROZEN DEFECT LEDGER ===')
+          if defects:
+              for i,d in enumerate(defects,1): print(f'{i}. {d}')
+          else:
+              print('No supported defect found.')
+          print(f'R20_DEFECT_COUNT={len(defects)}')
+          sys.exit(1 if defects else 0)
+          PY
