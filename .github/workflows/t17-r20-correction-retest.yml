@@ -1,0 +1,46 @@
+name: File 08 T17 R20 Frozen Correction Retest
+on: push
+permissions:
+  contents: read
+jobs:
+  retest:
+    if: github.ref == 'refs/heads/tmp-file08-r20-correction-20260831'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze exact corrected source
+        run: |
+          set -euo pipefail
+          git checkout --detach a41a2905e529eda616739540965698d094f8d591
+          test "$(git rev-parse HEAD)" = "a41a2905e529eda616739540965698d094f8d591"
+          test -z "$(git status --porcelain)"
+      - name: Exact R20 regression and full source QA
+        run: |
+          set -euo pipefail
+          php -d display_errors=1 -d error_reporting=E_ALL tests/seventeenth-r20-warning-clean-regressions.php 2>&1 | tee /tmp/r20-specific.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:|Fatal error:|Parse error:' /tmp/r20-specific.txt
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r20-correction-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/r20-correction-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:|Fatal error:|Parse error:' /tmp/r20-correction-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Deterministic candidate parity after R20 correction
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          epoch=$(git show -s --format=%ct HEAD)
+          rm -rf build/t17-r20-fix-a build/t17-r20-fix-b
+          php tools/build-candidate.php --output-dir=build/t17-r20-fix-a --commit="$sha" --source-date-epoch="$epoch" | tee /tmp/r20-fix-build-a.txt
+          php tools/build-candidate.php --output-dir=build/t17-r20-fix-b --commit="$sha" --source-date-epoch="$epoch" | tee /tmp/r20-fix-build-b.txt
+          cmp build/t17-r20-fix-a/*-candidate.zip build/t17-r20-fix-b/*-candidate.zip
+          cmp build/t17-r20-fix-a/*-candidate-manifest.json build/t17-r20-fix-b/*-candidate-manifest.json
+          cmp build/t17-r20-fix-a/*-candidate.sha256 build/t17-r20-fix-b/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/t17-r20-fix-a --commit="$sha"
+          php tools/verify-candidate.php --artifact=build/t17-r20-fix-b --commit="$sha"
+          cat build/t17-r20-fix-a/*-candidate.sha256
+          rm -rf build/t17-r20-fix-a build/t17-r20-fix-b
+          echo "R20 CORRECTION RETEST: PASS at $sha"
