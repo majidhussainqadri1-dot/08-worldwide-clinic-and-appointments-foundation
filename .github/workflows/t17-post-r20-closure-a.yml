@@ -1,0 +1,64 @@
+name: File 08 Post-R20 Closure Verification A
+on: push
+permissions:
+  contents: read
+jobs:
+  closure-a:
+    if: github.ref == 'refs/heads/tmp-file08-post-r20-closure-a-20260831'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Freeze exact final source
+        run: |
+          set -euo pipefail
+          git checkout --detach 5f073e7412b834c1ad22e6c8dfb52f24591207fc
+          test "$(git rev-parse HEAD)" = "5f073e7412b834c1ad22e6c8dfb52f24591207fc"
+          test -z "$(git status --porcelain)"
+      - name: Fresh full-suite and diagnostic review
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/closure-a-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/closure-a-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:|Fatal error:|Parse error:' /tmp/closure-a-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Fresh authorization mutation and privacy adversarial review
+        run: |
+          set -euo pipefail
+          ! grep -RInE 'wp_ajax_nopriv_.*(save|create|delete|update|book|cancel|reschedule|complete|submit)' includes worldwide-clinic.php --include='*.php'
+          ! grep -RInE 'permission_callback[[:space:]]*=>[[:space:]]*["'"']__return_true["'"']' includes/class-wca-continuity-secure.php
+          grep -q 'wca_intake_version_required' includes/class-wca-continuity-secure.php
+          grep -q 'appointment_processing' includes/class-wca-continuity-secure.php
+          grep -q 'legal_hold' includes/class-wca-privacy.php
+          grep -q 'wca_purge_backup_verified' includes/class-wca-privacy.php
+          grep -q 'wca_episode_version_required' includes/class-wca-future24.php
+          grep -q 'wca_fhir_adapter_disabled' includes/class-wca-future24.php
+          grep -q 'versionId' includes/class-wca-future24.php
+          grep -q 'lastUpdated' includes/class-wca-future24.php
+          grep -q 'claim_idempotency' includes/class-wca-calendar-link.php
+          grep -q 'wca_calendar_provider_verify_webhook' includes/class-wca-calendar-link.php
+          grep -q 'hash_equals( $expected, $sig )' includes/class-wca-calendar-link.php
+          ! grep -RInE 'CREATE TABLE[^[:cntrl:]]*(file17|file19|file20|file24|file26)|INSERT INTO[^[:cntrl:]]*(file17|file19|file20|file24|file26)' includes --include='*.php'
+      - name: Fresh source hygiene and reproducible release review
+        run: |
+          set -euo pipefail
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          sha=$(git rev-parse HEAD)
+          epoch=$(git show -s --format=%ct HEAD)
+          rm -rf build/closure-a-1 build/closure-a-2
+          php tools/build-candidate.php --output-dir=build/closure-a-1 --commit="$sha" --source-date-epoch="$epoch"
+          php tools/build-candidate.php --output-dir=build/closure-a-2 --commit="$sha" --source-date-epoch="$epoch"
+          cmp build/closure-a-1/*-candidate.zip build/closure-a-2/*-candidate.zip
+          cmp build/closure-a-1/*-candidate-manifest.json build/closure-a-2/*-candidate-manifest.json
+          cmp build/closure-a-1/*-candidate.sha256 build/closure-a-2/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/closure-a-1 --commit="$sha"
+          php tools/verify-candidate.php --artifact=build/closure-a-2 --commit="$sha"
+          cat build/closure-a-1/*-candidate.sha256
+          rm -rf build/closure-a-1 build/closure-a-2
+          echo "POST-R20 CLOSURE VERIFICATION A: CLEAN at $sha"
