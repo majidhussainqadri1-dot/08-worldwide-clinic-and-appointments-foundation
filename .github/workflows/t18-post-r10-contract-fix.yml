@@ -1,0 +1,68 @@
+name: File 08 T18 Post-R10 Contract Fix
+on:
+  push:
+    branches: [review/file08-t18-ten-round-2026-09-06]
+    paths: [.github/workflows/t18-post-r10-contract-fix.yml, .github/scripts/t18-post-r10-future24-contract-correct.py]
+permissions:
+  contents: write
+jobs:
+  fix-regress-exact-head:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 0}
+      - name: Confirm prior R10 corrected source ancestry
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 15dcde5daf337cdec31b93d7b860f9d0ddb5656a HEAD
+          git rev-parse HEAD
+      - name: Apply frozen closure defect
+        run: python3 .github/scripts/t18-post-r10-future24-contract-correct.py
+      - name: Dedicated contract regression
+        run: php -d display_errors=1 -d error_reporting=E_ALL tests/t18-post-r10-future24-contract-regressions.php
+      - name: Full warning-free regression
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/post-r10-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/post-r10-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/post-r10-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+          git diff --check
+      - name: Commit corrected exact source
+        id: commit
+        run: |
+          set -euo pipefail
+          git config user.name 'Sabri File 08 Review Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add includes/class-wca-contracts.php tests/run-all.php tests/t18-post-r10-future24-contract-regressions.php
+          git diff --cached --check
+          git commit -m 'fix(file08): align canonical Future24 contract version'
+          git push origin HEAD:review/file08-t18-ten-round-2026-09-06
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Exact-head QA
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.commit.outputs.sha }}'
+          test -z "$(git status --porcelain)"
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/post-r10-exact.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/post-r10-exact.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Exact-head reproducible package proof
+        run: |
+          set -euo pipefail
+          sha='${{ steps.commit.outputs.sha }}'
+          epoch=$(git show -s --format=%ct "$sha")
+          php tools/build-candidate.php --output-dir=build/post-r10-fix-a --commit="$sha" --source-date-epoch="$epoch"
+          php tools/build-candidate.php --output-dir=build/post-r10-fix-b --commit="$sha" --source-date-epoch="$epoch"
+          cmp build/post-r10-fix-a/*-candidate.zip build/post-r10-fix-b/*-candidate.zip
+          cmp build/post-r10-fix-a/*-candidate-manifest.json build/post-r10-fix-b/*-candidate-manifest.json
+          cmp build/post-r10-fix-a/*-candidate.sha256 build/post-r10-fix-b/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/post-r10-fix-a --commit="$sha"
+          php tools/verify-candidate.php --artifact=build/post-r10-fix-b --commit="$sha"
+          echo "POST_R10_CORRECTED_SOURCE=$sha"
+          cat build/post-r10-fix-a/*-candidate.sha256
