@@ -52,60 +52,75 @@ final class SWC_Helpers {
 	}
 
 	/**
-	 * File 08 never creates or mutates doctor verification.
-	 * It consumes all central verification gates and fails closed.
+	 * Canonical practitioner eligibility only.
+	 *
+	 * File 00 owns membership/practice authority and File 09 owns doctor
+	 * verification. File 08 must not recreate either decision from local roles,
+	 * profile metadata, completion percentages, or historical helper states.
 	 */
 	public static function is_verified_doctor( $user_id ) {
 		$user_id = absint( $user_id );
-		if ( ! $user_id || ! get_userdata( $user_id ) ) {
-			return false;
-		}
-		if ( ! class_exists( 'SPD_Helpers' ) || ! class_exists( 'SDD_Helpers' ) || ! class_exists( 'GDO_Helpers' ) ) {
-			return false;
-		}
-		if ( ! function_exists( 'smc_user_status' ) || ! function_exists( 'smc_is_founder' ) ) {
-			return false;
-		}
-
-		$is_founder = SDD_Helpers::is_founder( $user_id ) && smc_is_founder( $user_id );
-		$smc_ok     = $is_founder || ( 'approved' === smc_user_status( $user_id ) && (bool) get_user_meta( $user_id, '_smc_doctor_verified', true ) );
-		$legacy_ok  = SDD_Helpers::is_verified( $user_id );
-		$gdo_ok     = $is_founder || 100 === (int) GDO_Helpers::completion( $user_id );
-
-		return $smc_ok && $legacy_ok && $gdo_ok;
+		return $user_id > 0
+			&& class_exists( 'SWC_Doctor_Authority' )
+			&& SWC_Doctor_Authority::is_eligible( $user_id );
 	}
 
 	/**
-	 * Return all eligible clinic doctor IDs without a silent hard limit.
+	 * Return eligible public clinic practitioners without using a local-role
+	 * prefilter. Raw WordPress users are scanned in bounded batches, while
+	 * offset/limit are applied only after canonical eligibility/publicity gates.
 	 *
 	 * @return int[]
 	 */
 	public static function doctor_ids( $limit = 100, $offset = 0 ) {
-		$limit = min( 200, max( 1, absint( $limit ) ) );
-		$offset = max( 0, absint( $offset ) );
-		$users = get_users(
-			array(
-				'role__in' => array( 'sabri_doctor_verified', 'sabri_doctor' ),
-				'number'   => $limit,
-				'offset'   => $offset,
-				'fields'   => 'ID',
-				'orderby'  => 'display_name',
-				'order'    => 'ASC',
-			)
-		);
-		$ids   = array_values(
-			array_filter(
-				array_map( 'absint', $users ),
-				function ( $id ) {
-					return self::is_verified_doctor( $id ) && ( SDD_Helpers::is_public( $id ) || SDD_Helpers::is_founder( $id ) );
-				}
-			)
-		);
-		$founder = SDD_Helpers::founder_id();
-		if ( $founder && self::is_verified_doctor( $founder ) ) {
-			array_unshift( $ids, $founder );
+		$limit        = min( 200, max( 1, absint( $limit ) ) );
+		$offset       = max( 0, absint( $offset ) );
+		$needed       = $offset + $limit;
+		$batch_size   = 200;
+		$raw_offset   = 0;
+		$eligible_ids = array();
+		$founder      = 0;
+
+		if ( class_exists( 'SDD_Helpers' ) && method_exists( 'SDD_Helpers', 'founder_id' ) ) {
+			try { $founder = absint( SDD_Helpers::founder_id() ); } catch ( Throwable $e ) { $founder = 0; }
 		}
-		return array_values( array_unique( $ids ) );
+		if ( $founder && self::is_verified_doctor( $founder ) && self::practitioner_is_public( $founder ) ) {
+			$eligible_ids[] = $founder;
+		}
+
+		do {
+			$users = get_users(
+				array(
+					'number'  => $batch_size,
+					'offset'  => $raw_offset,
+					'fields'  => 'ID',
+					'orderby' => 'display_name',
+					'order'   => 'ASC',
+				)
+			);
+			$raw_ids = array_values( array_filter( array_map( 'absint', (array) $users ) ) );
+			foreach ( $raw_ids as $id ) {
+				if ( $id === $founder || in_array( $id, $eligible_ids, true ) ) { continue; }
+				if ( self::is_verified_doctor( $id ) && self::practitioner_is_public( $id ) ) {
+					$eligible_ids[] = $id;
+					if ( count( $eligible_ids ) >= $needed ) { break 2; }
+				}
+			}
+			$raw_offset += $batch_size;
+		} while ( count( $raw_ids ) === $batch_size );
+
+		return array_slice( array_values( array_unique( $eligible_ids ) ), $offset, $limit );
+	}
+
+	private static function practitioner_is_public( $user_id ) {
+		if ( ! class_exists( 'SDD_Helpers' ) || ! method_exists( 'SDD_Helpers', 'is_public' ) || ! method_exists( 'SDD_Helpers', 'is_founder' ) ) {
+			return false;
+		}
+		try {
+			return (bool) ( SDD_Helpers::is_public( absint( $user_id ) ) || SDD_Helpers::is_founder( absint( $user_id ) ) );
+		} catch ( Throwable $e ) {
+			return false;
+		}
 	}
 
 	public static function doctor_is_requestable( $doctor_id ) {
