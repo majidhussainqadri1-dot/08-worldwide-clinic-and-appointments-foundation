@@ -23,8 +23,7 @@ if text.count(old) != 1:
 p.write_text(text.replace(old, new, 1), encoding='utf-8')
 
 # T18 R2 originally asserted that the server-rendered frontend itself performed
-# claims/object checks. R9 deliberately centralizes those checks in WCA_Query_API;
-# preserve the security invariant while testing the new canonical owner path.
+# claims/object checks. R9 centralizes those checks in WCA_Query_API.
 p = ROOT / 'tests/t18-r2-appointment-list-authorization-regressions.php'
 p.write_text(r'''<?php
 $root = dirname(__DIR__);
@@ -43,4 +42,15 @@ foreach ($checks as $name => $ok) { if (!$ok) { fwrite(STDERR, "T18 R2 FAIL: {$n
 echo "T18 R2 appointment-list authorization regressions: PASS\n";
 ''', encoding='utf-8')
 
-print('R9 historical regression probes aligned to canonical patient cursor/authorization contract.')
+# T19 R4 predated the R9 audience split and intentionally treated doctor/staff
+# scope as part of the patient collection. Keep its cursor/security checks while
+# asserting the new canonical separation instead.
+p = ROOT / 'tests/t19-r4-query-contract-regressions.php'
+text = p.read_text(encoding='utf-8')
+old = "\t'patient query scopes participant identities' => false !== strpos( $query, \"_swc_patient_user_id\" ) && false !== strpos( $query, \"_swc_doctor_id\" ) && false !== strpos( $query, \"_swc_guardian_user_id\" ),\n\t'patient query includes appointment delegations' => false !== strpos( $query, \"delegated_clinic_ids( \\$actor_user_id, 'appointments' )\" ),"
+new = "\t'patient query scopes patient and guardian identities' => false !== strpos( $query, \"_swc_patient_user_id\" ) && false !== strpos( $query, \"_swc_guardian_user_id\" ),\n\t'patient query excludes staff delegation expansion' => false !== strpos( $query, 'query_candidate_appointments( $actor_user_id, 0, array(), $cursor, $per_page + 1 )' ),"
+if text.count(old) != 1:
+    raise SystemExit('R9 T19 R4 participant/delegation assertion marker missing or duplicated')
+p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+print('R9 historical regression probes aligned to canonical patient/staff cursor and authorization separation.')
