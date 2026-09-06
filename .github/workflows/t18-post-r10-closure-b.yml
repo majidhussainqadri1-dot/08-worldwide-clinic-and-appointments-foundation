@@ -1,0 +1,81 @@
+name: File 08 T18 Post-R10 Closure B
+on:
+  push:
+    branches: [review/file08-t18-ten-round-2026-09-06]
+    paths: [.github/workflows/t18-post-r10-closure-b.yml]
+permissions:
+  contents: read
+jobs:
+  independent-closure-b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 0}
+      - name: Resolve exact source independently
+        run: |
+          set -euo pipefail
+          git checkout --detach 15dcde5daf337cdec31b93d7b860f9d0ddb5656a
+          test "$(git rev-parse HEAD)" = '15dcde5daf337cdec31b93d7b860f9d0ddb5656a'
+          test -z "$(git status --porcelain)"
+      - name: Independent full QA and diagnostics gate
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' f; do php -l "$f" >/dev/null; done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php > /tmp/b-out.txt 2>&1
+          cat /tmp/b-out.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/b-out.txt
+          for js in assets/js/clinic.js assets/js/continuity.js assets/js/future24.js; do node --check "$js"; done
+          git diff --check
+      - name: Cross-check current release truth against runtime source
+        run: |
+          set -euo pipefail
+          php -r '$c=file_get_contents("includes/class-wca-contracts.php"); $f=file_get_contents("includes/class-wca-future24.php"); $s=file_get_contents("STATUS.md"); $r=file_get_contents("readme.txt"); foreach(array("1.2.15","3.4.0") as $v){if(strpos($c,$v)===false)exit(1);} if(strpos($f,"1.1.0")===false)exit(2); if(strpos($s,"Core File 08 schema: **3.4.0**")===false||strpos($s,"Future24 additive operational schema: **1.1.0**")===false||strpos($s,"Future24 amendment contract: **1.1.0**")===false)exit(3); if(strpos($r,"current core schema is 3.4.0")===false||strpos($r,"Future24 schema/contract 1.1.0")===false)exit(4);'
+          current=$(awk '/## Current repository candidate/{p=1} /## Mandatory staging \/ production gates/{p=0} p' STATUS.md)
+          ! printf '%s\n' "$current" | grep -q '56a1ee4a59722e6574c4722e2c6bda791b15be39'
+          ! printf '%s\n' "$current" | grep -q '31741321738'
+          printf '%s\n' "$current" | grep -q 'Pending for current T18 final corrected HEAD'
+      - name: Independent safety boundary probes
+        run: |
+          set -euo pipefail
+          grep -q "COMMISSION_BPS.*0" includes/class-wca-contracts.php
+          grep -q 'can_view_appointment' includes/class-swc-frontend.php
+          grep -q 'appointment_processing' includes/class-wca-consent.php
+          grep -q 'source_version' includes/class-wca-payment-bridge.php
+          grep -q 'wca_external_busy_read_failed' includes/class-wca-future24.php
+          grep -q 'legal_hold' includes/class-wca-privacy.php
+          grep -q 'wca_privacy_patient_meta_delete' includes/class-wca-privacy.php
+          grep -q 'wca_privacy_doctor_meta_delete' includes/class-wca-privacy.php
+          grep -q 'valid_currency' includes/class-wca-repository.php
+      - name: Hygiene probes independent ordering
+        run: |
+          set -euo pipefail
+          [ -z "$(find . -type l -print -quit)" ]
+          [ -z "$(find . -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' \) -not -path './.git/*' -print -quit)" ]
+          if grep -RIlE --exclude-dir=.git --exclude='*.md' --exclude='*.txt' -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----' . > /tmp/b-keys.txt; then test ! -s /tmp/b-keys.txt; fi
+      - name: Independent reproducible package proof
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          epoch=$(git show -s --format=%ct "$sha")
+          mkdir -p build
+          php tools/build-candidate.php --output-dir=build/b-left --commit="$sha" --source-date-epoch="$epoch"
+          php tools/build-candidate.php --output-dir=build/b-right --commit="$sha" --source-date-epoch="$epoch"
+          left_zip=$(find build/b-left -name '*-candidate.zip' -type f -print -quit)
+          right_zip=$(find build/b-right -name '*-candidate.zip' -type f -print -quit)
+          left_manifest=$(find build/b-left -name '*-candidate-manifest.json' -type f -print -quit)
+          right_manifest=$(find build/b-right -name '*-candidate-manifest.json' -type f -print -quit)
+          left_sum=$(find build/b-left -name '*-candidate.sha256' -type f -print -quit)
+          right_sum=$(find build/b-right -name '*-candidate.sha256' -type f -print -quit)
+          test "$(sha256sum "$left_zip" | awk '{print $1}')" = "$(sha256sum "$right_zip" | awk '{print $1}')"
+          cmp "$left_manifest" "$right_manifest"
+          cmp "$left_sum" "$right_sum"
+          grep -q "$sha" "$left_manifest"
+          php tools/verify-candidate.php --artifact=build/b-left --commit="$sha"
+          php tools/verify-candidate.php --artifact=build/b-right --commit="$sha"
+          echo "CLOSURE_B_SOURCE=$sha"
+          echo "CLOSURE_B_ZIP_SHA256=$(sha256sum "$left_zip" | awk '{print $1}')"
+      - name: Closure B ledger
+        run: |
+          echo 'CLOSURE_B_DEFECT_COUNT=0'
+          echo 'No supported defect found in independent Closure Verification B.'
