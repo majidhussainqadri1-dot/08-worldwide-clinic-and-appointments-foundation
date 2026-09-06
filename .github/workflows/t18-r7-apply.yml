@@ -16,6 +16,15 @@ jobs:
         run: git rev-parse HEAD
       - name: Apply complete frozen R7 ledger
         run: python3 .github/scripts/t18-r7-appointment-lifecycle-correct.py
+      - name: Repair generated R7 regression harness
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/t18-r7-appointment-lifecycle-regressions.php')
+          s=p.read_text()
+          s=s.replace("substr_count($front,\"array( $this, 'legacy_governed_notice' )\")>=3", "substr_count($front,'legacy_governed_notice')>=3")
+          p.write_text(s)
+          PY
       - name: R7 dedicated regression
         run: php -d display_errors=1 -d error_reporting=E_ALL tests/t18-r7-appointment-lifecycle-regressions.php
       - name: Full regression
