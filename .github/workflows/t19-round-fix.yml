@@ -6,6 +6,7 @@ on:
       - review/file08-t19-twenty-round-2026-09-06
     paths:
       - .github/scripts/t19-round-fix.py
+      - .github/scripts/t19-round-fix-v2.py
       - .github/workflows/t19-round-fix.yml
 
 permissions:
@@ -29,7 +30,7 @@ jobs:
           coverage: none
           extensions: zip
       - name: Apply frozen round correction
-        run: python3 .github/scripts/t19-round-fix.py
+        run: python3 .github/scripts/t19-round-fix-v2.py
       - name: PHP syntax
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
       - name: Full source-level regression suite
@@ -45,7 +46,7 @@ jobs:
           set -euo pipefail
           git config user.name "majidhussainqadri1-dot"
           git config user.email "majidhussainqadri1@gmail.com"
-          git add -A -- ':!.github/scripts/t19-round-fix.py' ':!.github/workflows/t19-round-fix.yml'
+          git add -A -- ':!.github/scripts/t19-round-fix.py' ':!.github/scripts/t19-round-fix-v2.py' ':!.github/workflows/t19-round-fix.yml'
           if git diff --cached --quiet; then
             echo "No correction delta to commit."
             exit 0
