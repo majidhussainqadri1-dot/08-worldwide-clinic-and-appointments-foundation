@@ -263,6 +263,13 @@ final class WCA_Service {
 			$current = self::repository_read( static function () use ( $service_id ) { return WCA_Repository::get_service( $service_id, false ); } );
 			if ( is_wp_error( $current ) ) { return $current; }
 			if ( ! $current || absint( $current['clinic_id'] ) !== absint( $clinic['id'] ) ) { return new WP_Error( 'wca_service_scope', __( 'The service does not belong to this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+			// Versioned service updates are partial by contract. Omitted mutable fields
+			// must retain their current values rather than being reset by repository defaults.
+			foreach ( array( 'name', 'branch_id', 'doctor_user_id', 'tax_policy', 'refund_policy', 'cancellation_policy', 'status' ) as $preserve_field ) {
+				if ( ! array_key_exists( $preserve_field, $data ) ) {
+					$data[ $preserve_field ] = array_key_exists( $preserve_field, $current ) ? $current[ $preserve_field ] : ( in_array( $preserve_field, array( 'branch_id', 'doctor_user_id' ), true ) ? 0 : '' );
+				}
+			}
 		}
 		$consultation_type = sanitize_key( $data['consultation_type'] ?? ( $current['consultation_type'] ?? '' ) );
 		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) { return new WP_Error( 'wca_service_consultation_type', __( 'A valid consultation type is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
@@ -900,6 +907,21 @@ final class WCA_Service {
 		$read_error = WCA_Repository::consume_read_error();
 		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) { return array(); }
+		// A service is public only while its assigned practitioner has a current
+		// clinic-serving relationship. Global File 09 eligibility alone is insufficient.
+		$eligible_service_refs = array();
+		foreach ( (array) ( $private['services'] ?? array() ) as $private_service ) {
+			if ( 'active' !== (string) ( $private_service['status'] ?? '' ) ) { continue; }
+			$service_doctor_id = absint( $private_service['doctor_user_id'] ?? 0 ) ?: $owner_id;
+			if ( ! $service_doctor_id || ! SWC_Doctor_Authority::is_eligible( $service_doctor_id ) ) { continue; }
+			if ( ! WCA_Authorization::doctor_can_serve_clinic( $private, $service_doctor_id ) ) { continue; }
+			$service_ref = strtolower( (string) ( $private_service['public_ref'] ?? '' ) );
+			if ( preg_match( '/^[0-9a-f-]{36}$/', $service_ref ) ) { $eligible_service_refs[ $service_ref ] = true; }
+		}
+		$public_services = array_values( array_filter( (array) ( $clinic['services'] ?? array() ), static function ( $service ) use ( $eligible_service_refs ) {
+			$service_ref = strtolower( (string) ( $service['public_ref'] ?? '' ) );
+			return isset( $eligible_service_refs[ $service_ref ] );
+		} ) );
 		$projection = array(
 			'contract'       => 'wca.public-clinic',
 			'contract_version'=> WCA_Contracts::PUBLIC_CLINIC_CONTRACT_VERSION,
@@ -912,7 +934,7 @@ final class WCA_Service {
 			'policies'       => $clinic['policies'],
 			'status'         => $clinic['status'],
 			'branches'       => $clinic['branches'],
-			'services'       => $clinic['services'],
+			'services'       => $public_services,
 			'verified_owner' => true,
 			'updated_at'     => $clinic['updated_at'],
 			'record_version' => absint( $clinic['version'] ),
