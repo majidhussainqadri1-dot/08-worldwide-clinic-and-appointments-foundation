@@ -41,7 +41,7 @@ jobs:
           set -euo pipefail
           git config user.name "majidhussainqadri1-dot"
           git config user.email "majidhussainqadri1@gmail.com"
-          git add includes/class-wca-query-api.php includes/class-wca-frontend.php includes/class-wca-opaque-api.php tests/run-all.php tests/t19-r9-participant-query-authority-regressions.php tests/new-plan-hardening.php tests/ten-review-regressions.php
+          git add includes/class-wca-query-api.php includes/class-wca-frontend.php includes/class-wca-opaque-api.php tests/run-all.php tests/t19-r9-participant-query-authority-regressions.php tests/new-plan-hardening.php tests/ten-review-regressions.php tests/t18-r2-appointment-list-authorization-regressions.php
           if git diff --cached --quiet; then
             echo "No R9 correction delta to commit."
             exit 0
