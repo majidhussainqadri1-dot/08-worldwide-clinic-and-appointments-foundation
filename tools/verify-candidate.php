@@ -22,12 +22,34 @@ if ( ! preg_match( '/^[0-9a-f]{64}$/i', $expected ) || basename( $zipPath ) !== 
 $manifest = json_decode( (string) file_get_contents( $manifestPath ), true );
 $version = is_array( $manifest ) ? (string) ( $manifest['version'] ?? '' ) : '';
 $manifestCommit = is_array( $manifest ) ? strtolower( (string) ( $manifest['commit'] ?? '' ) ) : '';
+$versionKeys = array(
+	'runtime_contract_version',
+	'core_schema_version',
+	'public_clinic_contract_version',
+	'cf01_context_contract_version',
+	'continuity_schema_version',
+	'continuity_contract_version',
+	'future24_schema_version',
+	'future24_contract_version',
+);
+$versionsValid = true;
+if ( is_array( $manifest ) ) {
+	foreach ( $versionKeys as $key ) {
+		if ( ! preg_match( '/^\d+\.\d+\.\d+$/', (string) ( $manifest[ $key ] ?? '' ) ) ) {
+			$versionsValid = false;
+			break;
+		}
+	}
+}
 if (
 	! is_array( $manifest ) ||
 	'wca-candidate-manifest-1' !== ( $manifest['format'] ?? '' ) ||
 	'08-worldwide-clinic-and-appointments' !== ( $manifest['plugin'] ?? '' ) ||
 	'worldwide-clinic.php' !== ( $manifest['runtime_version_source'] ?? '' ) ||
+	'SSH-F08-PLAN-2026-v1.0' !== ( $manifest['plan_id'] ?? '' ) ||
 	! preg_match( '/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $version ) ||
+	! $versionsValid ||
+	! hash_equals( $version, (string) ( $manifest['runtime_contract_version'] ?? '' ) ) ||
 	! preg_match( '/^[0-9a-f]{40}$/', $manifestCommit ) ||
 	! hash_equals( $expectedCommit, $manifestCommit ) ||
 	(int) ( $manifest['source_date_epoch'] ?? 0 ) < 1 ||
@@ -35,7 +57,7 @@ if (
 	! empty( $manifest['staging_accepted'] ) ||
 	! empty( $manifest['production_accepted'] )
 ) {
-	fwrite( STDERR, "Manifest policy/commit mismatch.\n" ); exit( 5 );
+	fwrite( STDERR, "Manifest policy/commit/schema mismatch.\n" ); exit( 5 );
 }
 $base = '08-worldwide-clinic-and-appointments-' . $version . '-candidate';
 if ( basename( $zipPath ) !== $base . '.zip' || basename( $manifestPath ) !== $base . '-manifest.json' || basename( $checksumPath ) !== $base . '.sha256' ) {
@@ -78,7 +100,10 @@ if ( array_keys( $expectedEntries ) !== array_keys( $seen ) ) {
 	fwrite( STDERR, "ZIP contains missing or unmanifested payload entries.\n" ); exit( 10 );
 }
 $plugin = $zip->getFromName( $prefix . 'worldwide-clinic.php' );
-if ( ! is_string( $plugin ) ) { fwrite( STDERR, "Runtime plugin payload is missing.\n" ); exit( 11 ); }
+$contracts = $zip->getFromName( $prefix . 'includes/class-wca-contracts.php' );
+$continuity = $zip->getFromName( $prefix . 'includes/class-wca-continuity-secure.php' );
+$future24 = $zip->getFromName( $prefix . 'includes/class-wca-future24.php' );
+if ( ! is_string( $plugin ) || ! is_string( $contracts ) || ! is_string( $continuity ) || ! is_string( $future24 ) ) { fwrite( STDERR, "Runtime contract payload is missing.\n" ); exit( 11 ); }
 $header = '';
 $constant = '';
 if ( preg_match( '/^\s*\*\s*Version:\s*([^\s]+)/m', $plugin, $match ) ) { $header = trim( $match[1] ); }
@@ -86,5 +111,26 @@ if ( preg_match( "/define\(\s*'WCA_VERSION'\s*,\s*'([^']+)'\s*\)/", $plugin, $ma
 if ( ! $header || ! $constant || ! hash_equals( $version, $header ) || ! hash_equals( $version, $constant ) ) {
 	fwrite( STDERR, "Manifest/plugin runtime version mismatch.\n" ); exit( 12 );
 }
+function wca_verify_constant( $source, $constant ) {
+	$pattern = '/\bconst\s+' . preg_quote( $constant, '/' ) . '\s*=\s*[\'\"]([^\'\"]+)[\'\"]\s*;/';
+	return preg_match( $pattern, $source, $match ) ? trim( $match[1] ) : '';
+}
+$sourceParity = array(
+	'plan_id' => wca_verify_constant( $contracts, 'PLAN_ID' ),
+	'runtime_contract_version' => wca_verify_constant( $contracts, 'RUNTIME_VERSION' ),
+	'core_schema_version' => wca_verify_constant( $contracts, 'SCHEMA_VERSION' ),
+	'public_clinic_contract_version' => wca_verify_constant( $contracts, 'PUBLIC_CLINIC_CONTRACT_VERSION' ),
+	'cf01_context_contract_version' => wca_verify_constant( $contracts, 'CF01_CONTEXT_CONTRACT_VERSION' ),
+	'continuity_schema_version' => wca_verify_constant( $continuity, 'SCHEMA_VERSION' ),
+	'continuity_contract_version' => wca_verify_constant( $continuity, 'CONTRACT_VERSION' ),
+	'future24_schema_version' => wca_verify_constant( $future24, 'SCHEMA_VERSION' ),
+	'future24_contract_version' => wca_verify_constant( $future24, 'CONTRACT_VERSION' ),
+);
+foreach ( $sourceParity as $key => $value ) {
+	if ( '' === $value || ! hash_equals( (string) ( $manifest[ $key ] ?? '' ), $value ) ) {
+		fwrite( STDERR, "Manifest/runtime source parity failed: {$key}\n" );
+		exit( 13 );
+	}
+}
 $zip->close();
-echo "Candidate verified: " . basename( $zipPath ) . " (runtime {$version}, commit {$manifestCommit})\n";
+echo "Candidate verified: " . basename( $zipPath ) . " (runtime {$version}, core schema " . $manifest['core_schema_version'] . ", commit {$manifestCommit})\n";
