@@ -1,6 +1,7 @@
 from pathlib import Path
 import runpy
 
+# Trigger marker: R9 frozen ledger correction retry after legacy pagination-gate alignment.
 ROOT = Path(__file__).resolve().parents[2]
 runpy.run_path(str(ROOT / '.github/scripts/t19-round-fix.py'), run_name='__main__')
 
