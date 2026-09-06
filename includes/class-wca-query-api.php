@@ -75,7 +75,9 @@ final class WCA_Query_API {
 	}
 
 	/**
-	 * Query contract: own participant appointments plus current appointment-scope delegations.
+	 * Query contract: the current user's own patient appointments plus appointments
+	 * for which that user is the recorded guardian and the current relationship recheck passes.
+	 * Doctor/staff operational views belong to list_clinic_schedule(), not this patient surface.
 	 * Output is an opaque, minimum-detail projection with a signed keyset cursor.
 	 *
 	 * @return array<string,mixed>|WP_Error
@@ -88,8 +90,7 @@ final class WCA_Query_API {
 		$filter_hash = hash( 'sha256', wp_json_encode( array( 'actor' => $actor_user_id, 'scope' => 'own_appointments', 'per_page' => $per_page ) ) );
 		$cursor = self::decode_cursor( (string) ( $args['cursor'] ?? '' ), 'appointment_list', $actor_user_id, $filter_hash );
 		if ( is_wp_error( $cursor ) ) { return $cursor; }
-		$delegated = WCA_Authorization::delegated_clinic_ids( $actor_user_id, 'appointments' );
-		$rows = self::query_candidate_appointments( $actor_user_id, 0, $delegated, $cursor, $per_page + 1 );
+		$rows = self::query_candidate_appointments( $actor_user_id, 0, array(), $cursor, $per_page + 1 );
 		if ( is_wp_error( $rows ) ) { return $rows; }
 
 		$items = array();
@@ -210,16 +211,9 @@ final class WCA_Query_API {
 		} else {
 			$relations = array(
 				"EXISTS (SELECT 1 FROM {$wpdb->postmeta} pa WHERE pa.post_id=p.ID AND pa.meta_key='_swc_patient_user_id' AND CAST(pa.meta_value AS UNSIGNED)=%d)",
-				"EXISTS (SELECT 1 FROM {$wpdb->postmeta} pd WHERE pd.post_id=p.ID AND pd.meta_key='_swc_doctor_id' AND CAST(pd.meta_value AS UNSIGNED)=%d)",
 				"EXISTS (SELECT 1 FROM {$wpdb->postmeta} pg WHERE pg.post_id=p.ID AND pg.meta_key='_swc_guardian_user_id' AND CAST(pg.meta_value AS UNSIGNED)=%d)",
 			);
-			$params[] = $actor_user_id; $params[] = $actor_user_id; $params[] = $actor_user_id;
-			$delegated_clinic_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $delegated_clinic_ids ) ) ) );
-			if ( $delegated_clinic_ids ) {
-				$placeholders = implode( ',', array_fill( 0, count( $delegated_clinic_ids ), '%d' ) );
-				$relations[] = "EXISTS (SELECT 1 FROM {$wpdb->postmeta} pc WHERE pc.post_id=p.ID AND pc.meta_key='_swc_clinic_id' AND CAST(pc.meta_value AS UNSIGNED) IN ({$placeholders}))";
-				foreach ( $delegated_clinic_ids as $delegated_id ) { $params[] = $delegated_id; }
-			}
+			$params[] = $actor_user_id; $params[] = $actor_user_id;
 			$where[] = '(' . implode( ' OR ', $relations ) . ')';
 		}
 

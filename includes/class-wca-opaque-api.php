@@ -87,7 +87,8 @@ final class WCA_Opaque_API {
 		$id = self::appointment_id( $request['ref'] );
 		if ( is_wp_error( $id ) ) { return $id; }
 		if ( ! $id ) { return self::not_found(); }
-		$access = self::appointment_access( $id );
+		$purpose = user_can( get_current_user_id(), 'manage_worldwide_clinic' ) ? 'operations' : '';
+		$access = self::appointment_access( $id, $purpose );
 		if ( is_wp_error( $access ) ) { return $access; }
 		$data = self::data( $request );
 		$next = sanitize_key( isset( $data['next_status'] ) ? $data['next_status'] : '' );

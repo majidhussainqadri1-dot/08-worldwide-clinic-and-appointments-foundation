@@ -29,7 +29,7 @@ r10has('opaque plural compatibility redirect',$hardening,"^appointments/([0-9a-f
 r10has('legacy browser filter',$hardening,'wca_allow_legacy_numeric_browser_actions');
 r10has('legacy mutation block',$hardening,'swc_submit_appointment');
 r10has('legacy shortcode replacement',$hardening,"remove_shortcode( 'swc_request_appointment' )");
-r10has('delegated appointment list',$frontend,"delegated_clinic_ids( \$user_id, 'appointments' )");
+r10has('canonical patient appointment list',$frontend,'WCA_Query_API::list_patient_appointments');
 r10has('delegated clinic dashboard',$frontend,"delegated_clinic_ids( \$user_id, 'clinic_manage' )");
 r10has('delegated dashboard object recheck',$frontend,'WCA_Authorization::can_manage_clinic');
 
