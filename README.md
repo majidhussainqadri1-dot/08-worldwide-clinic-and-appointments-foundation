@@ -33,6 +33,8 @@ The current source implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-
 
 Historical sequential audit evidence is preserved in the repository's dedicated review/evidence documents and `readme.txt` changelog. Historical schema or exact-head values are not current release evidence.
 
+Historical provenance label retained for permanent regression history: **Current sixteenth-cycle runtime alignment**. This phrase refers only to the older T16 checkpoint; the current identity is the T19 section above.
+
 ## Canonical routes
 
 - `/clinic/{clinic_slug}`
