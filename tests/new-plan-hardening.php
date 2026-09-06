@@ -32,6 +32,7 @@ $bootstrap = f08h_source( 'worldwide-clinic.php' );
 $guards = f08h_source( 'includes/class-wca-continuity-guards.php' );
 $opaque = f08h_source( 'includes/class-wca-opaque-api.php' );
 $command = f08h_source( 'includes/class-wca-appointment-command.php' );
+$service = f08h_source( 'includes/class-wca-service.php' );
 $reconcile = f08h_source( 'includes/class-wca-verification-reconciliation.php' );
 $frontend = f08h_source( 'includes/class-wca-frontend.php' );
 $clinic_js = f08h_source( 'assets/js/clinic.js' );
@@ -62,13 +63,19 @@ foreach ( array(
 	'wca_privacy_consent_required', 'wca_emergency_ack_required',
 	'wca_teleconsult_consent_required', 'privacy_consent_verified',
 	'emergency_ack_verified', 'remote_consultation_consent_verified',
-	"'teleconsult'", "'privacy_notice'", 'register_rest_route', "'/appointments'",
-	'WCA_Service::request_appointment', 'ensure_context_consent', 'affirmative',
-	"array( 'true', 'yes', 'on' )", "unset( \$result['appointment_id'] )",
+	'register_rest_route', "'/appointments'", 'WCA_Service::request_appointment',
+	'affirmative', "array( 'true', 'yes', 'on' )", "unset( \$result['appointment_id'] )",
+	'$response->set_status( 201 )',
 ) as $token ) { f08h_has( 'appointment command', $command, $token ); }
 f08h_lacks( 'appointment command', $command, "empty( \$data['privacy_consent'] )" );
 f08h_lacks( 'appointment command', $command, "empty( \$data['emergency_acknowledged'] )" );
 f08h_lacks( 'appointment command', $command, "empty( \$data['telehealth_consent'] )" );
+f08h_lacks( 'appointment command', $command, 'ensure_context_consent' );
+
+foreach ( array(
+	"'scope'              => 'appointment_processing'", "\$context_scopes = array( 'privacy_notice' )",
+	"if ( \$remote ) { \$context_scopes[] = 'teleconsult'; }", 'complete_idempotency',
+) as $token ) { f08h_has( 'appointment owner transaction', $service, $token ); }
 
 foreach ( array(
 	'ClinicEligibilityChanged.v1', 'File26.SearchProjectionChanged.v1',
