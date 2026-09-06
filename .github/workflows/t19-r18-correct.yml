@@ -1,0 +1,39 @@
+name: File 08 T19 R18 Frozen Ledger Correction
+on:
+  push:
+    branches: [review/file08-t19-twenty-round-2026-09-06]
+permissions:
+  contents: write
+concurrency:
+  group: file08-t19-r18-correct
+  cancel-in-progress: false
+jobs:
+  correct:
+    if: ${{ !contains(github.event.head_commit.message, 'close T19 R18 frozen ledger') && !contains(github.event.head_commit.message, 'retire T19 R18 correction runner') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - name: Apply frozen R18 ledger corrections
+        run: python3 .github/scripts/t19-r18-fix.py
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Full regression suite
+        run: php tests/run-all.php
+      - name: JavaScript syntax
+        run: |
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit corrected R18 tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-wca-frontend.php assets/js/clinic.js tests/run-all.php tests/t19-r18-frontend-calendar-timezone-regressions.php
+          git commit -m "fix(file08): close T19 R18 frozen ledger"
+          git push origin HEAD:review/file08-t19-twenty-round-2026-09-06
