@@ -16,7 +16,7 @@ p.write_text(text.replace(old, new, 1), encoding='utf-8')
 
 p = ROOT / 'tests/ten-review-regressions.php'
 text = p.read_text(encoding='utf-8')
-old = "r10has('delegated appointment list',$frontend,\"delegated_clinic_ids( \\\$user_id, 'appointments' )\");"
+old = r'''r10has('delegated appointment list',$frontend,"delegated_clinic_ids( \$user_id, 'appointments' )");'''
 new = "r10has('canonical patient appointment list',$frontend,'WCA_Query_API::list_patient_appointments');"
 if text.count(old) != 1:
     raise SystemExit('R9 legacy delegated appointment-list assertion marker missing or duplicated')
