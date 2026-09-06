@@ -10,6 +10,14 @@ defined( 'ABSPATH' ) || exit;
 final class WCA_Plan_Guard {
 	const REVIEW_ELIGIBILITY_DAYS = 180;
 
+	/** Execute a repository read and propagate the repository's fail-closed read channel. */
+	private static function repository_read( $callback ) {
+		WCA_Repository::clear_read_error();
+		$result = call_user_func( $callback );
+		$error = WCA_Repository::consume_read_error();
+		return is_wp_error( $error ) ? $error : $result;
+	}
+
 	public static function practitioner_ref( $user_id ) {
 		global $wpdb;
 		$user_id = absint( $user_id );
@@ -60,8 +68,12 @@ final class WCA_Plan_Guard {
 
 	/** @return array<string,mixed>|WP_Error */
 	public static function resolve_public_slot_query( $args ) {
-		$clinic = WCA_Repository::get_clinic( sanitize_text_field( $args['clinic_ref'] ?? '' ), true );
-		$service = WCA_Repository::get_service_by_ref( sanitize_text_field( $args['service_ref'] ?? '' ), true );
+		$clinic_ref = sanitize_text_field( $args['clinic_ref'] ?? '' );
+		$service_ref = sanitize_text_field( $args['service_ref'] ?? '' );
+		$clinic = self::repository_read( static function () use ( $clinic_ref ) { return WCA_Repository::get_clinic( $clinic_ref, true ); } );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
+		$service = self::repository_read( static function () use ( $service_ref ) { return WCA_Repository::get_service_by_ref( $service_ref, true ); } );
+		if ( is_wp_error( $service ) ) { return $service; }
 		$doctor_id = self::practitioner_id( $args['practitioner_ref'] ?? '' );
 		if ( ! $clinic || ! $service || ! $doctor_id ) {
 			return new WP_Error( 'wca_slot_reference', __( 'A valid public clinic, service, and practitioner reference is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
@@ -110,7 +122,9 @@ final class WCA_Plan_Guard {
 		if ( is_wp_error( $query ) ) {
 			return $query;
 		}
-		$rule = WCA_Repository::get_availability_rule_by_ref( sanitize_text_field( $data['rule_ref'] ?? '' ), true );
+		$rule_ref = sanitize_text_field( $data['rule_ref'] ?? '' );
+		$rule = self::repository_read( static function () use ( $rule_ref ) { return WCA_Repository::get_availability_rule_by_ref( $rule_ref, true ); } );
+		if ( is_wp_error( $rule ) ) { return $rule; }
 		$slot_ref = sanitize_text_field( $data['slot_ref'] ?? '' );
 		$freshness = absint( $data['freshness_version'] ?? 0 );
 		if ( ! $rule || ! $slot_ref || ! $freshness ) {
@@ -135,7 +149,9 @@ final class WCA_Plan_Guard {
 		 * ignore only the hold created by this same patient/key, allowing a true replay
 		 * to reach repository idempotency while every other overlapping hold still blocks. */
 		$repository_key = 'p' . absint( $patient_user_id ) . ':' . hash( 'sha256', $client_key );
-		$service = $query['service_id'] ? WCA_Repository::get_service( $query['service_id'], true ) : null;
+		$service_id = absint( $query['service_id'] );
+		$service = $service_id ? self::repository_read( static function () use ( $service_id ) { return WCA_Repository::get_service( $service_id, true ); } ) : null;
+		if ( is_wp_error( $service ) ) { return $service; }
 		$duration = $service ? absint( $service['duration_minutes'] ) : max( 10, (int) round( ( strtotime( $end . ' UTC' ) - strtotime( $start . ' UTC' ) ) / 60 ) );
 		$matched = WCA_Service::project_rule_slot( $rule, $start, $end, $duration, 'UTC', $repository_key );
 		if ( ! $matched
@@ -171,8 +187,12 @@ final class WCA_Plan_Guard {
 		if ( absint( $hold['patient_user_id'] ?? 0 ) !== absint( $patient_user_id ) || absint( $hold['appointment_id'] ?? 0 ) ) {
 			return new WP_Error( 'wca_hold_owner', __( 'The slot hold is not owned by this patient request.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) );
 		}
-		$clinic = WCA_Repository::get_clinic( absint( $hold['clinic_id'] ?? 0 ), true );
-		$service = WCA_Repository::get_service( absint( $hold['service_id'] ?? 0 ), true );
+		$clinic_id = absint( $hold['clinic_id'] ?? 0 );
+		$service_id = absint( $hold['service_id'] ?? 0 );
+		$clinic = self::repository_read( static function () use ( $clinic_id ) { return WCA_Repository::get_clinic( $clinic_id, true ); } );
+		if ( is_wp_error( $clinic ) ) { return $clinic; }
+		$service = self::repository_read( static function () use ( $service_id ) { return WCA_Repository::get_service( $service_id, true ); } );
+		if ( is_wp_error( $service ) ) { return $service; }
 		if ( ! $clinic || ! $service || absint( $service['clinic_id'] ) !== absint( $clinic['id'] ) || ! SWC_Doctor_Authority::is_eligible( absint( $hold['doctor_user_id'] ?? 0 ) ) ) {
 			return new WP_Error( 'wca_hold_scope', __( 'The clinic, service, or practitioner is no longer eligible.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
@@ -181,7 +201,8 @@ final class WCA_Plan_Guard {
 		}
 		$branch_id = absint( $hold['branch_id'] ?? 0 );
 		if ( $branch_id ) {
-			$branch = WCA_Repository::get_branch( $branch_id );
+			$branch = self::repository_read( static function () use ( $branch_id ) { return WCA_Repository::get_branch( $branch_id ); } );
+			if ( is_wp_error( $branch ) ) { return $branch; }
 			if ( ! $branch || absint( $branch['clinic_id'] ) !== absint( $clinic['id'] ) || 'active' !== (string) $branch['status'] ) {
 				return new WP_Error( 'wca_hold_branch_scope', __( 'The slot branch is no longer active for this clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 			}

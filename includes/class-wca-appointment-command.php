@@ -54,10 +54,14 @@ final class WCA_Appointment_Command {
 		}
 		$hold_token = sanitize_text_field( isset( $data['hold_token'] ) ? $data['hold_token'] : '' );
 		$hold = $hold_token ? WCA_Repository::get_slot_hold( $hold_token ) : null;
+		if ( is_wp_error( $hold ) ) { return $hold; }
 		if ( ! $hold ) {
 			return new WP_Error( 'wca_hold_missing', __( 'The selected appointment hold is unavailable or expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
+		WCA_Repository::clear_read_error();
 		$service = ! empty( $hold['service_id'] ) ? WCA_Repository::get_service( absint( $hold['service_id'] ), true ) : null;
+		$service_read_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $service_read_error ) ) { return $service_read_error; }
 		$type = sanitize_key( $service && isset( $service['consultation_type'] ) ? $service['consultation_type'] : '' );
 		$remote = in_array( $type, array( 'online', 'hybrid' ), true );
 		if ( $remote && ! self::affirmative( isset( $data['telehealth_consent'] ) ? $data['telehealth_consent'] : null ) ) {

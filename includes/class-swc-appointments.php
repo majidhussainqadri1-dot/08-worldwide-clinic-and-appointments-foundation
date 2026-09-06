@@ -10,12 +10,9 @@ defined( 'ABSPATH' ) || exit;
 final class SWC_Appointments {
 	public function hooks() {
 		add_action( 'init', array( 'SWC_Activator', 'register_type' ) );
-		add_action( 'admin_post_swc_submit_appointment', array( $this, 'submit' ) );
-		add_action( 'admin_post_swc_patient_cancel', array( $this, 'patient_cancel' ) );
-		add_action( 'admin_post_swc_patient_accept_reschedule', array( $this, 'patient_accept_reschedule' ) );
-		add_action( 'admin_post_swc_patient_accept_reassignment', array( $this, 'patient_accept_reassignment' ) );
-		add_action( 'admin_post_swc_patient_decline_reassignment', array( $this, 'patient_decline_reassignment' ) );
-		add_action( 'admin_post_swc_doctor_update', array( $this, 'doctor_update' ) );
+		/* Legacy appointment mutation endpoints are intentionally not registered.
+		 * All appointment creation/transitions now pass through WCA_Appointment_Command
+		 * and WCA_Service so holds, consent, finance, outbox and state law cannot diverge. */
 		add_action( 'admin_post_swc_save_availability', array( $this, 'save_availability' ) );
 	}
 

@@ -10,10 +10,15 @@ defined( 'ABSPATH' ) || exit;
 final class SWC_Frontend {
 	public function hooks() {
 		add_shortcode( 'swc_worldwide_clinic', array( $this, 'clinic' ) );
-		add_shortcode( 'swc_request_appointment', array( $this, 'request' ) );
-		add_shortcode( 'swc_my_appointments', array( $this, 'patient' ) );
-		add_shortcode( 'swc_doctor_appointments', array( $this, 'doctor' ) );
+		add_shortcode( 'swc_request_appointment', array( $this, 'legacy_governed_notice' ) );
+		add_shortcode( 'swc_my_appointments', array( $this, 'legacy_governed_notice' ) );
+		add_shortcode( 'swc_doctor_appointments', array( $this, 'legacy_governed_notice' ) );
 		add_shortcode( 'swc_doctor_availability', array( $this, 'availability' ) );
+	}
+
+	public function legacy_governed_notice() {
+		$appointments = home_url( '/appointments/' );
+		return '<div class="swc-notice"><h2>' . esc_html__( 'This legacy appointment workflow has been retired', 'worldwide-clinic-appointments' ) . '</h2><p>' . esc_html__( 'Use the current verified clinic booking flow. Appointment writes are accepted only through the governed File 08 scheduling service.', 'worldwide-clinic-appointments' ) . '</p><a class="swc-button" href="' . esc_url( $appointments ) . '">' . esc_html__( 'Open current appointments', 'worldwide-clinic-appointments' ) . '</a></div>';
 	}
 
 	public function clinic() {
