@@ -34,9 +34,9 @@ echo "T18 R8 external-calendar degradation regressions: PASS\n";
 """)
 run = root / 'tests/run-all.php'
 r = run.read_text()
-needle = "'t18-r7-appointment-lifecycle-regressions.php',"
+needle = "'seventeenth-r20-warning-clean-regressions.php' );"
 if needle not in r:
     raise SystemExit('R8 run-all insertion needle missing')
-if "'t18-r8-external-calendar-degraded-regressions.php'," not in r:
-    r = r.replace(needle, needle + "\n    't18-r8-external-calendar-degraded-regressions.php',", 1)
+if "'t18-r8-external-calendar-degraded-regressions.php'" not in r:
+    r = r.replace(needle, "'seventeenth-r20-warning-clean-regressions.php', 't18-r8-external-calendar-degraded-regressions.php' );", 1)
 run.write_text(r)
