@@ -13,7 +13,6 @@ final class WCA_Query_API {
 	public static function boot() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ), 45 );
 		add_filter( 'template_include', array( __CLASS__, 'dashboard_template' ), 100 );
-		// Replace the earlier canonical dashboard shortcode with the complete schedule-aware renderer.
 		add_shortcode( 'wca_clinic_dashboard', array( __CLASS__, 'render_dashboard' ) );
 	}
 
@@ -58,22 +57,21 @@ final class WCA_Query_API {
 		$actor = get_current_user_id();
 		$rate = self::rate_limit( 'appointment_list', $actor );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		$result = self::list_patient_appointments( $actor, array(
+		return self::response( self::list_patient_appointments( $actor, array(
 			'cursor'   => sanitize_text_field( (string) $request->get_param( 'cursor' ) ),
 			'per_page' => $request->get_param( 'per_page' ),
-		) );
-		return self::response( $result );
+		) ) );
 	}
 
 	public static function rest_clinic_schedule( WP_REST_Request $request ) {
 		$actor = get_current_user_id();
 		$rate = self::rate_limit( 'clinic_schedule', $actor );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		$result = self::list_clinic_schedule( sanitize_text_field( $request['ref'] ), $actor, array(
+		return self::response( self::list_clinic_schedule( sanitize_text_field( $request['ref'] ), $actor, array(
 			'cursor'   => sanitize_text_field( (string) $request->get_param( 'cursor' ) ),
 			'per_page' => $request->get_param( 'per_page' ),
-		) );
-		return self::response( $result );
+			'purpose'  => sanitize_key( (string) $request->get_header( 'X-WCA-Access-Purpose' ) ),
+		) ) );
 	}
 
 	/**
@@ -106,7 +104,7 @@ final class WCA_Query_API {
 				$consumed = $row;
 				continue;
 			}
-			$projection = self::appointment_projection( $id, false );
+			$projection = self::appointment_projection( $id, false, $actor_user_id );
 			if ( is_wp_error( $projection ) ) { return $projection; }
 			$items[] = $projection;
 			$consumed = $row;
@@ -132,7 +130,8 @@ final class WCA_Query_API {
 	}
 
 	/**
-	 * Query contract: delegated/owned clinic schedule with privacy-filtered reason fields.
+	 * Query contract: owned/delegated clinic schedule with privacy-filtered reason fields.
+	 * Global administrative access is purpose-limited, step-up protected and audited per appointment.
 	 *
 	 * @return array<string,mixed>|WP_Error
 	 */
@@ -145,23 +144,39 @@ final class WCA_Query_API {
 		$read_error = WCA_Repository::consume_read_error();
 		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $clinic ) { return new WP_Error( 'wca_clinic_missing', __( 'Clinic was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
-		$manage = WCA_Authorization::can_manage_clinic( $clinic, $actor_user_id );
-		$appointment_scope = in_array( absint( $clinic['id'] ), WCA_Authorization::delegated_clinic_ids( $actor_user_id, 'appointments' ), true );
-		if ( is_wp_error( $manage ) && ! $appointment_scope ) {
-			return new WP_Error( 'wca_clinic_schedule_forbidden', __( 'You cannot view this clinic schedule.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
+
+		$clinic_id = absint( $clinic['id'] ?? 0 );
+		$owner_scope = $clinic_id && absint( $clinic['owner_user_id'] ?? 0 ) === $actor_user_id && ( ! empty( $claims['doctor'] ) || ! empty( $claims['founder'] ) );
+		$appointment_scope = $clinic_id && in_array( $clinic_id, WCA_Authorization::delegated_clinic_ids( $actor_user_id, 'appointments' ), true );
+		$admin_scope = user_can( $actor_user_id, 'manage_worldwide_clinic' ) || user_can( $actor_user_id, 'manage_wca_operations' );
+		$purpose = sanitize_key( (string) ( $args['purpose'] ?? '' ) );
+		$allowed_admin_purposes = array( 'operations', 'complaint', 'privacy_request', 'incident', 'support_case' );
+		if ( ! $owner_scope && ! $appointment_scope ) {
+			if ( ! $admin_scope || ! in_array( $purpose, $allowed_admin_purposes, true ) ) {
+				return new WP_Error( 'wca_clinic_schedule_forbidden', __( 'You cannot view this clinic schedule.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
+			}
+			$step = WCA_Authorization::require_step_up( 'appointment_' . $purpose, $actor_user_id );
+			if ( is_wp_error( $step ) ) {
+				return new WP_Error( 'wca_clinic_schedule_step_up', __( 'Recent security verification is required for this purpose-limited schedule access.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
+			}
 		}
 
 		$per_page = self::page_size( $args['per_page'] ?? 20 );
-		$filter_hash = hash( 'sha256', wp_json_encode( array( 'actor' => $actor_user_id, 'clinic_ref' => strtolower( (string) $clinic['public_ref'] ), 'per_page' => $per_page ) ) );
+		$filter_hash = hash( 'sha256', wp_json_encode( array( 'actor' => $actor_user_id, 'clinic_ref' => strtolower( (string) $clinic['public_ref'] ), 'per_page' => $per_page, 'purpose' => $admin_scope && ! $owner_scope && ! $appointment_scope ? $purpose : '' ) ) );
 		$cursor = self::decode_cursor( (string) ( $args['cursor'] ?? '' ), 'clinic_schedule', $actor_user_id, $filter_hash );
 		if ( is_wp_error( $cursor ) ) { return $cursor; }
-		$rows = self::query_candidate_appointments( $actor_user_id, absint( $clinic['id'] ), array(), $cursor, $per_page + 1 );
+		$rows = self::query_candidate_appointments( $actor_user_id, $clinic_id, array(), $cursor, $per_page + 1 );
 		if ( is_wp_error( $rows ) ) { return $rows; }
 		$has_more = count( $rows ) > $per_page;
 		$page_rows = array_slice( $rows, 0, $per_page );
 		$items = array();
 		foreach ( $page_rows as $row ) {
-			$projection = self::appointment_projection( absint( $row['ID'] ?? 0 ), true );
+			$id = absint( $row['ID'] ?? 0 );
+			if ( ! $owner_scope && ! $appointment_scope ) {
+				$access = WCA_Authorization::can_view_appointment( $id, $actor_user_id, $purpose );
+				if ( is_wp_error( $access ) ) { return $access; }
+			}
+			$projection = self::appointment_projection( $id, true, $actor_user_id );
 			if ( is_wp_error( $projection ) ) { return $projection; }
 			$items[] = $projection;
 		}
@@ -187,10 +202,7 @@ final class WCA_Query_API {
 		$actor_user_id = absint( $actor_user_id );
 		$clinic_id = absint( $clinic_id );
 		$limit = min( self::MAX_PAGE_SIZE + 1, max( 2, absint( $limit ) ) );
-		$where = array(
-			'p.post_type=%s',
-			"p.post_status IN ('private','publish')",
-		);
+		$where = array( 'p.post_type=%s', "p.post_status IN ('private','publish')" );
 		$params = array( SWC_Helpers::TYPE );
 		if ( $clinic_id ) {
 			$where[] = "EXISTS (SELECT 1 FROM {$wpdb->postmeta} pc WHERE pc.post_id=p.ID AND pc.meta_key='_swc_clinic_id' AND CAST(pc.meta_value AS UNSIGNED)=%d)";
@@ -229,9 +241,10 @@ final class WCA_Query_API {
 	}
 
 	/** @return array<string,mixed>|WP_Error */
-	private static function appointment_projection( $appointment_id, $clinic_schedule = false ) {
+	private static function appointment_projection( $appointment_id, $clinic_schedule = false, $actor_user_id = 0 ) {
 		$appointment_id = absint( $appointment_id );
-		if ( ! $appointment_id ) { return new WP_Error( 'wca_appointment_projection_invalid', __( 'Appointment projection could not be created safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
+		if ( ! $appointment_id || ! $actor_user_id ) { return new WP_Error( 'wca_appointment_projection_invalid', __( 'Appointment projection could not be created safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		$ref = strtolower( (string) SWC_Helpers::meta( $appointment_id, 'public_ref', '' ) );
 		if ( ! preg_match( '/^[0-9a-f-]{36}$/i', $ref ) ) { return new WP_Error( 'wca_appointment_public_ref_missing', __( 'Appointment projection is missing its public reference.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$status = SWC_Helpers::status( $appointment_id );
@@ -249,7 +262,7 @@ final class WCA_Query_API {
 			// Deliberately expose category only; free-text patient reason stays out of staff schedule lists.
 			$projection['reason_category'] = sanitize_key( (string) SWC_Helpers::meta( $appointment_id, 'reason_category', 'general' ) );
 		} else {
-			$actor = WCA_Authorization::appointment_actor( $appointment_id, get_current_user_id() );
+			$actor = WCA_Authorization::appointment_actor( $appointment_id, $actor_user_id );
 			$projection['allowed_actions'] = WCA_Contracts::allowed_transitions( $actor, $status );
 		}
 		return $projection;
@@ -267,14 +280,7 @@ final class WCA_Query_API {
 	}
 
 	private static function encode_cursor( $scope, $actor_user_id, $filter_hash, $state ) {
-		$payload = array(
-			'v' => 1,
-			's' => sanitize_key( $scope ),
-			'a' => absint( $actor_user_id ),
-			'f' => (string) $filter_hash,
-			't' => sanitize_text_field( $state['t'] ?? '' ),
-			'i' => absint( $state['i'] ?? 0 ),
-		);
+		$payload = array( 'v' => 1, 's' => sanitize_key( $scope ), 'a' => absint( $actor_user_id ), 'f' => (string) $filter_hash, 't' => sanitize_text_field( $state['t'] ?? '' ), 'i' => absint( $state['i'] ?? 0 ) );
 		$json = wp_json_encode( $payload );
 		if ( ! is_string( $json ) || ! $payload['t'] || ! $payload['i'] ) { return ''; }
 		$encoded = bin2hex( $json );
@@ -296,12 +302,9 @@ final class WCA_Query_API {
 		return array( 't' => sanitize_text_field( $state['t'] ), 'i' => absint( $state['i'] ) );
 	}
 
-	/** Render canonical /clinic/dashboard with appointment schedule/requests, not only clinic cards. */
 	public static function render_dashboard() {
 		$claims = WCA_Authorization::claims();
-		if ( is_wp_error( $claims ) || ! in_array( $claims['role'] ?? '', array( 'doctor','founder','administrator','clinic_staff' ), true ) ) {
-			return self::notice( __( 'Verified clinic access is required.', 'worldwide-clinic-appointments' ), 'error' );
-		}
+		if ( is_wp_error( $claims ) || ! in_array( $claims['role'] ?? '', array( 'doctor','founder','administrator','clinic_staff' ), true ) ) { return self::notice( __( 'Verified clinic access is required.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$user_id = get_current_user_id();
 		$clinics = self::manageable_clinics( $user_id );
 		if ( is_wp_error( $clinics ) ) { return self::notice( __( 'Clinic dashboard data is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
@@ -315,25 +318,12 @@ final class WCA_Query_API {
 			<h1 id="wca-dashboard-title"><?php esc_html_e( 'Clinic dashboard', 'worldwide-clinic-appointments' ); ?></h1>
 			<p><?php esc_html_e( 'Manage clinic scheduling, appointment requests and completion actions within your current owner or delegated scope. Platform commission is always 0%.', 'worldwide-clinic-appointments' ); ?></p>
 			<?php if ( ! $clinics ) : ?><p><?php esc_html_e( 'No manageable clinics were found.', 'worldwide-clinic-appointments' ); ?></p><?php endif; ?>
-			<div class="wca-grid">
-			<?php foreach ( $clinics as $clinic ) :
-				$link = add_query_arg( 'clinic_ref', strtolower( (string) $clinic['public_ref'] ), home_url( '/clinic/dashboard/' ) ); ?>
-				<article class="wca-card"><h2><?php echo esc_html( $clinic['name'] ); ?></h2><p><?php echo esc_html( ucfirst( $clinic['status'] ) ); ?> · v<?php echo esc_html( $clinic['version'] ); ?></p><a class="wca-button" href="<?php echo esc_url( $link ); ?>"><?php esc_html_e( 'Open schedule', 'worldwide-clinic-appointments' ); ?></a></article>
-			<?php endforeach; ?>
-			</div>
-			<?php if ( $selected_ref ) : ?>
-			<section aria-labelledby="wca-schedule-title"><h2 id="wca-schedule-title"><?php esc_html_e( 'Appointment schedule and requests', 'worldwide-clinic-appointments' ); ?></h2>
-				<?php if ( empty( $schedule['items'] ) ) : ?><p><?php esc_html_e( 'No appointments were found for this clinic.', 'worldwide-clinic-appointments' ); ?></p><?php endif; ?>
-				<div class="wca-list">
-				<?php foreach ( (array) $schedule['items'] as $item ) : ?>
-					<article class="wca-card"><h3><?php echo esc_html( ucfirst( str_replace( '_', ' ', (string) $item['status'] ) ) ); ?></h3><p><time datetime="<?php echo esc_attr( (string) $item['scheduled_at_utc'] ); ?>"><?php echo esc_html( (string) $item['scheduled_at_utc'] ); ?></time></p><p><?php echo esc_html( sprintf( __( 'Reason category: %s', 'worldwide-clinic-appointments' ), (string) $item['reason_category'] ) ); ?></p><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointment/' . rawurlencode( (string) $item['public_ref'] ) . '/' ) ); ?>"><?php esc_html_e( 'View appointment', 'worldwide-clinic-appointments' ); ?></a></article>
-				<?php endforeach; ?>
-				</div>
-				<?php if ( ! empty( $schedule['next_cursor'] ) ) : $next = add_query_arg( array( 'clinic_ref' => $selected_ref, 'schedule_cursor' => $schedule['next_cursor'] ), home_url( '/clinic/dashboard/' ) ); ?><p><a class="wca-button wca-button-secondary" href="<?php echo esc_url( $next ); ?>"><?php esc_html_e( 'Next appointments', 'worldwide-clinic-appointments' ); ?></a></p><?php endif; ?>
-			</section>
-			<?php endif; ?>
-		</main>
-		<?php return ob_get_clean();
+			<div class="wca-grid"><?php foreach ( $clinics as $clinic ) : $link = add_query_arg( 'clinic_ref', strtolower( (string) $clinic['public_ref'] ), home_url( '/clinic/dashboard/' ) ); ?><article class="wca-card"><h2><?php echo esc_html( $clinic['name'] ); ?></h2><p><?php echo esc_html( ucfirst( $clinic['status'] ) ); ?> · v<?php echo esc_html( $clinic['version'] ); ?></p><a class="wca-button" href="<?php echo esc_url( $link ); ?>"><?php esc_html_e( 'Open schedule', 'worldwide-clinic-appointments' ); ?></a></article><?php endforeach; ?></div>
+			<?php if ( $selected_ref ) : ?><section aria-labelledby="wca-schedule-title"><h2 id="wca-schedule-title"><?php esc_html_e( 'Appointment schedule and requests', 'worldwide-clinic-appointments' ); ?></h2>
+			<?php if ( empty( $schedule['items'] ) ) : ?><p><?php esc_html_e( 'No appointments were found for this clinic.', 'worldwide-clinic-appointments' ); ?></p><?php endif; ?><div class="wca-list">
+			<?php foreach ( (array) $schedule['items'] as $item ) : ?><article class="wca-card"><h3><?php echo esc_html( ucfirst( str_replace( '_', ' ', (string) $item['status'] ) ) ); ?></h3><p><time datetime="<?php echo esc_attr( (string) $item['scheduled_at_utc'] ); ?>"><?php echo esc_html( (string) $item['scheduled_at_utc'] ); ?></time></p><p><?php echo esc_html( sprintf( __( 'Reason category: %s', 'worldwide-clinic-appointments' ), (string) $item['reason_category'] ) ); ?></p><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointment/' . rawurlencode( (string) $item['public_ref'] ) . '/' ) ); ?>"><?php esc_html_e( 'View appointment', 'worldwide-clinic-appointments' ); ?></a></article><?php endforeach; ?></div>
+			<?php if ( ! empty( $schedule['next_cursor'] ) ) : $next = add_query_arg( array( 'clinic_ref' => $selected_ref, 'schedule_cursor' => $schedule['next_cursor'] ), home_url( '/clinic/dashboard/' ) ); ?><p><a class="wca-button wca-button-secondary" href="<?php echo esc_url( $next ); ?>"><?php esc_html_e( 'Next appointments', 'worldwide-clinic-appointments' ); ?></a></p><?php endif; ?></section><?php endif; ?>
+		</main><?php return ob_get_clean();
 	}
 
 	/** @return array<int,array<string,mixed>>|WP_Error */
