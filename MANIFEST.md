@@ -1,6 +1,6 @@
-# Source Manifest
+# Source Manifest — historical original-archive provenance
 
-The following files are the exact extracted contents of the original File 08 archive.
+This document records the exact extracted contents of the **original File 08 archive only**. It is retained for provenance and is **not** the current release/candidate manifest. Current release identity is generated deterministically as `WCA-CANDIDATE-MANIFEST.json` inside the exact-head CI artifact and binds exact commit, runtime, plan, schemas and contracts.
 
 | Path | Bytes | SHA-256 |
 |---|---:|---|
