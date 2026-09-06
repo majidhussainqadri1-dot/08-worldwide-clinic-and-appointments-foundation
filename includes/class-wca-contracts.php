@@ -16,7 +16,7 @@ final class WCA_Contracts {
 	const FILE17_CONTEXT_CONTRACT_VERSION = '1.0.0';
 	const FILE19_EVENT_CONTRACT_VERSION   = '1.0.0';
 	const ASSURANCE_CONTRACT_VERSION      = '1.0.0';
-	const FUTURE24_CONTRACT_VERSION       = '1.0.0';
+	const FUTURE24_CONTRACT_VERSION       = '1.1.0';
 	const SCHEMA_VERSION                  = '3.4.0';
 
 	/** @return array<string,string> */
