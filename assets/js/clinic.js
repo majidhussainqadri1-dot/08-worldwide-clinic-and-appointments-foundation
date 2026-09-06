@@ -82,8 +82,11 @@
 		}
 
 		var tz = form.elements.timezone;
-		if (tz && (!tz.value || tz.value === 'UTC')) {
-			try { tz.value = Intl.DateTimeFormat().resolvedOptions().timeZone || tz.value; } catch (e) {}
+		if (tz) {
+			try {
+				var browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+				if (browserTimezone) tz.value = browserTimezone;
+			} catch (e) {}
 		}
 
 		Array.prototype.forEach.call(['service_ref', 'date_from', 'timezone'], function (name) {

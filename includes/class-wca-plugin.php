@@ -43,10 +43,12 @@ final class WCA_Plugin {
 		if ( ! $needed ) { return; }
 		wp_enqueue_style( 'wca-clinic' );
 		wp_enqueue_script( 'wca-clinic' );
+		$runtime_timezone = wp_timezone_string();
+		if ( ! WCA_Service::valid_timezone( $runtime_timezone ) ) { $runtime_timezone = 'UTC'; }
 		wp_localize_script( 'wca-clinic', 'wcaRuntime', array(
 			'restUrl'   => esc_url_raw( rest_url( 'wca/v1/' ) ),
 			'nonce'     => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
-			'timezone'  => wp_timezone_string(),
+			'timezone'  => $runtime_timezone,
 			'loggedIn'  => is_user_logged_in(),
 			'i18n'      => array(
 				'loading' => __( 'Loading…', 'worldwide-clinic-appointments' ),

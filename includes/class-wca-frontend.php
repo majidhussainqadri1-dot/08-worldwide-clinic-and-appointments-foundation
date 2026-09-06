@@ -78,6 +78,8 @@ final class WCA_Frontend {
 		if ( is_wp_error( $clinic ) ) { return self::notice( __( 'Clinic information is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
 		if ( ! $clinic ) { return self::notice( __( 'Clinic is unavailable.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$service_ref = sanitize_text_field( wp_unslash( $_GET['service'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only route choice.
+		$default_timezone = wp_timezone_string();
+		if ( ! WCA_Service::valid_timezone( $default_timezone ) ) { $default_timezone = 'UTC'; }
 		ob_start();
 		?>
 		<main class="wca-shell" aria-labelledby="wca-book-title" data-wca-booking data-clinic-ref="<?php echo esc_attr( $clinic['public_ref'] ); ?>" data-service-ref="<?php echo esc_attr( $service_ref ); ?>">
@@ -86,7 +88,7 @@ final class WCA_Frontend {
 			<form class="wca-form" data-wca-booking-form novalidate>
 				<label><?php esc_html_e( 'Service and verified practitioner', 'worldwide-clinic-appointments' ); ?><select name="service_ref" required><?php foreach ( (array) $clinic['services'] as $service ) : ?><option value="<?php echo esc_attr( $service['public_ref'] ); ?>" data-practitioner-ref="<?php echo esc_attr( $service['practitioner_ref'] ); ?>" data-consultation-type="<?php echo esc_attr( $service['consultation_type'] ); ?>" <?php selected( $service_ref, $service['public_ref'] ); ?>><?php echo esc_html( $service['name'] ); ?></option><?php endforeach; ?></select></label>
 				<label><?php esc_html_e( 'Date from', 'worldwide-clinic-appointments' ); ?><input name="date_from" type="date" required value="<?php echo esc_attr( wp_date( 'Y-m-d' ) ); ?>"></label>
-				<label><?php esc_html_e( 'Your time zone', 'worldwide-clinic-appointments' ); ?><input name="timezone" required value="<?php echo esc_attr( wp_timezone_string() ); ?>"></label>
+				<label><?php esc_html_e( 'Your time zone', 'worldwide-clinic-appointments' ); ?><input name="timezone" required value="<?php echo esc_attr( $default_timezone ); ?>"></label>
 				<button class="wca-button" type="button" data-wca-search-slots><?php esc_html_e( 'Find available times', 'worldwide-clinic-appointments' ); ?></button>
 				<div class="wca-slots" data-wca-slots aria-live="polite"></div>
 				<label><?php esc_html_e( 'Reason category', 'worldwide-clinic-appointments' ); ?><select name="category"><option value="general"><?php esc_html_e( 'General consultation', 'worldwide-clinic-appointments' ); ?></option><option value="follow_up"><?php esc_html_e( 'Follow-up', 'worldwide-clinic-appointments' ); ?></option></select></label>
