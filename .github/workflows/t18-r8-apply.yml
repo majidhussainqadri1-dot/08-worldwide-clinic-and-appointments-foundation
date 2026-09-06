@@ -2,7 +2,7 @@ name: File 08 T18 R8 Apply Frozen Ledger
 on:
   push:
     branches: [review/file08-t18-ten-round-2026-09-06]
-    paths: [.github/workflows/t18-r8-apply.yml]
+    paths: [.github/workflows/t18-r8-apply.yml, .github/scripts/t18-r8-external-calendar-degraded-correct.py]
 permissions:
   contents: write
 jobs:
