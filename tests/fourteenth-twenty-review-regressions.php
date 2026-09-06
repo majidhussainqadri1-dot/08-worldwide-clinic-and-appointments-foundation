@@ -14,7 +14,8 @@ t14has('R6 no-show heatmap count','includes/class-wca-future24.php',"'no_show' =
 t14has('R7 opaque clinic read helper','includes/class-wca-future24.php','clinic_id_from_public_ref');
 t14has('R8 advisor reason','includes/class-wca-future24.php',"'utilization_ratio'");
 t14has('R8 advisor provenance','includes/class-wca-future24.php',"'source_contract' => 'wca.capacity-heatmap'");
-t14has('R9 bounded doctor query','includes/class-swc-helpers.php','\'number\'   => $limit');
+t14has('R9 bounded doctor query','includes/class-swc-helpers.php',"'number'  => \$batch_size");
+t14has('R9 bounded doctor batch size','includes/class-swc-helpers.php','$batch_size   = 200;');
 t14lacks('R9 no unbounded doctor load','includes/class-swc-helpers.php',"'number'   => -1");
 t14has('R10 bounded request doctors','includes/class-swc-frontend.php','requestable_doctor_ids( 100, 0 )');
 t14has('R11 secure UUID fallback','includes/class-wca-repository.php','random_bytes( 16 )');
