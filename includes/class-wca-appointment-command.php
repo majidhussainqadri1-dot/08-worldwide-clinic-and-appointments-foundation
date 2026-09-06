@@ -13,7 +13,7 @@
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Appointment_Command {
-	const CONTRACT_VERSION = '1.0.2';
+	const CONTRACT_VERSION = '1.0.3';
 
 	public static function boot() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_route' ), 60 );
@@ -39,7 +39,13 @@ final class WCA_Appointment_Command {
 		}
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : $request->get_params();
-		return self::request( $data, $user_id );
+		$result = self::request( $data, $user_id );
+		if ( is_wp_error( $result ) ) { return $result; }
+		$response = rest_ensure_response( $result );
+		$response->set_status( 201 );
+		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
+		$response->header( 'X-Request-ID', WCA_Observability::trace_id() );
+		return $response;
 	}
 
 	/** @return array<string,mixed>|WP_Error */
@@ -67,32 +73,26 @@ final class WCA_Appointment_Command {
 		if ( $remote && ! self::affirmative( isset( $data['telehealth_consent'] ) ? $data['telehealth_consent'] : null ) ) {
 			return new WP_Error( 'wca_teleconsult_consent_required', __( 'Explicit remote-consultation consent is required for the selected online or hybrid service.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		/* Fail closed before the legacy service can reclaim an ambiguous stale
-		 * processing reservation. A prior worker may already have committed the
-		 * appointment even if it died before persisting the idempotent response. */
+		/* Fail closed before the service reaches its owner mutation. A prior worker
+		 * may already have committed the appointment even if its replay evidence
+		 * could not be finalized. */
 		$stale = self::guard_stale_request_claim( $data, $actor_user_id );
 		if ( is_wp_error( $stale ) ) { return $stale; }
 		$data['privacy_consent']        = true;
 		$data['emergency_acknowledged'] = true;
 		$data['telehealth_consent']     = $remote ? true : false;
 		$result = WCA_Service::request_appointment( $data, $actor_user_id );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
+		if ( is_wp_error( $result ) ) { return $result; }
+
+		/* The owner transaction already persists appointment_processing,
+		 * privacy_notice and (for remote care) teleconsult consent before commit.
+		 * Never perform a second post-commit consent read/write here: a transient
+		 * read failure after commit would turn a successful appointment into an
+		 * ambiguous client error. */
 		$result['command_contract'] = 'wca.appointment-request/' . self::CONTRACT_VERSION;
 		$result['privacy_consent_verified'] = true;
 		$result['emergency_ack_verified'] = true;
 		$result['remote_consultation_consent_verified'] = $remote;
-		$appointment_id = ! empty( $result['appointment_id'] ) ? absint( $result['appointment_id'] ) : 0;
-		if ( $remote && $appointment_id ) {
-			$sync = self::ensure_context_consent( $appointment_id, 'teleconsult', $actor_user_id );
-			if ( is_wp_error( $sync ) ) { return $sync; }
-		}
-		if ( $appointment_id ) {
-			$sync = self::ensure_context_consent( $appointment_id, 'privacy_notice', $actor_user_id );
-			if ( is_wp_error( $sync ) ) { return $sync; }
-		}
-		// Public/cross-file command responses use the opaque appointment ref only.
 		unset( $result['appointment_id'] );
 		return $result;
 	}
@@ -121,46 +121,11 @@ final class WCA_Appointment_Command {
 	}
 
 	private static function affirmative( $value ) {
-		if ( true === $value || 1 === $value || '1' === $value ) {
-			return true;
-		}
+		if ( true === $value || 1 === $value || '1' === $value ) { return true; }
 		if ( is_string( $value ) ) {
 			return in_array( strtolower( trim( $value ) ), array( 'true', 'yes', 'on' ), true );
 		}
 		return false;
-	}
-
-	private static function ensure_context_consent( $appointment_id, $scope, $actor_user_id ) {
-		global $wpdb;
-		$table = WCA_Schema::tables()['consents'];
-		$exists = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT id FROM {$table} WHERE appointment_id=%d AND scope=%s AND status='granted' AND revoked_at IS NULL ORDER BY id DESC LIMIT 1",
-				$appointment_id,
-				$scope
-			)
-		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( null === $exists && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_consent_read_failed', __( 'Current consent state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-		if ( $exists ) { return true; }
-		$claims = WCA_Authorization::claims( $actor_user_id );
-		if ( is_wp_error( $claims ) ) { return $claims; }
-		$guardian_id = absint( SWC_Helpers::meta( $appointment_id, 'guardian_user_id', 0 ) );
-		$record = WCA_Repository::record_consent( array(
-			'appointment_id'     => $appointment_id,
-			'actor_user_id'      => $actor_user_id,
-			'actor_subject_uuid' => $claims['subject_uuid'],
-			'guardian_user_id'   => $guardian_id,
-			'scope'              => sanitize_key( $scope ),
-			'terms_version'      => '2026-08-10.1',
-			'terms_text'         => 'wca-context:' . sanitize_key( $scope ) . ':2026-08-10',
-			'legal_basis'        => 'consent',
-			'metadata'           => array( 'source' => 'governed_appointment_request', 'contract' => self::CONTRACT_VERSION ),
-		) );
-		if ( is_wp_error( $record ) ) {
-			WCA_Observability::log( 'error', 'context_consent_sync_failed', array( 'scope' => sanitize_key( $scope ), 'appointment_ref' => (string) SWC_Helpers::meta( $appointment_id, 'public_ref', '' ) ) );
-			return $record;
-		}
-		return true;
 	}
 }
 
