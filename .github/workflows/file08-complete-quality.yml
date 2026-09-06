@@ -7,11 +7,47 @@ on:
   pull_request:
     branches: [main]
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: file08-complete-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  r9_correct:
+    name: Apply frozen R9 ledger
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'review/file08-t19-twenty-round-2026-09-06'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: '${{ github.event.pull_request.head.ref }}'
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - name: Apply frozen R9 ledger corrections
+        run: python3 .github/scripts/t19-round-fix-v2.py
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Full source-level regression suite
+        run: php tests/run-all.php
+      - name: JavaScript syntax
+        run: |
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit corrected R9 working tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "majidhussainqadri1-dot"
+          git config user.email "majidhussainqadri1@gmail.com"
+          git add includes/class-wca-query-api.php includes/class-wca-frontend.php includes/class-wca-opaque-api.php tests/run-all.php tests/t19-r9-participant-query-authority-regressions.php tests/new-plan-hardening.php
+          if git diff --cached --quiet; then
+            echo "No R9 correction delta to commit."
+            exit 0
+          fi
+          git commit -m "fix(file08): close T19 R9 frozen ledger"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
   quality:
     name: PHP ${{ matrix.php }} and source contracts
     runs-on: ubuntu-latest
