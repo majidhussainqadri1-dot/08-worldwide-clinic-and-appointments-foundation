@@ -227,6 +227,20 @@
 				} catch (error) { setStatus(card, error.message, true); button.disabled = false; }
 			});
 		});
+
+		Array.prototype.forEach.call(card.querySelectorAll('[data-wca-calendar-download]'), function (button) {
+			button.addEventListener('click', async function () {
+				button.disabled = true;
+				try {
+					var signed = await api('calendar-links/' + encodeURIComponent(ref));
+					if (!signed || !signed.url) throw new Error(tr('Calendar export is unavailable.'));
+					window.location.assign(String(signed.url));
+				} catch (error) {
+					setStatus(card, error.message, true);
+					button.disabled = false;
+				}
+			});
+		});
 	}
 
 	document.addEventListener('DOMContentLoaded', function () {

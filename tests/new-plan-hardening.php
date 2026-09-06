@@ -84,7 +84,7 @@ foreach ( array(
 ) as $token ) { f08h_has( 'verification reconciliation', $reconcile, $token ); }
 
 foreach ( array(
-	'data-wca-appointment-ref', '/appointment-refs/', 'telehealth_consent',
+	'data-wca-appointment-ref', 'data-wca-calendar-download', 'telehealth_consent',
 	'data-consultation-type', 'wca_cursor', 'View details',
 ) as $token ) { f08h_has( 'frontend', $frontend, $token ); }
 f08h_lacks( 'frontend', $frontend, 'data-wca-appointment-id' );
