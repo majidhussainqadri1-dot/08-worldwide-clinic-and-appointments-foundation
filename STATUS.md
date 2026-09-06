@@ -2,50 +2,45 @@
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t18-ten-round-2026-09-06`
-- Current corrected source lineage: **T18 sequential review/correction cycle**
+- Working review branch: `review/file08-t19-twenty-round-2026-09-06`
+- Current review discipline: **T19 fresh 20-round Review → Ledger Freeze → Fix → Regression → Exact-head CI → Next Round**
 - Runtime candidate: **1.2.15**
 - Core File 08 schema: **3.4.0**
-- Restricted continuity schema: **1.1.0**
-- Future24 additive operational schema: **1.1.0**
+- Restricted continuity schema/contract: **1.1.0**
+- Future24 additive operational schema/contract: **1.1.0**
 - File plan contract: **SSH-F08-PLAN-2026-v1.0**
-- Future24 amendment contract: **1.1.0**
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Platform commission: **0%**
 
-The authoritative repository release identity is the exact final branch HEAD together with its exact-head GitHub Actions run, deterministic candidate manifest, artifact digest, and candidate SHA-256. Documentation history, older commits, older artifacts, or prior green CI are not substitutes for that exact final identity.
+The authoritative repository release identity is the exact final branch HEAD together with its exact-head GitHub Actions run, deterministic candidate manifest, artifact digest and candidate SHA-256. The manifest must carry and independently verify the same runtime, plan, core schema, continuity schema/contract, Future24 schema/contract, Public Clinic contract and CF-01 contract embedded in the exact artifact.
+
+Documentation history, older commits, older artifacts and prior green CI are not substitutes for the exact current HEAD.
 
 ## Source implementation state
 
-The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving the File 08 ownership boundary. The runtime includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback metadata, accessibility/localization, and the Future24 scheduling/interoperability layer.
+The current candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving File 08 canonical ownership boundaries. The runtime includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback metadata, accessibility/localization, and the Future24 scheduling/interoperability layer.
 
-## Ninth fresh 10-round corrective audit
+Historical audit cycles remain evidence of their own exact historical heads only; their branch names, schemas, CI runs, package hashes or closure statements do not describe the current T19 candidate.
 
-A ninth fresh sequential review-and-correct cycle was run against the exact v1.2.8 corrected repository state. Each supported defect was corrected and the complete source QA suite passed before the next round began. The cycle closes opaque browser practitioner-reference leakage, O(N) doctor enumeration in mutation authorization, fail-open locked mutation audit behavior, transition event/outbox/review-eligibility partial commits, Future24 governance-audit fail-open record creation, waitlist-offer duplicate/projection races, support-participant revocation projection gaps, virtual-room projection gaps, and non-atomic group cancellation. Runtime is 1.2.9 while core schema remains 3.2.0, continuity schema 1.1.0 and Future24 schema 1.0.0. Repository evidence does not prove Hostinger staging or live state.
+## Current T19 sequential review state
 
-## Tenth fresh 10-round corrective audit
-
-A tenth fresh sequential review-and-correct cycle was run against exact v1.2.9 repository state. R1-R9 corrected owner transaction/event/outbox atomicity across appointment creation, clinic lifecycle, branch, service, availability, complaint and payment flows; replay-finalization now fails closed with a caller-owned mutation-status query; public clinic discovery uses opaque cursor pagination and conditional ETag caching. R10 aligns runtime/tests/docs to v1.2.10 while schemas remain 3.2.0 / 1.1.0 / 1.0.0. Repository evidence remains distinct from staging/live evidence.
-
-## Eleventh fresh 20-round corrective audit
-
-Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported repository defects; R16 aligns runtime/tests/docs and permanent regression evidence to v1.2.11 without schema inflation. R17-R20 are corrected-state closure reviews. Repository evidence remains distinct from staging/live evidence.
+- R1 completed review first, froze its defect ledger, corrected the complete R1 batch, and passed full PHP 7.4/PHP 8.3 source regression plus deterministic package verification.
+- R2 completed a separate workflow/release-automation review, froze its ledger, retired obsolete self-mutating T17/T18 one-shot workflows, and passed exact-head PHP 7.4/PHP 8.3 source QA plus reproducible candidate verification.
+- R3 is the current release/version/schema/contract/documentation-truth review. Any R3 correction invalidates earlier exact-head package evidence for final-release purposes and requires a new exact-head regression/package pass before R4 begins.
 
 ## Evidence-state classification
 
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **T18 correction in progress** — R1-R9 are corrected/Green; R10 release-truth correction must complete exact-head regression before this cycle can close. |
-| Fresh post-final-code reviews | **Pending for current T18 final corrected HEAD.** Older T16/T17 closure reviews remain historical evidence only. |
-| Packaged | **Pending for current T18 final corrected HEAD.** No older candidate artifact is current-release evidence. |
-| Automated-QA Green | **Pending for current T18 final corrected HEAD.** Older successful workflow runs remain historical evidence only. |
+| Coded | **Candidate under T19 sequential review.** Current source is reviewable; final T19 closure has not yet occurred. |
+| Fresh post-final-code reviews | **Pending until the final T19 code/documentation correction is complete.** |
+| Packaged | **Head-specific only.** Earlier successful T19 R1/R2 package runs become historical when the branch changes; final package evidence must be regenerated on final T19 HEAD. |
+| Automated-QA Green | **Head-specific only.** Earlier successful T19 R1/R2 runs do not prove a later corrected HEAD. |
 | Staging-Accepted | **Pending / not claimed.** |
-| Live-Deployed | **Not claimed.** |
-| Operational | **Pending.** |
-
-No older v1.2.1 through v1.2.14 artifact or older CI run may be used as evidence for the v1.2.15 candidate. Package and QA status are valid only when the candidate manifest, artifact and workflow all identify the exact same final commit.
+| Live-Deployed | **Unverified / not claimed.** |
+| Operational | **Not claimed.** |
 
 ## Mandatory staging / production gates
 
@@ -55,63 +50,8 @@ Only after controlled production deployment may live re-test and repository/depl
 
 ## Live truth
 
-This repository status does not prove the current staging or live installation. Exact deployed plugin files/version, database/schema version, migration state, active configuration/dependencies, deployed artifact checksum, and post-deploy behavior must be independently frozen and verified before any live/operational assertion.
+This repository status does not prove the current staging or live installation. Exact deployed plugin files/version, database/schema version, migration state, active configuration/dependencies, deployed artifact checksum and post-deploy behavior must be independently frozen and verified before any live/operational assertion.
 
-## Sixteenth fresh 20-round sequential audit — repository closure checkpoint
+## Historical evidence note
 
-- Governing sequence: each round was reviewed to completion before any correction; the closed round's supported findings were corrected together and fully retested before the next round.
-- Defect rounds: **R1, R4, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20**.
-- Clean rounds: **R2, R3, R5**.
-- R20 classification: repository/release-evidence closure defects only; the final R20 review proved full source QA green and deterministic packaging before cleanup, with no new functional PHP/JavaScript defect.
-- Runtime: **1.2.15**; core schema **3.2.0**; continuity **1.1.0**; Future24 **1.0.0**.
-- Temporary T16 correction workflows/scripts/diagnostic evidence are removed by the R20 correction batch and guarded by a permanent closure-hygiene regression.
-- Exact-final-head canonical CI, candidate manifest/artifact/SHA-256 and PR evidence were verified together on `56a1ee4a59722e6574c4722e2c6bda791b15be39`; staging/live remain separate external gates.
-- Staging-Accepted: **not claimed**; Live-Deployed: **unverified/not claimed**; Operational: **not claimed**.
-
-## Thirteenth fresh 20-round corrected-state closure
-
-- Main review rounds: T13-R01 through T13-R20; all 20 contained a supported repository defect/gap and were corrected sequentially.
-- Post-final corrective sweeps: legacy mutation persistence, repair/purge failure visibility, and canonical purge fail-closed semantics corrected.
-- Two fresh post-coding source reviews: PASS / PASS, no new supported defect.
-- Runtime: 1.2.13; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.
-- Staging-Accepted: false; Live-Deployed: unverified; Operational: not claimed.
-
-## Fourteenth fresh 20-round corrected-state closure
-
-- Frozen baseline: `fe10d05bdb4d1ffb726063f657f283097e65abbd` / runtime 1.2.13.
-- Main review rounds: T14-R01 through T14-R20. Supported product defects were corrected in R01-R18; R19-R20 were clean corrected-state reviews at that point.
-- Broader post-main sweep then found and corrected three additional repository defects: rule-local timezone/DST/effective-range heatmap projection, low-volume outcome privacy suppression, and deterministic signed stateless public clinic cursors for stable ETags.
-- Because post-main source changed, the two required fresh post-coding reviews were restarted and both passed.
-- Fourteenth corrected source/tooling cleanup checkpoint: `f976c7c8e64d4303a1e8ce07af97430b36551bc3`.
-- Runtime: 1.2.14; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.
-- Temporary T14 workflows/scripts were removed; only the canonical quality workflow remains.
-- Staging-Accepted: false; Live-Deployed: unverified; Operational: not claimed.
-
-
-## Fifteenth fresh 20-round audit — R17 release alignment checkpoint
-
-- Governing method: each review round completes before any correction; all findings from that round are then corrected together and fully retested before the next round.
-- R1-R16 completed; R4 and R9 were clean, while supported findings in the other closed rounds were corrected and retested.
-- R17 identified stale runtime/release/document/package identity after the substantive corrections and aligns the current candidate to runtime **1.2.15** without schema inflation.
-- Core schema: **3.2.0**; continuity schema: **1.1.0**; Future24 schema: **1.0.0**.
-- R18 completed broad plan-to-code/repository-evidence review and its three findings were corrected/retested; R19 was clean; R20 found only closure-evidence/PR metadata lag and no new product-code defect. Post-correction verification is being repeated after the status contradiction found by Sweep B. This is not a claim of staging acceptance, live deployment or operational status.
-
-
-## Fifteenth fresh 20-round main-cycle closure
-
-- Runtime: **1.2.15**; core schema **3.2.0**; continuity **1.1.0**; Future24 **1.0.0**.
-- Main review method: each round completed fully before any correction; all supported findings from that closed round were then corrected together and fully retested before the next round.
-- Main defect/gap rounds: **R1, R2, R3, R5, R6, R7, R8, R10, R11, R12, R13, R14, R15, R16, R17, R18, R20**.
-- Main clean rounds: **R4, R9, R19**.
-- R20 finding class was closure/release evidence only; no new product-code/security/privacy/concurrency defect was proven in R19 or R20.
-- Because R20 changes closure evidence, two extra fresh post-correction verification sweeps will be completed before exact-final-head repository closure.
-- Staging-Accepted: **not claimed**; Live-Deployed: **unverified/not claimed**; Operational: **not claimed**.
-
-
-## Post-R20 verification restart
-
-- Corrected main-cycle HEAD after R20 evidence update: `0ddc816cba623404e79cf130491e6b77553b12c7`.
-- Post-correction Sweep A: **PASS** — compare from R18 source HEAD showed only documentation/permanent-regression evidence changed; no runtime PHP/JS file changed, and only the canonical quality workflow remained.
-- Post-correction Sweep B: **finding** — the lower main-cycle closure section was correct, but the upper status classification and R17 checkpoint still said R19/R20 were pending because a buffered documentation write restored stale text.
-- This status-only contradiction is corrected here. Because verification evidence changed, two final fresh read-only sweeps are restarted on the new corrected exact HEAD before exact-final-head CI/package closure.
-- Runtime remains **1.2.15**; schemas remain core **3.2.0**, continuity **1.1.0**, Future24 **1.0.0**.
+Earlier T13–T18 and prior-cycle evidence files are intentionally retained as historical provenance. Their embedded schema values and exact heads apply only to the historical state they explicitly name. For current release decisions, the top-level current candidate section above and the final T19 exact-head CI/package evidence are governing.
