@@ -994,7 +994,7 @@ final class WCA_Service {
 		$amount = self::strict_int( is_scalar( $amount_raw ) ? (string) $amount_raw : '', 0, PHP_INT_MAX );
 		$service_ref = (string) SWC_Helpers::meta( $appointment_id, 'service_public_ref_snapshot' );
 		$service_version = absint( SWC_Helpers::meta( $appointment_id, 'service_version_snapshot' ) );
-		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) || null === $amount || ! $service_ref || ! $service_version ) {
+		if ( ! self::valid_currency( $currency ) || null === $amount || ! $service_ref || ! $service_version ) {
 			return new WP_Error( 'wca_payment_snapshot_missing', __( 'The appointment does not have a trustworthy booked fee snapshot. Financial reconciliation is required before payment.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		return array(

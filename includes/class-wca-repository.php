@@ -370,6 +370,10 @@ final class WCA_Repository {
 		$sql = "SELECT * FROM {$table} WHERE id=%d" . ( $public_only ? " AND status='active'" : '' ) . ' LIMIT 1';
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, absint( $id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $row && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_service_read_failed', __( 'Service data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
+		if ( $row && $public_only && ! WCA_Service::valid_currency( (string) $row['currency'] ) ) {
+			self::note_read_error( 'wca_service_currency_invalid', __( 'Public service pricing contains an unsupported currency and cannot be trusted.', 'worldwide-clinic-appointments' ) );
+			return null;
+		}
 		return $row ?: null;
 	}
 
@@ -388,6 +392,7 @@ final class WCA_Repository {
 		if ( ! $public_only ) { return $rows; }
 		$clinic = self::get_clinic( $clinic_id, false );
 		return array_values( array_filter( array_map( static function ( $row ) use ( $clinic ) {
+			if ( ! WCA_Service::valid_currency( (string) ( $row['currency'] ?? '' ) ) ) { return null; }
 			$doctor_id = absint( $row['doctor_user_id'] ) ?: absint( $clinic['owner_user_id'] ?? 0 );
 			$practitioner_ref = WCA_Plan_Guard::practitioner_ref( $doctor_id );
 			if ( ! $practitioner_ref ) { return null; }
