@@ -102,6 +102,16 @@ replace_once(
     "\t\t});\n" + calendar_js + "\t}\n\n\tdocument.addEventListener('DOMContentLoaded', function () {\n"
 )
 
+# The earlier hardening gate required a direct /appointment-refs/ token in the
+# server-rendered frontend. That requirement is now unsafe for browser calendar
+# navigation; keep appointment mutation routing in the JS gate and require the
+# signed-download control on the frontend instead.
+replace_once(
+    'tests/new-plan-hardening.php',
+    "\t'data-wca-appointment-ref', '/appointment-refs/', 'telehealth_consent',\n",
+    "\t'data-wca-appointment-ref', 'data-wca-calendar-download', 'telehealth_consent',\n"
+)
+
 # Permanent R18 regression gate.
 test = ROOT / 'tests/t19-r18-frontend-calendar-timezone-regressions.php'
 test.write_text(r'''<?php
