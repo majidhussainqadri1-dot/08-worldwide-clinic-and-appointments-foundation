@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# T18 R9 frozen-ledger correction runner.
 root = Path(__file__).resolve().parents[2]
 wca = root / 'includes/class-wca-privacy.php'
 s = wca.read_text()
@@ -22,7 +23,6 @@ if old not in s:
     raise SystemExit('R9 scrub helper needle missing')
 s = s.replace(old, new, 1)
 
-# Clear stale DB errors at privacy read boundaries before examining last_error.
 needles = [
     "$future_rows_raw = $wpdb->get_results(",
     "$rows_raw = $wpdb->get_results(\n\t\t\t\t$wpdb->prepare(\n\t\t\t\t\t\"SELECT * FROM {$table} WHERE (actor_user_id=%d OR subject_user_id=%d)",
@@ -35,8 +35,6 @@ needles = [
 for needle in needles:
     if needle not in s:
         raise SystemExit('R9 DB boundary needle missing: ' + needle[:70])
-    indent = '\t\t\t' if needle.startswith('$future_rows_raw') else None
-    # derive indentation from the actual line containing needle
     pos = s.index(needle)
     line_start = s.rfind('\n', 0, pos) + 1
     prefix = s[line_start:pos]
