@@ -296,8 +296,8 @@ final class WCA_Repository {
 		$currency_raw = trim( (string) ( $data['currency'] ?? '' ) );
 		$currency = strtoupper( $currency_raw );
 		$consultation_type = sanitize_key( $data['consultation_type'] ?? '' );
-		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) ) {
-			return new WP_Error( 'wca_repository_service_currency', __( 'Service persistence requires a valid three-letter currency code.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		if ( ! WCA_Service::valid_currency( $currency ) ) {
+			return new WP_Error( 'wca_repository_service_currency', __( 'Service persistence requires a currently supported ISO currency code.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
 		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) {
 			return new WP_Error( 'wca_repository_service_type', __( 'Service persistence requires a valid consultation type.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );

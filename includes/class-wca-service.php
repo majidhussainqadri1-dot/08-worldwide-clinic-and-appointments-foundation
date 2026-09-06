@@ -29,6 +29,20 @@ final class WCA_Service {
 		return 1 === preg_match( '/^(?:[01]\d|2[0-3]):[0-5]\d$/', (string) $value );
 	}
 
+	public static function valid_currency( $value ) {
+		if ( ! is_string( $value ) ) { return false; }
+		$currency = strtoupper( trim( $value ) );
+		$codes = array(
+			'AED','AFN','ALL','AMD','AOA','ARS','AUD','AWG','AZN','BAM','BBD','BDT','BGN','BHD','BIF','BMD','BND','BOB','BRL','BSD','BTN','BWP','BYN','BZD',
+			'CAD','CDF','CHF','CLP','CNY','COP','CRC','CUP','CVE','CZK','DJF','DKK','DOP','DZD','EGP','ERN','ETB','EUR','FJD','FKP','GBP','GEL','GHS','GIP','GMD','GNF','GTQ','GYD',
+			'HKD','HNL','HTG','HUF','IDR','ILS','INR','IQD','IRR','ISK','JMD','JOD','JPY','KES','KGS','KHR','KMF','KPW','KRW','KWD','KYD','KZT','LAK','LBP','LKR','LRD','LSL','LYD',
+			'MAD','MDL','MGA','MKD','MMK','MNT','MOP','MRU','MUR','MVR','MWK','MXN','MYR','MZN','NAD','NGN','NIO','NOK','NPR','NZD','OMR','PAB','PEN','PGK','PHP','PKR','PLN','PYG',
+			'QAR','RON','RSD','RUB','RWF','SAR','SBD','SCR','SDG','SEK','SGD','SHP','SLE','SOS','SRD','SSP','STN','SYP','SZL','THB','TJS','TMT','TND','TOP','TRY','TTD','TWD','TZS',
+			'UAH','UGX','USD','UYU','UZS','VES','VND','VUV','WST','XAF','XCD','XCG','XOF','XPF','YER','ZAR','ZMW','ZWG'
+		);
+		return in_array( $currency, $codes, true );
+	}
+
 	/** Strict integer validator used by canonical persistence roots; never silently clamps caller intent. */
 	public static function strict_int( $value, $min, $max ) {
 		if ( ! is_int( $value ) && ! is_string( $value ) ) { return null; }
@@ -254,7 +268,7 @@ final class WCA_Service {
 		if ( ! in_array( $consultation_type, array( 'online', 'in_person', 'hybrid', 'home_visit' ), true ) ) { return new WP_Error( 'wca_service_consultation_type', __( 'A valid consultation type is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$currency_raw = trim( (string) ( $data['currency'] ?? ( $current['currency'] ?? '' ) ) );
 		$currency = strtoupper( $currency_raw );
-		if ( ! preg_match( '/^[A-Z]{3}$/', $currency ) ) { return new WP_Error( 'wca_service_currency', __( 'A valid three-letter currency code is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( ! self::valid_currency( $currency ) ) { return new WP_Error( 'wca_service_currency', __( 'A currently supported ISO currency code is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$duration = self::strict_int( array_key_exists( 'duration_minutes', $data ) ? $data['duration_minutes'] : ( $current['duration_minutes'] ?? 30 ), 10, 480 );
 		$fee_minor = self::strict_int( array_key_exists( 'fee_minor', $data ) ? $data['fee_minor'] : ( $current['fee_minor'] ?? 0 ), 0, PHP_INT_MAX );
 		$fee_max_minor = self::strict_int( array_key_exists( 'fee_max_minor', $data ) ? $data['fee_max_minor'] : ( $current['fee_max_minor'] ?? 0 ), 0, PHP_INT_MAX );
