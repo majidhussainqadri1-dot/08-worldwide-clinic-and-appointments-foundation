@@ -1,8 +1,15 @@
-# File 08 Master-Plan Traceability — 1.0.0
+# File 08 Master-Plan Traceability — document version 1.0.0
 
 **Plan:** SSH-F08-PLAN-2026-v1.0  
-**Runtime candidate:** 1.0.0  
-**Date:** 2026-08-06
+**Current repository runtime candidate:** 1.2.15  
+**Core schema:** 3.4.0  
+**Restricted continuity schema/contract:** 1.1.0  
+**Future24 schema/contract:** 1.1.0  
+**Public Clinic Contract:** 1.1.0  
+**CF-01 scheduling context contract:** 1.1.0  
+**Document baseline date:** 2026-08-06  
+
+The `1.0.0` in this document filename is the traceability-document version, not the current plugin runtime. Runtime/schema/contract truth is verified from the exact source and exact candidate manifest.
 
 | Requirement | Implemented source ownership | Primary evidence | Automated gate |
 |---|---|---|---|
@@ -35,6 +42,10 @@
 | F08-NFR-009 Compatibility | SWC adapters, canonical WCA APIs, versioned manifests/events | compatibility/bootstrap/contracts | source test + cross-repo staging |
 | F08-NFR-010 Localization | canonical text domain, translatable strings, RTL CSS | runtime/frontend/CSS | source + Urdu manual gate |
 
+## Future24 traceability
+
+`F08-FUT-01…24` are implemented by the governed Future24 capability manifest and its source-level regression/contract suites. The exact candidate manifest independently records and verifies Future24 schema/contract parity so a package cannot claim an older Future24 state while containing newer source.
+
 ## Definition-of-Done classification
 
-Source implementation, static traceability, syntax, deterministic packaging and automated source checks are governed by CI. Environment-dependent gates remain false until evidence is produced: exact Hostinger staging installation, migration from 0.1.0/0.2.2, restore/rollback, real dependency integration, actual role journeys, delivery/cache, browser/mobile/Urdu RTL/manual WCAG, load, independent privacy/security/professional review, Founder acceptance and production deployment.
+Source implementation, static traceability, syntax, deterministic packaging and automated source checks are governed by exact-head CI. Environment-dependent gates remain false until evidence is produced: exact Hostinger staging installation, migration from supported legacy versions, restore/rollback, real dependency integration, actual role journeys, delivery/cache, browser/mobile/Urdu RTL/manual WCAG, load, independent privacy/security/professional review, Founder acceptance and production deployment.
