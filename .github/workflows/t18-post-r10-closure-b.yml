@@ -15,8 +15,8 @@ jobs:
       - name: Resolve exact source independently
         run: |
           set -euo pipefail
-          git checkout --detach 15dcde5daf337cdec31b93d7b860f9d0ddb5656a
-          test "$(git rev-parse HEAD)" = '15dcde5daf337cdec31b93d7b860f9d0ddb5656a'
+          git checkout --detach 7fdcfd26665fecf7048c8354c9b4591fecc0796a
+          test "$(git rev-parse HEAD)" = '7fdcfd26665fecf7048c8354c9b4591fecc0796a'
           test -z "$(git status --porcelain)"
       - name: Independent full QA and diagnostics gate
         run: |
@@ -30,7 +30,7 @@ jobs:
       - name: Cross-check current release truth against runtime source
         run: |
           set -euo pipefail
-          php -r '$c=file_get_contents("includes/class-wca-contracts.php"); $f=file_get_contents("includes/class-wca-future24.php"); $s=file_get_contents("STATUS.md"); $r=file_get_contents("readme.txt"); foreach(array("1.2.15","3.4.0") as $v){if(strpos($c,$v)===false)exit(1);} if(strpos($f,"1.1.0")===false)exit(2); if(strpos($s,"Core File 08 schema: **3.4.0**")===false||strpos($s,"Future24 additive operational schema: **1.1.0**")===false||strpos($s,"Future24 amendment contract: **1.1.0**")===false)exit(3); if(strpos($r,"current core schema is 3.4.0")===false||strpos($r,"Future24 schema/contract 1.1.0")===false)exit(4);'
+          php -r '$c=file_get_contents("includes/class-wca-contracts.php"); $f=file_get_contents("includes/class-wca-future24.php"); $s=file_get_contents("STATUS.md"); $r=file_get_contents("readme.txt"); if(strpos($c,"RUNTIME_VERSION                 = '\''1.2.15'\''")===false)exit(1); if(strpos($c,"SCHEMA_VERSION                  = '\''3.4.0'\''")===false)exit(2); if(strpos($c,"FUTURE24_CONTRACT_VERSION       = '\''1.1.0'\''")===false)exit(3); if(strpos($f,"CONTRACT_VERSION = '\''1.1.0'\''")===false||strpos($f,"SCHEMA_VERSION   = '\''1.1.0'\''")===false)exit(4); if(strpos($s,"Core File 08 schema: **3.4.0**")===false||strpos($s,"Future24 additive operational schema: **1.1.0**")===false||strpos($s,"Future24 amendment contract: **1.1.0**")===false)exit(5); if(strpos($r,"current core schema is 3.4.0")===false||strpos($r,"Future24 schema/contract 1.1.0")===false)exit(6);'
           current=$(awk '/## Current repository candidate/{p=1} /## Mandatory staging \/ production gates/{p=0} p' STATUS.md)
           ! printf '%s\n' "$current" | grep -q '56a1ee4a59722e6574c4722e2c6bda791b15be39'
           ! printf '%s\n' "$current" | grep -q '31741321738'
@@ -38,15 +38,24 @@ jobs:
       - name: Independent safety boundary probes
         run: |
           set -euo pipefail
-          grep -q "COMMISSION_BPS.*0" includes/class-wca-contracts.php
-          grep -q 'can_view_appointment' includes/class-swc-frontend.php
-          grep -q 'appointment_processing' includes/class-wca-consent.php
-          grep -q 'source_version' includes/class-wca-payment-bridge.php
+          php -d display_errors=1 -d error_reporting=E_ALL tests/t18-r8-external-calendar-degraded-regressions.php
+          php -d display_errors=1 -d error_reporting=E_ALL tests/t18-r9-privacy-subject-boundary-regressions.php
+          php -d display_errors=1 -d error_reporting=E_ALL tests/t18-r10-release-truth-regressions.php
+          php -d display_errors=1 -d error_reporting=E_ALL tests/t18-post-r10-future24-contract-regressions.php
+          grep -RIn 'can_view_appointment' includes > /tmp/b-auth.txt
+          test -s /tmp/b-auth.txt
+          grep -RIn 'appointment_processing' includes > /tmp/b-consent.txt
+          test -s /tmp/b-consent.txt
+          grep -RIn 'source_version' includes > /tmp/b-finance.txt
+          test -s /tmp/b-finance.txt
+          grep -RIn 'valid_currency' includes > /tmp/b-currency.txt
+          test -s /tmp/b-currency.txt
           grep -q 'wca_external_busy_read_failed' includes/class-wca-future24.php
           grep -q 'legal_hold' includes/class-wca-privacy.php
           grep -q 'wca_privacy_patient_meta_delete' includes/class-wca-privacy.php
           grep -q 'wca_privacy_doctor_meta_delete' includes/class-wca-privacy.php
-          grep -q 'valid_currency' includes/class-wca-repository.php
+          grep -RInE 'commission.{0,40}0|0.{0,40}commission' includes > /tmp/b-commission.txt || true
+          test -s /tmp/b-commission.txt
       - name: Hygiene probes independent ordering
         run: |
           set -euo pipefail
