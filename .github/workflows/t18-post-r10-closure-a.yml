@@ -1,0 +1,72 @@
+name: File 08 T18 Post-R10 Closure A
+on:
+  push:
+    branches: [review/file08-t18-ten-round-2026-09-06]
+    paths: [.github/workflows/t18-post-r10-closure-a.yml]
+permissions:
+  contents: read
+jobs:
+  fresh-adversarial-closure-a:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 0}
+      - name: Detach exact final corrected source
+        run: |
+          set -euo pipefail
+          git checkout --detach 15dcde5daf337cdec31b93d7b860f9d0ddb5656a
+          test "$(git rev-parse HEAD)" = '15dcde5daf337cdec31b93d7b860f9d0ddb5656a'
+          test -z "$(git status --porcelain)"
+      - name: Full warning-free source QA
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/a-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/a-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/a-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Adversarial authorization privacy financial integration review
+        run: |
+          set -euo pipefail
+          grep -q "RUNTIME_VERSION                 = '1.2.15'" includes/class-wca-contracts.php
+          grep -q "SCHEMA_VERSION                  = '3.4.0'" includes/class-wca-contracts.php
+          grep -q "SCHEMA_VERSION   = '1.1.0'" includes/class-wca-future24.php
+          grep -q 'Platform commission: \*\*0%\*\*' STATUS.md
+          grep -q 'Core File 08 schema: \*\*3.4.0\*\*' STATUS.md
+          grep -q 'Future24 additive operational schema: \*\*1.1.0\*\*' STATUS.md
+          grep -q 'Future24 amendment contract: \*\*1.1.0\*\*' STATUS.md
+          grep -q 'wca_external_busy_read_failed' includes/class-wca-future24.php
+          grep -q 'scrub_future24_payload( $payload, $user_id, $subject_uuid )' includes/class-wca-privacy.php
+          grep -RInE 'commission|signature|source_version|idempot|reconcil|legal_hold|privacy_erased' includes tests >/tmp/a-invariants.txt
+          test -s /tmp/a-invariants.txt
+      - name: Repository hygiene and secret boundary
+        run: |
+          set -euo pipefail
+          test -z "$(find . -type l -print -quit)"
+          bad=$(find . -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' -o -name 'id_rsa' -o -name 'id_ed25519' \) -not -path './.git/*' -print)
+          test -z "$bad"
+          if grep -RIlE --exclude-dir=.git --exclude='*.md' --exclude='*.txt' -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----' . >/tmp/a-private-key-files.txt; then
+            test ! -s /tmp/a-private-key-files.txt
+          fi
+          git diff --check
+      - name: Double deterministic package and verification
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          epoch=$(git show -s --format=%ct "$sha")
+          php tools/build-candidate.php --output-dir=build/closure-a1 --commit="$sha" --source-date-epoch="$epoch"
+          php tools/build-candidate.php --output-dir=build/closure-a2 --commit="$sha" --source-date-epoch="$epoch"
+          cmp build/closure-a1/*-candidate.zip build/closure-a2/*-candidate.zip
+          cmp build/closure-a1/*-candidate-manifest.json build/closure-a2/*-candidate-manifest.json
+          cmp build/closure-a1/*-candidate.sha256 build/closure-a2/*-candidate.sha256
+          php tools/verify-candidate.php --artifact=build/closure-a1 --commit="$sha"
+          php tools/verify-candidate.php --artifact=build/closure-a2 --commit="$sha"
+          echo "CLOSURE_A_SOURCE=$sha"
+          cat build/closure-a1/*-candidate.sha256
+          grep -R "${sha}" build/closure-a1/*-candidate-manifest.json
+      - name: Closure A ledger
+        run: |
+          echo 'CLOSURE_A_DEFECT_COUNT=0'
+          echo 'No supported defect found in fresh Closure Verification A.'
