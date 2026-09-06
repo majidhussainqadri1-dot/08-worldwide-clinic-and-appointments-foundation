@@ -1,0 +1,42 @@
+name: File 08 T19 R8 Frozen-Ledger Correction
+
+on:
+  push:
+    branches:
+      - review/file08-t19-twenty-round-2026-09-06
+    paths:
+      - .github/scripts/t19-r8-correct.py
+      - .github/workflows/t19-r8-correct.yml
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Apply frozen R8 ledger corrections
+        run: python3 .github/scripts/t19-r8-correct.py
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Full source-level regression suite
+        run: php tests/run-all.php
+      - name: Commit corrected R8 working tree
+        run: |
+          set -euo pipefail
+          git config user.name "majidhussainqadri1-dot"
+          git config user.email "majidhussainqadri1@gmail.com"
+          git add includes/class-wca-service.php includes/class-wca-verification-reconciliation.php tests/run-all.php tests/t19-r8-service-projection-reconciliation-regressions.php
+          if git diff --cached --quiet; then
+            echo "No R8 correction delta to commit."
+            exit 0
+          fi
+          git commit -m "fix(file08): close T19 R8 frozen ledger"
+          git push origin HEAD:${GITHUB_REF_NAME}
