@@ -1,0 +1,62 @@
+name: File 08 T18 R10 Complete Review
+on:
+  push:
+    branches: [review/file08-t18-ten-round-2026-09-06]
+    paths: [.github/workflows/t18-r10-review.yml]
+permissions:
+  contents: read
+jobs:
+  complete-review-ledger-freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 0}
+      - name: Freeze exact reviewed source
+        run: |
+          set -euo pipefail
+          git checkout --detach 9e78faa33208b4b5830073a0d7c5512e3e741acc
+          test "$(git rev-parse HEAD)" = "9e78faa33208b4b5830073a0d7c5512e3e741acc"
+          git status --porcelain
+      - name: Complete warning-free source regression
+        run: |
+          set -euo pipefail
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/tmp/r10-lint.txt
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php 2>&1 | tee /tmp/r10-tests.txt
+          ! grep -Eq 'PHP (Warning|Notice|Deprecated|Fatal|Parse)|Warning:|Notice:|Deprecated:' /tmp/r10-tests.txt
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Version schema and release metadata review
+        run: |
+          set -euo pipefail
+          echo '=== VERSION AND SCHEMA REFERENCES ==='
+          grep -RInE "Version:|Stable tag:|WCA_VERSION|SCHEMA_VERSION|schema_version|1\.2\.15|3\.4\.0|1\.1\.0" worldwide-clinic-appointments.php readme.txt includes 2>/dev/null | head -n 240 || true
+          echo '=== PACKAGE / MANIFEST TOOLING ==='
+          find . -maxdepth 4 -type f \( -iname '*package*' -o -iname '*candidate*' -o -iname '*manifest*' -o -iname '*checksum*' -o -iname '*build*' -o -iname '*verify*' \) -print | sort
+      - name: Secret symlink and repository hygiene review
+        run: |
+          set -euo pipefail
+          test -z "$(find . -type l -print -quit)"
+          bad=$(find . -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' -o -name 'id_rsa' -o -name 'id_ed25519' \) -not -path './.git/*' -print)
+          test -z "$bad"
+          ! grep -RIlE --exclude-dir=.git --exclude='*.md' --exclude='*.txt' '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----' . | grep -q .
+          git diff --check
+      - name: Runtime package boundary review
+        run: |
+          set -euo pipefail
+          echo '=== ROOT ==='; find . -maxdepth 2 -type f -print | sort
+          echo '=== BUILD REFERENCES ==='
+          grep -RInE 'ZipArchive|zip -|manifest|SOURCE_COMMIT|source_commit|candidate|deterministic|CHECKSUM' .github scripts tools tests 2>/dev/null | head -n 400 || true
+      - name: Financial privacy integration invariant review
+        run: |
+          set -euo pipefail
+          grep -RIn "commission" includes tests | head -n 80
+          grep -RInE 'signature|source_version|event_id|idempot|reconcil|external_busy|degraded' includes/class-wca-future24.php includes 2>/dev/null | head -n 220
+          grep -RInE 'legal_hold|backup|retention|privacy_erased|scrub_future24_payload' includes/class-wca-privacy.php includes/class-swc-privacy.php | head -n 180
+      - name: R10 review ledger freeze
+        run: |
+          set -euo pipefail
+          echo "R10_REVIEWED_SOURCE=$(git rev-parse HEAD)"
+          echo 'R10 review completed without source modification.'
+          echo 'Inspect all preceding evidence before deciding CLEAN vs defect-bearing.'
