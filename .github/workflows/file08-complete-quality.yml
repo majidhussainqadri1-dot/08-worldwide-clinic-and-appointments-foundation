@@ -7,11 +7,38 @@ on:
   pull_request:
     branches: [main]
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: file08-complete-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  r8_correct:
+    name: Apply frozen R8 ledger
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'review/file08-t19-twenty-round-2026-09-06'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: '${{ github.event.pull_request.head.ref }}'
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - name: Apply frozen R8 ledger corrections
+        run: python3 .github/scripts/t19-r8-correct.py
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Full source regression suite
+        run: php tests/run-all.php
+      - name: Commit corrected R8 working tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "majidhussainqadri1-dot"
+          git config user.email "majidhussainqadri1@gmail.com"
+          git add includes/class-wca-service.php includes/class-wca-verification-reconciliation.php tests/run-all.php tests/t19-r8-service-projection-reconciliation-regressions.php
+          git commit -m "fix(file08): close T19 R8 frozen ledger"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
   quality:
     name: PHP ${{ matrix.php }} and source contracts
     runs-on: ubuntu-latest
