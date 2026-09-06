@@ -42,7 +42,7 @@ The eighth fresh corrective audit removes residual total-page ceilings from doct
 
 = 1.2.15 =
 * Fifteenth fresh 20-round corrective cycle aligned the current release after R1-R16 repository corrections: authoritative SQL-read failure handling, privacy/retention truthfulness, outbox/idempotency recovery, exact money validation, object authorization, strict File00/File09 claims, opaque REST replay/privacy, migration snapshots, Future24 transaction/read/scope hardening, browser replay/deep-link safety, cross-file projection reliability, public discovery read safety, and operational health/CLI failure propagation.
-* Runtime 1.2.15; core schema remains 3.2.0, continuity 1.1.0, Future24 1.0.0. All 20 fifteenth-cycle main reviews are complete: R19 found no new supported defect; R20 found no new product-code defect but corrected closure-document/PR evidence lag. Two extra post-correction verification sweeps plus exact-final-head package/CI evidence remain before repository closure; staging/live acceptance remains separate.
+* Runtime 1.2.15; current core schema is 3.4.0, continuity schema 1.1.0, and Future24 schema/contract 1.1.0. All 20 fifteenth-cycle main reviews are complete as historical evidence; later T17 and T18 repository corrections supersede that older schema/evidence snapshot. Current exact-head package/CI evidence must identify the same corrected commit; staging/live acceptance remains a separate gate and is not claimed by repository evidence.
 
 = 1.2.14 =
 * Fourteenth fresh 20-round corrective closure plus post-main heatmap timezone/DST/privacy and deterministic public-cursor corrections.

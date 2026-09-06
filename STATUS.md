@@ -2,13 +2,14 @@
 
 ## Current repository candidate
 
-- Branch: `codex/file08-new-governing-plans-completion-2026`
+- Working review branch: `review/file08-t18-ten-round-2026-09-06`
+- Current corrected source lineage: **T18 sequential review/correction cycle**
 - Runtime candidate: **1.2.15**
-- Core File 08 schema: **3.2.0**
+- Core File 08 schema: **3.4.0**
 - Restricted continuity schema: **1.1.0**
-- Future24 additive operational schema: **1.0.0**
+- Future24 additive operational schema: **1.1.0**
 - File plan contract: **SSH-F08-PLAN-2026-v1.0**
-- Future24 amendment contract: **1.0.0**
+- Future24 amendment contract: **1.1.0**
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Platform commission: **0%**
@@ -36,10 +37,10 @@ Fresh sequential review against exact v1.2.10 source. R1-R15 corrected supported
 | State | Current repository evidence |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Corrected T16 candidate** — all sixteenth-cycle R1-R20 sequential reviews are complete; R20 found closure/release-evidence defects but no new functional PHP/JavaScript defect. |
-| Fresh post-final-code reviews | **PASS** — R20 correction verification and the required fresh read-only sweeps completed before exact-final-head canonical CI/package closure. |
-| Packaged | **PASS** — deterministic candidate package verified on exact HEAD `56a1ee4a59722e6574c4722e2c6bda791b15be39`; ZIP SHA-256 `bcbc4fa1279fb2ee2e555c8972b36776039ce9e84110dab40eccb1a851d80c09`. |
-| Automated-QA Green | **PASS** — canonical exact-head run `31741321738` succeeded for PHP 7.4/8.3, source contracts, JavaScript, repository hygiene and reproducible package verification. |
+| Coded | **T18 correction in progress** — R1-R9 are corrected/Green; R10 release-truth correction must complete exact-head regression before this cycle can close. |
+| Fresh post-final-code reviews | **Pending for current T18 final corrected HEAD.** Older T16/T17 closure reviews remain historical evidence only. |
+| Packaged | **Pending for current T18 final corrected HEAD.** No older candidate artifact is current-release evidence. |
+| Automated-QA Green | **Pending for current T18 final corrected HEAD.** Older successful workflow runs remain historical evidence only. |
 | Staging-Accepted | **Pending / not claimed.** |
 | Live-Deployed | **Not claimed.** |
 | Operational | **Pending.** |
