@@ -48,6 +48,7 @@ $wca_files = array(
 	'includes/class-wca-privacy.php',
 	'includes/class-wca-rest.php',
 	'includes/class-wca-opaque-api.php',
+	'includes/class-wca-query-api.php',
 	'includes/class-wca-calendar-link.php',
 	'includes/class-wca-future24.php',
 	'includes/class-wca-ten-review-hardening.php',
@@ -110,6 +111,7 @@ function wca_start_plugin() {
 	WCA_Continuity_Guards::boot();
 	WCA_Verification_Reconciliation::boot();
 	WCA_Opaque_API::boot();
+	WCA_Query_API::boot();
 	WCA_Calendar_Link::boot();
 	WCA_Appointment_Command::boot();
 	WCA_Future24::boot();
