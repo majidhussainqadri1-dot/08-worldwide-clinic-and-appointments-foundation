@@ -36,6 +36,7 @@ final class WCA_Frontend {
 
 	private static function clinic( $ref ) {
 		$clinic = WCA_Service::public_clinic_projection( $ref );
+		if ( is_wp_error( $clinic ) ) { return self::notice( __( 'Clinic information is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
 		if ( ! $clinic ) { return self::notice( __( 'Clinic was not found or is not publicly available.', 'worldwide-clinic-appointments' ), 'error' ); }
 		ob_start();
 		?>
@@ -74,6 +75,7 @@ final class WCA_Frontend {
 	private static function booking( $clinic_ref ) {
 		if ( ! is_user_logged_in() ) { return self::notice( __( 'Sign in to book an appointment.', 'worldwide-clinic-appointments' ), 'warning' ); }
 		$clinic = WCA_Service::public_clinic_projection( $clinic_ref );
+		if ( is_wp_error( $clinic ) ) { return self::notice( __( 'Clinic information is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
 		if ( ! $clinic ) { return self::notice( __( 'Clinic is unavailable.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$service_ref = sanitize_text_field( wp_unslash( $_GET['service'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only route choice.
 		ob_start();
@@ -167,13 +169,19 @@ final class WCA_Frontend {
 		$claims = WCA_Authorization::claims();
 		if ( is_wp_error( $claims ) || ! in_array( $claims['role'], array( 'doctor','founder','administrator','clinic_staff' ), true ) ) { return self::notice( __( 'Verified clinic access is required.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$user_id = get_current_user_id();
+		WCA_Repository::clear_read_error();
 		$clinics = WCA_Repository::list_clinics( array( 'owner_user_id' => $user_id, 'status' => '', 'per_page' => 50 ) );
+		$clinic_list_error = WCA_Repository::consume_read_error();
+		if ( is_wp_error( $clinic_list_error ) ) { return self::notice( __( 'Clinic dashboard data is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$seen = array();
 		foreach ( $clinics as $clinic ) { $seen[ absint( $clinic['id'] ) ] = true; }
 		foreach ( WCA_Authorization::delegated_clinic_ids( $user_id, 'clinic_manage' ) as $clinic_id ) {
 			$clinic_id = absint( $clinic_id );
 			if ( ! $clinic_id || isset( $seen[ $clinic_id ] ) ) { continue; }
+			WCA_Repository::clear_read_error();
 			$clinic = WCA_Repository::get_clinic( $clinic_id, false );
+			$clinic_read_error = WCA_Repository::consume_read_error();
+			if ( is_wp_error( $clinic_read_error ) ) { return self::notice( __( 'Clinic dashboard data is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
 			if ( ! $clinic || is_wp_error( WCA_Authorization::can_manage_clinic( $clinic, $user_id ) ) ) { continue; }
 			$clinics[] = $clinic;
 			$seen[ $clinic_id ] = true;
