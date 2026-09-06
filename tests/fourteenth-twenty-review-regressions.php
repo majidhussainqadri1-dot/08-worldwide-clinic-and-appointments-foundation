@@ -3,7 +3,7 @@ $root=dirname(__DIR__); $pass=0; $fail=array();
 function t14has($label,$path,$needle){global $root,$pass,$fail;$s=file_get_contents($root.'/'.$path);if(is_string($s)&&false!==strpos($s,$needle)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' missing: '.$needle;}}
 function t14lacks($label,$path,$needle){global $root,$pass,$fail;$s=file_get_contents($root.'/'.$path);if(is_string($s)&&false===strpos($s,$needle)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' forbidden: '.$needle;}}
 t14has('R1 owner-transaction privacy consent','includes/class-wca-service.php','$context_scopes = array( \'privacy_notice\' )');
-t14has('R1 command consent fail closed','includes/class-wca-appointment-command.php','context_consent_sync_failed');
+t14has('R1 owner-transaction consent fail closed','includes/class-wca-service.php','if ( is_wp_error( $context_consent ) ) { return $context_consent; }');
 t14has('R2 strict IANA identifiers','includes/class-wca-service.php','timezone_identifiers_list()');
 t14has('R3 strict DOB roundtrip','includes/class-wca-central-governance.php',"createFromFormat( '!Y-m-d'");
 t14has('R4 age assertion conflict','includes/class-wca-central-governance.php','wca_age_claim_conflict');
