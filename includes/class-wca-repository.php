@@ -462,10 +462,16 @@ final class WCA_Repository {
 			$breaks[] = array( 'start' => (string) $break['start'], 'end' => (string) $break['end'] );
 		}
 		$exceptions = array();
+		$exception_dates = array();
 		foreach ( (array) ( $data['exceptions'] ?? array() ) as $exception ) {
 			if ( ! is_array( $exception ) || ! WCA_Service::valid_date( $exception['date'] ?? '' ) || ! in_array( $exception['type'] ?? '', array( 'closed','open','capacity' ), true ) ) {
 				return new WP_Error( 'wca_repository_availability_exception', __( 'Availability persistence received an invalid exception.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 			}
+			$exception_date = (string) $exception['date'];
+			if ( isset( $exception_dates[ $exception_date ] ) ) {
+				return new WP_Error( 'wca_repository_availability_exception_duplicate', __( 'Only one availability exception may be defined for a date.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+			}
+			$exception_dates[ $exception_date ] = true;
 			$type = (string) $exception['type'];
 			$exception_start = (string) ( $exception['start'] ?? '' );
 			$exception_end = (string) ( $exception['end'] ?? '' );

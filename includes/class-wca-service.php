@@ -465,10 +465,14 @@ final class WCA_Service {
 			$date_key = $cursor->format( 'Y-m-d' );
 			$exception = self::exception_for_date( $rule['exceptions'], $date_key );
 			$closed = $exception && 'closed' === $exception['type'];
-			$eligible_day = isset( $days[ $day_key ] ) && $cursor >= $effective_from && $cursor <= $effective_until && ! $closed;
+			$open_override = $exception && 'open' === $exception['type'];
+			$eligible_day = ( isset( $days[ $day_key ] ) || $open_override ) && $cursor >= $effective_from && $cursor <= $effective_until && ! $closed;
+			$date_capacity = ( $exception && 'capacity' === $exception['type'] && absint( $exception['capacity'] ?? 0 ) >= 1 )
+				? min( 50, absint( $exception['capacity'] ) )
+				: max( 1, absint( $rule['capacity'] ?? 1 ) );
 			if ( $eligible_day ) {
-				$start_hhmm = $exception && 'open' === $exception['type'] && $exception['start'] ? $exception['start'] : $rule['rrule']['start'];
-				$end_hhmm   = $exception && 'open' === $exception['type'] && $exception['end'] ? $exception['end'] : $rule['rrule']['end'];
+				$start_hhmm = $open_override && ! empty( $exception['start'] ) ? $exception['start'] : $rule['rrule']['start'];
+				$end_hhmm   = $open_override && ! empty( $exception['end'] ) ? $exception['end'] : $rule['rrule']['end'];
 				$slot = self::local_datetime( $date_key, $start_hhmm, $rule_zone );
 				$day_end = self::local_datetime( $date_key, $end_hhmm, $rule_zone );
 				if ( $slot && $day_end ) {
@@ -483,7 +487,7 @@ final class WCA_Service {
 						$conflict_start = $start_utc->modify( '-' . $buffer_before . ' minutes' );
 						$conflict_end   = $end_utc->modify( '+' . $buffer_after . ' minutes' );
 						$conflict_minutes = max( 1, (int) ceil( ( $conflict_end->getTimestamp() - $conflict_start->getTimestamp() ) / 60 ) );
-						if ( $inside_display && $start_utc->getTimestamp() > time() + $buffer_before * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_end->format( 'Y-m-d H:i:s' ), $ignore_hold_key, strtolower( (string) $rule['public_ref'] ), max( 1, absint( $rule['capacity'] ?? 1 ) ) ) ) {
+						if ( $inside_display && $start_utc->getTimestamp() > time() + $buffer_before * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_end->format( 'Y-m-d H:i:s' ), $ignore_hold_key, strtolower( (string) $rule['public_ref'] ), $date_capacity ) ) {
 							$slots[] = array(
 								'slot_ref'       => hash( 'sha256', $rule['public_ref'] . '|' . $start_utc->format( 'c' ) . '|' . $duration ),
 								'rule_ref'       => $rule['public_ref'],
@@ -497,7 +501,7 @@ final class WCA_Service {
 								'end_local'      => $end_utc->setTimezone( $display_zone )->format( 'Y-m-d H:i' ),
 								'timezone'       => $display_timezone,
 								'duration_minutes'=> $duration,
-								'capacity'        => absint( $rule['capacity'] ),
+								'capacity'        => $date_capacity,
 								'freshness_version'=> absint( $rule['version'] ),
 							);
 						}
