@@ -34,8 +34,44 @@ function wca_build_runtime_version( $root ) {
 	return $header;
 }
 
+function wca_build_class_constant( $root, $relative, $constant ) {
+	$path = $root . '/' . $relative;
+	$source = is_file( $path ) ? file_get_contents( $path ) : false;
+	if ( ! is_string( $source ) ) {
+		fwrite( STDERR, "Contract source is unavailable: {$relative}\n" );
+		exit( 2 );
+	}
+	$pattern = '/\bconst\s+' . preg_quote( $constant, '/' ) . '\s*=\s*[\'\"]([^\'\"]+)[\'\"]\s*;/';
+	if ( ! preg_match( $pattern, $source, $match ) ) {
+		fwrite( STDERR, "Contract constant is unavailable: {$relative}::{$constant}\n" );
+		exit( 2 );
+	}
+	return trim( $match[1] );
+}
+
 @mkdir( $out, 0775, true );
 $version = wca_build_runtime_version( $root );
+$contractVersions = array(
+	'plan_id' => wca_build_class_constant( $root, 'includes/class-wca-contracts.php', 'PLAN_ID' ),
+	'runtime_contract_version' => wca_build_class_constant( $root, 'includes/class-wca-contracts.php', 'RUNTIME_VERSION' ),
+	'core_schema_version' => wca_build_class_constant( $root, 'includes/class-wca-contracts.php', 'SCHEMA_VERSION' ),
+	'public_clinic_contract_version' => wca_build_class_constant( $root, 'includes/class-wca-contracts.php', 'PUBLIC_CLINIC_CONTRACT_VERSION' ),
+	'cf01_context_contract_version' => wca_build_class_constant( $root, 'includes/class-wca-contracts.php', 'CF01_CONTEXT_CONTRACT_VERSION' ),
+	'continuity_schema_version' => wca_build_class_constant( $root, 'includes/class-wca-continuity-secure.php', 'SCHEMA_VERSION' ),
+	'continuity_contract_version' => wca_build_class_constant( $root, 'includes/class-wca-continuity-secure.php', 'CONTRACT_VERSION' ),
+	'future24_schema_version' => wca_build_class_constant( $root, 'includes/class-wca-future24.php', 'SCHEMA_VERSION' ),
+	'future24_contract_version' => wca_build_class_constant( $root, 'includes/class-wca-future24.php', 'CONTRACT_VERSION' ),
+);
+if ( ! hash_equals( $version, $contractVersions['runtime_contract_version'] ) ) {
+	fwrite( STDERR, "Plugin/runtime contract version mismatch.\n" );
+	exit( 2 );
+}
+foreach ( array( 'core_schema_version', 'continuity_schema_version', 'continuity_contract_version', 'future24_schema_version', 'future24_contract_version', 'public_clinic_contract_version', 'cf01_context_contract_version' ) as $key ) {
+	if ( ! preg_match( '/^\d+\.\d+\.\d+$/', $contractVersions[ $key ] ) ) {
+		fwrite( STDERR, "Invalid contract/schema version: {$key}\n" );
+		exit( 2 );
+	}
+}
 $base = '08-worldwide-clinic-and-appointments-' . $version . '-candidate';
 $zipPath = rtrim( $out, '/' ) . '/' . $base . '.zip';
 $manifestPath = rtrim( $out, '/' ) . '/' . $base . '-manifest.json';
@@ -57,18 +93,21 @@ foreach ( $allowRoots as $dir ) {
 sort( $files, SORT_STRING );
 $entries = array();
 foreach ( $files as $file ) { $entries[] = array( 'path' => $file, 'bytes' => filesize( $root . '/' . $file ), 'sha256' => hash_file( 'sha256', $root . '/' . $file ) ); }
-$manifest = array(
-	'format' => 'wca-candidate-manifest-1',
-	'plugin' => '08-worldwide-clinic-and-appointments',
-	'version' => $version,
-	'runtime_version_source' => 'worldwide-clinic.php',
-	'commit' => $commit,
-	'source_date_epoch' => $epoch,
-	'built_at_utc' => gmdate( 'c', $epoch ),
-	'staging_accepted' => false,
-	'production_accepted' => false,
-	'commission_percent' => 0,
-	'files' => $entries,
+$manifest = array_merge(
+	array(
+		'format' => 'wca-candidate-manifest-1',
+		'plugin' => '08-worldwide-clinic-and-appointments',
+		'version' => $version,
+		'runtime_version_source' => 'worldwide-clinic.php',
+		'commit' => $commit,
+		'source_date_epoch' => $epoch,
+		'built_at_utc' => gmdate( 'c', $epoch ),
+		'staging_accepted' => false,
+		'production_accepted' => false,
+		'commission_percent' => 0,
+	),
+	$contractVersions,
+	array( 'files' => $entries )
 );
 $json = json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n";
 file_put_contents( $manifestPath, $json );
