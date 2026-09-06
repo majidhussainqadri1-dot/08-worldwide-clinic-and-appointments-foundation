@@ -1,0 +1,54 @@
+name: File 08 T19 Frozen-Ledger Correction Runner
+
+on:
+  push:
+    branches:
+      - review/file08-t19-twenty-round-2026-09-06
+    paths:
+      - .github/scripts/t19-round-fix.py
+      - .github/workflows/t19-round-fix.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: file08-t19-round-fix
+  cancel-in-progress: false
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: zip
+      - name: Apply frozen round correction
+        run: python3 .github/scripts/t19-round-fix.py
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Full source-level regression suite
+        run: php tests/run-all.php
+      - name: JavaScript syntax
+        run: |
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit frozen-round correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "majidhussainqadri1-dot"
+          git config user.email "majidhussainqadri1@gmail.com"
+          git add -A -- ':!.github/scripts/t19-round-fix.py' ':!.github/workflows/t19-round-fix.yml'
+          if git diff --cached --quiet; then
+            echo "No correction delta to commit."
+            exit 0
+          fi
+          git commit -m "fix(file08): close current T19 frozen ledger"
+          git push origin HEAD:${GITHUB_REF_NAME}
