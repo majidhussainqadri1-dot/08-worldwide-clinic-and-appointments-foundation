@@ -105,6 +105,8 @@ final class WCA_Frontend {
 	private static function appointments() {
 		if ( ! is_user_logged_in() ) { return self::notice( __( 'Sign in to view appointments.', 'worldwide-clinic-appointments' ), 'warning' ); }
 		$user_id  = get_current_user_id();
+		$claims = WCA_Authorization::claims( $user_id );
+		if ( is_wp_error( $claims ) ) { return self::notice( __( 'Current account eligibility is required to view appointments.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$page     = max( 1, absint( wp_unslash( $_GET['wca_page'] ?? 1 ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only pagination.
 		$per_page = 30;
 		$meta_query = array(
@@ -128,7 +130,14 @@ final class WCA_Frontend {
 			'meta_key'       => '_swc_preferred_at_utc',
 			'order'          => 'DESC',
 		) );
-		$ids = (array) $query->posts;
+		$ids = array();
+		foreach ( (array) $query->posts as $candidate_id ) {
+			$candidate_id = absint( $candidate_id );
+			if ( ! $candidate_id ) { continue; }
+			$current_access = WCA_Authorization::can_view_appointment( $candidate_id, $user_id );
+			if ( is_wp_error( $current_access ) ) { continue; }
+			$ids[] = $candidate_id;
+		}
 		ob_start(); ?>
 		<main class="wca-shell" aria-labelledby="wca-appts-title"><h1 id="wca-appts-title"><?php esc_html_e( 'My appointments', 'worldwide-clinic-appointments' ); ?></h1>
 		<?php if ( ! $ids ) : ?><p><?php esc_html_e( 'No appointments found.', 'worldwide-clinic-appointments' ); ?></p><?php endif; ?>
