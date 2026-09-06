@@ -15,8 +15,8 @@ jobs:
       - name: Detach exact final corrected source
         run: |
           set -euo pipefail
-          git checkout --detach 15dcde5daf337cdec31b93d7b860f9d0ddb5656a
-          test "$(git rev-parse HEAD)" = '15dcde5daf337cdec31b93d7b860f9d0ddb5656a'
+          git checkout --detach 7fdcfd26665fecf7048c8354c9b4591fecc0796a
+          test "$(git rev-parse HEAD)" = '7fdcfd26665fecf7048c8354c9b4591fecc0796a'
           test -z "$(git status --porcelain)"
       - name: Full warning-free source QA
         run: |
@@ -32,6 +32,8 @@ jobs:
           set -euo pipefail
           grep -q "RUNTIME_VERSION                 = '1.2.15'" includes/class-wca-contracts.php
           grep -q "SCHEMA_VERSION                  = '3.4.0'" includes/class-wca-contracts.php
+          grep -q "FUTURE24_CONTRACT_VERSION       = '1.1.0'" includes/class-wca-contracts.php
+          grep -q "CONTRACT_VERSION = '1.1.0'" includes/class-wca-future24.php
           grep -q "SCHEMA_VERSION   = '1.1.0'" includes/class-wca-future24.php
           grep -q 'Platform commission: \*\*0%\*\*' STATUS.md
           grep -q 'Core File 08 schema: \*\*3.4.0\*\*' STATUS.md
