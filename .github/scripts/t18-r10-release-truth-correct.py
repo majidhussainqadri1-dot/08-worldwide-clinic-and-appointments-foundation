@@ -4,7 +4,7 @@ root = Path(__file__).resolve().parents[2]
 readme = root / 'readme.txt'
 s = readme.read_text()
 old = "* Runtime 1.2.15; core schema remains 3.2.0, continuity 1.1.0, Future24 1.0.0. All 20 fifteenth-cycle main reviews are complete: R19 found no new supported defect; R20 found no new product-code defect but corrected closure-document/PR evidence lag. Two extra post-correction verification sweeps plus exact-final-head package/CI evidence remain before repository closure; staging/live acceptance remains separate."
-new = "* Runtime 1.2.15; current core schema is 3.4.0, continuity schema 1.1.0, and Future24 schema/contract 1.1.0. The later T17 and T18 repository corrections supersede the older fifteenth-cycle schema/evidence snapshot. Current exact-head package/CI evidence must identify the same corrected commit; staging/live acceptance remains a separate gate and is not claimed by repository evidence."
+new = "* Runtime 1.2.15; current core schema is 3.4.0, continuity schema 1.1.0, and Future24 schema/contract 1.1.0. All 20 fifteenth-cycle main reviews are complete as historical evidence; later T17 and T18 repository corrections supersede that older schema/evidence snapshot. Current exact-head package/CI evidence must identify the same corrected commit; staging/live acceptance remains a separate gate and is not claimed by repository evidence."
 if old not in s:
     raise SystemExit('R10 readme current-release needle missing')
 s = s.replace(old, new, 1)
@@ -70,6 +70,7 @@ $checks=array(
  'future runtime schema is 1.1.0'=>strpos($future,"SCHEMA_VERSION   = '1.1.0'")!==false,
  'readme current release records core 3.4.0'=>strpos($readme,'current core schema is 3.4.0')!==false,
  'readme current release records Future24 1.1.0'=>strpos($readme,'Future24 schema/contract 1.1.0')!==false,
+ 'readme preserves historical T15 completion fact'=>strpos($readme,'All 20 fifteenth-cycle main reviews are complete')!==false,
  'status current branch is T18 review branch'=>strpos($status,'Working review branch: `review/file08-t18-ten-round-2026-09-06`')!==false,
  'status current core schema is 3.4.0'=>strpos($status,'Core File 08 schema: **3.4.0**')!==false,
  'status current Future24 schema is 1.1.0'=>strpos($status,'Future24 additive operational schema: **1.1.0**')!==false,
