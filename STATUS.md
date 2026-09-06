@@ -57,3 +57,5 @@ This repository status does not prove the current staging or live installation. 
 Earlier T13–T18 and prior-cycle evidence files are intentionally retained as historical provenance. Their embedded schema values and exact heads apply only to the historical state they explicitly name. For current release decisions, the top-level current candidate section above and the final T19 exact-head CI/package evidence are governing.
 
 Historical checkpoint label retained for permanent regression provenance: **Fifteenth fresh 20-round main-cycle closure**. This label records an older closed audit only; it does not assert that its historical schema/head/package is current.
+
+Historical checkpoint label retained for permanent regression provenance: **Sixteenth fresh 20-round sequential audit**. This also refers only to the older T16 closure and is not the current T19 release identity.
