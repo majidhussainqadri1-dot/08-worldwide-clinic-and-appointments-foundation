@@ -205,6 +205,7 @@ final class SWC_Privacy {
 			WHERE p.post_type=%s AND p.post_status IN ('publish','private') AND p.ID>%d
 			AND (p.post_author=%d OR patient.meta_value=%s OR doctor.meta_value=%s OR proposed.meta_value=%s)
 			ORDER BY p.ID ASC LIMIT %d";
+		$wpdb->last_error = '';
 		$raw = $wpdb->get_col( $wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $cursor ), absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_privacy_related_after_read_failed', __( 'Appointment privacy records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		return array_map( 'absint', (array) $raw );
@@ -221,6 +222,7 @@ final class SWC_Privacy {
 			WHERE p.post_type=%s AND p.post_status IN ('publish','private')
 			AND (p.post_author=%d OR patient.meta_value=%s OR doctor.meta_value=%s OR proposed.meta_value=%s)
 			ORDER BY p.ID ASC LIMIT %d OFFSET %d";
+		$wpdb->last_error = '';
 		$raw = $wpdb->get_col( $wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), self::PAGE_SIZE, $offset ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_privacy_related_ids_read_failed', __( 'Appointment privacy records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		return array_map( 'absint', (array) $raw );
@@ -235,6 +237,7 @@ final class SWC_Privacy {
 			LEFT JOIN {$wpdb->postmeta} proposed ON proposed.post_id=p.ID AND proposed.meta_key='_swc_proposed_doctor_id'
 			WHERE p.post_type=%s AND p.post_status IN ('publish','private')
 			AND (p.post_author=%d OR patient.meta_value=%s OR doctor.meta_value=%s OR proposed.meta_value=%s)";
+		$wpdb->last_error = '';
 		$raw = $wpdb->get_var( $wpdb->prepare( $sql, SWC_Helpers::TYPE, absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ), (string) absint( $user_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_privacy_related_count_read_failed', __( 'Appointment privacy record count could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		return absint( $raw );

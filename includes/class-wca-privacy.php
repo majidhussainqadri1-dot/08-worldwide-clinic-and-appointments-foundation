@@ -84,6 +84,7 @@ final class WCA_Privacy {
 		if ( is_wp_error( $table ) ) { return $table; }
 		if ( $table ) {
 			$offset = ( $page - 1 ) * 50;
+			$wpdb->last_error = '';
 			$future_rows_raw = $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT id,public_ref,feature_id,status,appointment_id,clinic_id,parent_ref,starts_at,ends_at,expires_at,created_at,updated_at,payload_json
@@ -139,15 +140,21 @@ final class WCA_Privacy {
 				$last_id = max( $last_id, $id );
 				continue;
 			}
+			$is_patient = absint( SWC_Helpers::meta( $id, 'patient_user_id', 0 ) ) === $user_id || absint( get_post_field( 'post_author', $id ) ) === $user_id;
+			$is_guardian = absint( SWC_Helpers::meta( $id, 'guardian_user_id', 0 ) ) === $user_id;
+			$is_doctor = absint( SWC_Helpers::meta( $id, 'doctor_id', 0 ) ) === $user_id;
 			$erase_error = null;
-			foreach ( array( 'reason','patient_message','phone','whatsapp','country','city','doctor_private_note','transition_reason_code' ) as $key ) {
-				$deleted = SWC_Helpers::delete_meta_strict( $id, '_swc_' . $key, 'wca_privacy_meta_delete' );
-				if ( is_wp_error( $deleted ) ) { $erase_error = $deleted; break; }
+			if ( $is_patient ) {
+				foreach ( array( 'reason','patient_message','phone','whatsapp','country','city' ) as $key ) {
+					$deleted = SWC_Helpers::delete_meta_strict( $id, '_swc_' . $key, 'wca_privacy_patient_meta_delete' );
+					if ( is_wp_error( $deleted ) ) { $erase_error = $deleted; break; }
+				}
 			}
+			if ( ! $erase_error && $is_doctor ) { $erase_error = SWC_Helpers::delete_meta_strict( $id, '_swc_doctor_private_note', 'wca_privacy_doctor_meta_delete' ); }
 			if ( ! $erase_error ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_privacy_erased_at', WCA_Repository::now(), 'wca_privacy_erased_marker' ); }
-			if ( ! $erase_error && absint( SWC_Helpers::meta( $id, 'patient_user_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_patient_user_id', 0, 'wca_privacy_patient_anonymize' ); }
-			if ( ! $erase_error && absint( SWC_Helpers::meta( $id, 'guardian_user_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_guardian_user_id', 0, 'wca_privacy_guardian_anonymize' ); }
-			if ( ! $erase_error && absint( SWC_Helpers::meta( $id, 'doctor_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_doctor_id', 0, 'wca_privacy_doctor_anonymize' ); }
+			if ( ! $erase_error && $is_patient && absint( SWC_Helpers::meta( $id, 'patient_user_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_patient_user_id', 0, 'wca_privacy_patient_anonymize' ); }
+			if ( ! $erase_error && $is_guardian ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_guardian_user_id', 0, 'wca_privacy_guardian_anonymize' ); }
+			if ( ! $erase_error && $is_doctor ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_doctor_id', 0, 'wca_privacy_doctor_anonymize' ); }
 			if ( ! $erase_error && absint( get_post_field( 'post_author', $id ) ) === $user_id ) {
 				$post_update = wp_update_post( array( 'ID' => $id, 'post_author' => 0 ), true );
 				if ( is_wp_error( $post_update ) || ! $post_update || 0 !== absint( get_post_field( 'post_author', $id ) ) ) { $erase_error = new WP_Error( 'wca_privacy_author_anonymize', __( 'Appointment author identity could not be anonymized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
@@ -169,6 +176,7 @@ final class WCA_Privacy {
 		if ( $table ) {
 			$cursor_key = $base . '_future24';
 			$cursor = absint( get_transient( $cursor_key ) );
+			$wpdb->last_error = '';
 			$rows_raw = $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT * FROM {$table} WHERE (actor_user_id=%d OR subject_user_id=%d) AND id>%d ORDER BY id ASC LIMIT %d",
@@ -184,7 +192,7 @@ final class WCA_Privacy {
 				$row_id = absint( $row['id'] );
 				if ( self::future24_legal_hold( $row ) ) { $retained = true; $last = max( $last, $row_id ); continue; }
 				$payload = json_decode( (string) $row['payload_json'], true );
-				$payload = is_array( $payload ) ? self::scrub_future24_payload( $payload, $subject_uuid ) : array();
+				$payload = is_array( $payload ) ? self::scrub_future24_payload( $payload, $user_id, $subject_uuid ) : array();
 				$updated = $wpdb->update(
 					$table,
 					array(
@@ -203,6 +211,7 @@ final class WCA_Privacy {
 					break;
 				}
 				if ( 0 === (int) $updated ) {
+					$wpdb->last_error = '';
 					$current = $wpdb->get_row( $wpdb->prepare( "SELECT actor_user_id,subject_user_id FROM {$table} WHERE id=%d", $row_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 					if ( null === $current && '' !== (string) $wpdb->last_error ) {
 						$messages[] = __( 'Future24 privacy erasure could not verify a concurrent update safely.', 'worldwide-clinic-appointments' );
@@ -219,6 +228,7 @@ final class WCA_Privacy {
 				$removed = true;
 			}
 			if ( $last > $cursor ) { set_transient( $cursor_key, $last, self::CURSOR_TTL ); }
+			$wpdb->last_error = '';
 			$more = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE (actor_user_id=%d OR subject_user_id=%d) AND id>%d ORDER BY id ASC LIMIT 1", $user_id, $user_id, $last ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $more && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Future24 privacy erasure could not verify completion safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; } elseif ( $more ) { $done = false; } else { delete_transient( $cursor_key ); }
 		}
@@ -243,6 +253,7 @@ final class WCA_Privacy {
 			 ORDER BY p.ID ASC LIMIT %d",
 			SWC_Helpers::TYPE, $cursor, $user_id, $user_id, $user_id, $limit
 		);
+		$wpdb->last_error = '';
 		$raw = $wpdb->get_col( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_privacy_appointment_read_failed', __( 'Appointment privacy records could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		return array_map( 'absint', (array) $raw );
@@ -330,18 +341,21 @@ final class WCA_Privacy {
 		global $wpdb;
 		if ( ! class_exists( 'WCA_Future24' ) ) { return ''; }
 		$table = $wpdb->prefix . 'wca_future24_records';
+		$wpdb->last_error = '';
 		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
 		if ( null === $exists && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_privacy_future24_table_read_failed', __( 'Future24 privacy storage could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 		return $exists === $table ? $table : '';
 	}
 
-	private static function scrub_future24_payload( $value, $subject_uuid ) {
+	private static function scrub_future24_payload( $value, $user_id, $subject_uuid ) {
 		if ( ! is_array( $value ) ) { return $value; }
+		$user_id = absint( $user_id );
 		$out = array();
 		foreach ( $value as $key => $item ) {
 			$key_string = is_string( $key ) ? sanitize_key( $key ) : $key;
-			if ( is_string( $key_string ) && in_array( $key_string, array( 'subject_uuid','patient_user_id','guardian_user_id','recipient_user_id' ), true ) ) { continue; }
-			if ( is_array( $item ) ) { $out[ $key ] = self::scrub_future24_payload( $item, $subject_uuid ); continue; }
+			if ( is_array( $item ) ) { $out[ $key ] = self::scrub_future24_payload( $item, $user_id, $subject_uuid ); continue; }
+			if ( is_string( $key_string ) && in_array( $key_string, array( 'patient_user_id','guardian_user_id','recipient_user_id','actor_user_id','subject_user_id' ), true ) && $user_id && absint( $item ) === $user_id ) { continue; }
+			if ( 'subject_uuid' === $key_string && $subject_uuid && is_string( $item ) && hash_equals( $subject_uuid, strtolower( sanitize_text_field( $item ) ) ) ) { continue; }
 			if ( $subject_uuid && is_string( $item ) && hash_equals( $subject_uuid, strtolower( sanitize_text_field( $item ) ) ) ) { continue; }
 			$out[ $key ] = $item;
 		}
@@ -371,6 +385,7 @@ final class WCA_Privacy {
 			$cursor = 0;
 			$batch = 250;
 			do {
+				$wpdb->last_error = '';
 				$rows_raw = $wpdb->get_results(
 					$wpdb->prepare( "SELECT * FROM {$table} WHERE expires_at IS NOT NULL AND expires_at<%s AND updated_at<%s AND id>%d ORDER BY id ASC LIMIT %d", WCA_Repository::now(), $cutoff, $cursor, $batch ),
 					ARRAY_A
