@@ -205,8 +205,22 @@ final class WCA_Frontend {
 		</main><?php return ob_get_clean();
 	}
 
+	private static function currency_fraction_digits( $currency ) {
+		$currency = strtoupper( sanitize_text_field( $currency ) );
+		$zero = array( 'BIF','CLP','DJF','GNF','ISK','JPY','KMF','KRW','PYG','RWF','UGX','VND','VUV','XAF','XOF','XPF' );
+		$three = array( 'BHD','IQD','JOD','KWD','LYD','OMR','TND' );
+		$four = array( 'CLF','UYW' );
+		if ( in_array( $currency, $zero, true ) ) { return 0; }
+		if ( in_array( $currency, $three, true ) ) { return 3; }
+		if ( in_array( $currency, $four, true ) ) { return 4; }
+		return 2;
+	}
+
 	private static function money( $minor, $currency ) {
-		return strtoupper( sanitize_text_field( $currency ) ) . ' ' . number_format_i18n( absint( $minor ) / 100, 2 );
+		$currency = strtoupper( sanitize_text_field( $currency ) );
+		$digits = self::currency_fraction_digits( $currency );
+		$divisor = 10 ** $digits;
+		return $currency . ' ' . number_format_i18n( absint( $minor ) / $divisor, $digits );
 	}
 
 	private static function notice( $message, $type = 'info' ) {
