@@ -8,7 +8,7 @@ t15h('R1 active hold read fails closed','includes/class-wca-service.php',"return
 t15h('R1 slot hold read failure explicit','includes/class-wca-repository.php','wca_slot_hold_read_failed');
 t15h('R1 slot capacity query failure explicit','includes/class-wca-repository.php','wca_slot_capacity_count_failed');
 t15h('R1 stale request replay read failure explicit','includes/class-wca-appointment-command.php','wca_idempotency_read_failed');
-t15h('R1 consent read failure explicit','includes/class-wca-appointment-command.php','wca_consent_read_failed');
+t15h('R1 consent persistence fail closed in owner transaction','includes/class-wca-service.php','if ( is_wp_error( $context_consent ) ) { return $context_consent; }');
 t15h('R1 waitlist offer read failure explicit','includes/class-wca-future24.php','wca_waitlist_offer_read_failed');
 t15h('R1 waitlist dedupe read failure explicit','includes/class-wca-future24.php','wca_waitlist_dedupe_read_failed');
 t15h('R1 windows dedupe read failure explicit','includes/class-wca-future24.php','wca_windows_dedupe_read_failed');
