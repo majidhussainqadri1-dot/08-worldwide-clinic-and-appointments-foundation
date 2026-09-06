@@ -47,7 +47,7 @@ $checks = array(
     'open exception overrides recurring weekday closure' => false !== strpos( $service, '( isset( $days[ $day_key ] ) || $open_override )' ),
     'capacity exception derives date capacity' => false !== strpos( $service, "'capacity' ===" ) && false !== strpos( $service, '$date_capacity' ),
     'slot conflict gate consumes date capacity' => false !== strpos( $service, ', $date_capacity )' ),
-    'slot projection exposes date capacity' => false !== strpos( $service, "'capacity'        => $date_capacity" ),
+    'slot projection exposes date capacity' => false !== strpos( $service, "'capacity'        => " . '$date_capacity' ),
     'repository tracks exception dates' => false !== strpos( $repo, '$exception_dates = array();' ),
     'duplicate exception dates fail explicitly' => false !== strpos( $repo, 'wca_repository_availability_exception_duplicate' ),
 );
