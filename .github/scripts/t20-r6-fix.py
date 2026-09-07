@@ -13,7 +13,24 @@ replace_once('includes/class-wca-authorization.php', '''\tpublic static function
 replace_once('includes/class-swc-plugin.php', '''\t\tif ( user_can( $user_id, 'manage_worldwide_clinic' ) ) {\n\t\t\treturn array( 'manage_worldwide_clinic' );\n\t\t}\n\t\tif ( 'read_swc_appointment' === $cap && ( SWC_Helpers::can_patient_manage( $appointment_id, $user_id ) || SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) ) {\n\t\t\treturn array( 'read' );\n\t\t}\n\t\treturn array( 'do_not_allow' );\n''', '''\t\t/* Generic WordPress post capabilities are not an administrative mutation surface.\n\t\t * Purpose-limited administrators must use File 08 governed commands, where\n\t\t * current identity, step-up and audit evidence are enforced. */\n\t\tif ( 'read_swc_appointment' === $cap ) {\n\t\t\t$access = WCA_Authorization::can_view_appointment( $appointment_id, $user_id );\n\t\t\treturn is_wp_error( $access ) ? array( 'do_not_allow' ) : array( 'read' );\n\t\t}\n\t\treturn array( 'do_not_allow' );\n''')
 
 test = ROOT/'tests/t20-r6-authorization-boundary-regressions.php'
-test.write_text('''<?php\n$root=dirname(__DIR__); $auth=file_get_contents($root.'/includes/class-wca-authorization.php'); $legacy=file_get_contents($root.'/includes/class-swc-plugin.php'); $fails=array(); $n=0;\nfunction t20r6($name,$ok){global $fails,$n;$n++;if(!$ok)$fails[]=$name;}\nt20r6('authorization source readable',is_string($auth)); t20r6('legacy plugin source readable',is_string($legacy));\n$patient=strpos($auth,"can_patient_manage( $appointment_id, $user_id ) ) { return 'patient'; }");\n$admin=strpos($auth,"user_can( $user_id, 'manage_worldwide_clinic' ) ) { return 'admin'; }");\nt20r6('participant actor precedes global admin actor',$patient!==false && $admin!==false && $patient<$admin);\nt20r6('doctor relationship remains explicit',false!==strpos($auth,"can_doctor_manage( $appointment_id, $user_id ) ) { return 'doctor'; }"));\nt20r6('staff relationship remains explicit',false!==strpos($auth,"return 'clinic_staff'"));\nt20r6('generic read path delegates to canonical authorization',false!==strpos($legacy,'WCA_Authorization::can_view_appointment( $appointment_id, $user_id )'));\nt20r6('generic edit delete path fails closed',false===strpos($legacy,"return array( 'manage_worldwide_clinic' )"));\nif($fails){fwrite(STDERR,"T20 R6 authorization regressions failed:\\n- ".implode("\\n- ",$fails)."\\n");exit(1);} echo "T20 R6 authorization regressions: PASS {$n}/{$n}.\\n";\n''')
+test.write_text(r'''<?php
+$root = dirname( __DIR__ );
+$auth = file_get_contents( $root . '/includes/class-wca-authorization.php' );
+$legacy = file_get_contents( $root . '/includes/class-swc-plugin.php' );
+$fails = array(); $n = 0;
+function t20r6( $name, $ok ) { global $fails, $n; $n++; if ( ! $ok ) { $fails[] = $name; } }
+t20r6( 'authorization source readable', is_string( $auth ) );
+t20r6( 'legacy plugin source readable', is_string( $legacy ) );
+$patient = strpos( $auth, 'can_patient_manage( $appointment_id, $user_id ) ) { return \'patient\'; }' );
+$admin = strpos( $auth, 'user_can( $user_id, \'manage_worldwide_clinic\' ) ) { return \'admin\'; }' );
+t20r6( 'participant actor precedes global admin actor', false !== $patient && false !== $admin && $patient < $admin );
+t20r6( 'doctor relationship remains explicit', false !== strpos( $auth, 'can_doctor_manage( $appointment_id, $user_id ) ) { return \'doctor\'; }' ) );
+t20r6( 'staff relationship remains explicit', false !== strpos( $auth, "return 'clinic_staff'" ) );
+t20r6( 'generic read path delegates to canonical authorization', false !== strpos( $legacy, 'WCA_Authorization::can_view_appointment( $appointment_id, $user_id )' ) );
+t20r6( 'generic edit delete path fails closed', false === strpos( $legacy, "return array( 'manage_worldwide_clinic' )" ) );
+if ( $fails ) { fwrite( STDERR, "T20 R6 authorization regressions failed:\n- " . implode( "\n- ", $fails ) . "\n" ); exit( 1 ); }
+echo "T20 R6 authorization regressions: PASS {$n}/{$n}.\n";
+''')
 
 path='tests/run-all.php'; text=read(path); old="'t20-r5-idempotency-header-parity-regressions.php' );"; new="'t20-r5-idempotency-header-parity-regressions.php', 't20-r6-authorization-boundary-regressions.php' );";
 if text.count(old)!=1: raise SystemExit('run-all R6 anchor mismatch')
