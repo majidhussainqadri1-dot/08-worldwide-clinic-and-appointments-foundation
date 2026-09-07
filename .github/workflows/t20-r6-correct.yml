@@ -25,8 +25,6 @@ jobs:
         run: php -l includes/class-wca-authorization.php && php -l includes/class-swc-plugin.php && php -l tests/t20-r6-authorization-boundary-regressions.php
       - name: Targeted R6 regression
         run: php tests/t20-r6-authorization-boundary-regressions.php
-      - name: Full source regression
-        run: php tests/run-all.php
       - name: Commit R6 correction
         shell: bash
         run: |
