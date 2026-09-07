@@ -50,7 +50,29 @@ final class WCA_Calendar_Link {
 		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,191}$/', $event_id ) || false === self::strict_utc_timestamp( $occurred_at ) || abs( time() - self::strict_utc_timestamp( $occurred_at ) ) > 900 ) { return new WP_Error( 'wca_calendar_webhook_replay_window', __( 'Calendar provider event identity or timestamp is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$doctor_id = absint( $verified['doctor_user_id'] ?? 0 );
 		if ( ! $doctor_id || ! SWC_Doctor_Authority::is_eligible( $doctor_id ) ) { return new WP_Error( 'wca_calendar_webhook_doctor', __( 'Calendar provider event is not bound to an eligible practitioner.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
-		$claim = WCA_Repository::claim_idempotency( 'calendar_provider_webhook', $provider . ':' . $event_id, 0, array( 'provider' => $provider, 'event_id' => $event_id, 'doctor_user_id' => $doctor_id ) );
+		$busy_fingerprint = array();
+		foreach ( (array) ( $verified['busy_windows'] ?? array() ) as $window ) {
+			if ( ! is_array( $window ) ) { return new WP_Error( 'wca_calendar_webhook_window', __( 'Calendar busy-window payload is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+			$busy_fingerprint[] = array(
+				'start_utc'    => sanitize_text_field( (string) ( $window['start_utc'] ?? '' ) ),
+				'end_utc'      => sanitize_text_field( (string) ( $window['end_utc'] ?? '' ) ),
+				'calendar_ref' => sanitize_text_field( (string) ( $window['calendar_ref'] ?? '' ) ),
+			);
+		}
+		usort( $busy_fingerprint, static function ( $a, $b ) { return strcmp( wp_json_encode( $a ), wp_json_encode( $b ) ); } );
+		$fingerprint = array(
+			'provider'           => $provider,
+			'event_id'           => $event_id,
+			'occurred_at'        => $occurred_at,
+			'doctor_user_id'     => $doctor_id,
+			'busy_windows'       => $busy_fingerprint,
+			'appointment_ref'    => strtolower( sanitize_text_field( (string) ( $verified['appointment_ref'] ?? '' ) ) ),
+			'provider_event_ref' => sanitize_text_field( (string) ( $verified['provider_event_ref'] ?? '' ) ),
+			'sync_status'        => sanitize_key( (string) ( $verified['sync_status'] ?? 'synced' ) ),
+			'conflict_status'    => sanitize_key( (string) ( $verified['conflict_status'] ?? 'none' ) ),
+			'etag'               => sanitize_text_field( (string) ( $verified['etag'] ?? '' ) ),
+		);
+		$claim = WCA_Repository::claim_idempotency( 'calendar_provider_webhook', $provider . ':' . $event_id, 0, $fingerprint );
 		if ( is_wp_error( $claim ) ) { return $claim; }
 		if ( 'completed' === (string) ( $claim['status'] ?? '' ) ) { return rest_ensure_response( $claim['response'] ); }
 		if ( empty( $claim['claimed_new'] ) ) { return new WP_Error( 'wca_calendar_webhook_in_progress', __( 'This calendar provider event is already being reconciled.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
@@ -63,14 +85,19 @@ final class WCA_Calendar_Link {
 				$busy_count++;
 			}
 			$mapping = null;
+			$mapping_action = 'none';
 			if ( ! empty( $verified['appointment_ref'] ) || ! empty( $verified['provider_event_ref'] ) ) {
 				$mapping = WCA_Repository::upsert_calendar_mapping_from_provider( $provider, $verified, $doctor_id );
 				if ( is_wp_error( $mapping ) ) { return $mapping; }
+				if ( is_array( $mapping ) ) {
+					$mapping_action = sanitize_key( (string) ( $mapping['_projection_action'] ?? 'applied' ) );
+					unset( $mapping['_projection_action'] );
+				}
 			}
 			$trace = WCA_Observability::trace_id();
-			$audit = WCA_Repository::append_event( 'CalendarProviderReconciled.v1', 'calendar_provider', $provider . ':' . $event_id, array( 'event_id' => WCA_Repository::uuid(), 'provider' => $provider, 'source_event_id' => $event_id, 'doctor_subject_uuid' => WCA_Authorization::subject_uuid( $doctor_id ), 'busy_windows' => $busy_count, 'mapping_ref' => is_array( $mapping ) ? (string) ( $mapping['public_ref'] ?? '' ) : '', 'trace_id' => $trace ), $doctor_id, $trace );
+			$audit = WCA_Repository::append_event( 'CalendarProviderReconciled.v1', 'calendar_provider', $provider . ':' . $event_id, array( 'event_id' => WCA_Repository::uuid(), 'provider' => $provider, 'source_event_id' => $event_id, 'doctor_subject_uuid' => WCA_Authorization::subject_uuid( $doctor_id ), 'busy_windows' => $busy_count, 'mapping_ref' => is_array( $mapping ) ? (string) ( $mapping['public_ref'] ?? '' ) : '', 'mapping_action' => $mapping_action, 'trace_id' => $trace ), $doctor_id, $trace );
 			if ( is_wp_error( $audit ) ) { return $audit; }
-			$response = array( 'accepted' => true, 'provider' => $provider, 'event_id' => $event_id, 'busy_windows' => $busy_count, 'mapping_ref' => is_array( $mapping ) ? (string) ( $mapping['public_ref'] ?? '' ) : '', 'canonical_appointment_mutated' => false );
+			$response = array( 'accepted' => true, 'provider' => $provider, 'event_id' => $event_id, 'busy_windows' => $busy_count, 'mapping_ref' => is_array( $mapping ) ? (string) ( $mapping['public_ref'] ?? '' ) : '', 'mapping_action' => $mapping_action, 'canonical_appointment_mutated' => false );
 			if ( ! WCA_Repository::complete_idempotency( $claim['id'], 202, $response ) ) { return new WP_Error( 'wca_calendar_webhook_finalize', __( 'Calendar provider reconciliation could not be finalized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			return $response;
 		}, 'wca_calendar_provider_webhook_transaction' );

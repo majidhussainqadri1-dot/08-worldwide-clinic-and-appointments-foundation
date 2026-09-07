@@ -1129,24 +1129,40 @@ final class WCA_Repository {
 		if ( '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_calendar_mapping_appointment_read_failed', __( 'Calendar mapping appointment could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( 1 !== count( $ids ) ) { return new WP_Error( 'wca_calendar_mapping_appointment', __( 'Calendar mapping appointment was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
 		$appointment_id = absint( $ids[0] );
-		$actor = WCA_Authorization::appointment_actor( $appointment_id, $doctor_id );
-		if ( ! in_array( $actor, array( 'doctor','clinic_staff','admin' ), true ) ) { return new WP_Error( 'wca_calendar_mapping_scope', __( 'Calendar provider event is outside the practitioner appointment scope.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
+		if ( ! SWC_Doctor_Authority::is_eligible( $doctor_id ) || ! SWC_Helpers::can_doctor_manage( $appointment_id, $doctor_id ) || $doctor_id !== absint( SWC_Helpers::meta( $appointment_id, 'doctor_id', 0 ) ) ) { return new WP_Error( 'wca_calendar_mapping_scope', __( 'Calendar provider event is outside the canonical practitioner appointment scope.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
+		$source_event_id = sanitize_text_field( (string) ( $event['event_id'] ?? '' ) );
+		$source_occurred_raw = trim( (string) ( $event['occurred_at'] ?? '' ) );
+		$source_occurred_at = '';
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/', $source_occurred_raw ) ) {
+			try { $source_occurred_at = ( new DateTimeImmutable( $source_occurred_raw ) )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' ); } catch ( Exception $e ) { $source_occurred_at = ''; }
+		}
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,191}$/', $source_event_id ) || ! $source_occurred_at ) { return new WP_Error( 'wca_calendar_mapping_source_order', __( 'Calendar provider mapping lacks trustworthy source ordering evidence.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE provider=%s AND provider_event_ref=%s LIMIT 1", $provider, $provider_event_ref ), ARRAY_A );
 		if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_calendar_mapping_read_failed', __( 'Calendar mapping could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$sync_status = sanitize_key( (string) ( $event['sync_status'] ?? 'synced' ) );
 		$conflict_status = sanitize_key( (string) ( $event['conflict_status'] ?? 'none' ) );
 		if ( ! in_array( $sync_status, array( 'pending','synced','stale','failed','deleted' ), true ) || ! in_array( $conflict_status, array( 'none','busy_conflict','provider_changed','canonical_changed','uncertain' ), true ) ) { return new WP_Error( 'wca_calendar_mapping_state', __( 'Calendar mapping state is unsupported.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$metadata = array( 'source' => 'verified_provider_webhook', 'provider_token_stored' => false, 'canonical_appointment_mutated' => false );
-		$row = array( 'appointment_id' => $appointment_id, 'provider' => $provider, 'provider_event_ref' => $provider_event_ref, 'etag' => sanitize_text_field( (string) ( $event['etag'] ?? '' ) ), 'last_synced_at' => self::now(), 'sync_status' => $sync_status, 'conflict_status' => $conflict_status, 'metadata_json' => wp_json_encode( $metadata ), 'updated_at' => self::now() );
+		$metadata = array( 'source' => 'verified_provider_webhook', 'provider_token_stored' => false, 'canonical_appointment_mutated' => false, 'source_event_id' => $source_event_id, 'source_occurred_at' => $source_occurred_at );
+		$row = array( 'appointment_id' => $appointment_id, 'provider' => $provider, 'provider_event_ref' => $provider_event_ref, 'etag' => sanitize_text_field( (string) ( $event['etag'] ?? '' ) ), 'last_synced_at' => self::now(), 'sync_status' => $sync_status, 'conflict_status' => $conflict_status, 'metadata_json' => self::json( $metadata ), 'updated_at' => self::now() );
 		if ( $existing ) {
 			if ( absint( $existing['appointment_id'] ) !== $appointment_id ) { return new WP_Error( 'wca_calendar_mapping_conflict', __( 'Provider event is already mapped to another appointment.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+			$existing_meta = self::decode( (string) ( $existing['metadata_json'] ?? '{}' ) );
+			$existing_source_event = sanitize_text_field( (string) ( $existing_meta['source_event_id'] ?? '' ) );
+			$existing_source_time = sanitize_text_field( (string) ( $existing_meta['source_occurred_at'] ?? '' ) );
+			$same_semantics = (string) ( $existing['etag'] ?? '' ) === (string) $row['etag'] && (string) ( $existing['sync_status'] ?? '' ) === $sync_status && (string) ( $existing['conflict_status'] ?? '' ) === $conflict_status;
+			if ( $existing_source_event && hash_equals( $existing_source_event, $source_event_id ) ) {
+				if ( $existing_source_time === $source_occurred_at && $same_semantics ) { $existing['_projection_action'] = 'equivalent_replay'; return $existing; }
+				return new WP_Error( 'wca_calendar_mapping_source_conflict', __( 'The same calendar provider event identity carries conflicting mapping state.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'reconciliation_required' => true ) );
+			}
+			if ( $existing_source_time && $source_occurred_at < $existing_source_time ) { $existing['_projection_action'] = 'stale_ignored'; return $existing; }
+			if ( $existing_source_time && $source_occurred_at === $existing_source_time ) { return new WP_Error( 'wca_calendar_mapping_source_conflict', __( 'Calendar provider events have ambiguous equal-time ordering.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'reconciliation_required' => true ) ); }
 			$changed = $wpdb->update( $table, $row, array( 'id' => absint( $existing['id'] ) ) );
 			if ( false === $changed ) { return new WP_Error( 'wca_calendar_mapping_write_failed', __( 'Calendar mapping could not be updated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			return array_merge( $existing, $row );
+			$updated = array_merge( $existing, $row ); $updated['_projection_action'] = 'applied'; return $updated;
 		}
 		$row['public_ref'] = self::uuid(); $row['created_at'] = self::now();
 		if ( false === $wpdb->insert( $table, $row ) ) { return new WP_Error( 'wca_calendar_mapping_write_failed', __( 'Calendar mapping could not be created safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-		return array_merge( array( 'id' => absint( $wpdb->insert_id ) ), $row );
+		$created = array_merge( array( 'id' => absint( $wpdb->insert_id ) ), $row ); $created['_projection_action'] = 'applied'; return $created;
 	}
 
 	/** @return array<string,mixed>|WP_Error */
