@@ -5,6 +5,9 @@ on:
     paths:
       - .github/workflows/t19-r20-correct.yml
       - .github/scripts/t19-r20-fix.py
+      - tests/eighth-ten-review-regressions.php
+      - tests/fifteenth-twenty-review-regressions.php
+      - tests/t18-r10-release-truth-regressions.php
 permissions:
   contents: write
 concurrency:
