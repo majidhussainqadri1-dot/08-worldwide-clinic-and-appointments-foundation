@@ -579,6 +579,31 @@ final class WCA_Service {
 	}
 
 	/** @return array<string,mixed>|WP_Error */
+	public static function hold_reschedule_slot( $appointment_id, $data, $actor_user_id = 0 ) {
+		$appointment_id = self::strict_id( $appointment_id );
+		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
+		$data = is_array( $data ) ? $data : array();
+		if ( null === $appointment_id || ! $actor_user_id ) { return new WP_Error( 'wca_reschedule_hold_identity', __( 'A valid appointment and actor are required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$current = SWC_Helpers::status_strict( $appointment_id );
+		if ( is_wp_error( $current ) ) { return $current; }
+		$auth = WCA_Authorization::can_transition_appointment( $appointment_id, 'reschedule_pending', $actor_user_id );
+		if ( is_wp_error( $auth ) ) { return $auth; }
+		$actor = WCA_Authorization::appointment_actor( $appointment_id, $actor_user_id );
+		if ( ! WCA_Contracts::can_transition( $actor, $current, 'reschedule_pending' ) ) { return new WP_Error( 'wca_reschedule_hold_state', __( 'A replacement slot cannot be proposed in the current appointment state.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		$patient_user_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
+		$data['patient_user_id'] = $patient_user_id;
+		$canonical = WCA_Plan_Guard::canonical_slot_hold( $data, $patient_user_id );
+		if ( is_wp_error( $canonical ) ) { return $canonical; }
+		if ( absint( $canonical['doctor_user_id'] ) !== absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) || absint( $canonical['clinic_id'] ) !== absint( SWC_Helpers::meta( $appointment_id, 'clinic_id' ) ) || absint( $canonical['service_id'] ) !== absint( SWC_Helpers::meta( $appointment_id, 'service_id' ) ) ) { return new WP_Error( 'wca_reschedule_hold_scope', __( 'The replacement slot does not belong to this appointment.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		if ( class_exists( 'WCA_Future24' ) ) {
+			$external = WCA_Future24::external_busy_conflict( sanitize_text_field( $data['practitioner_ref'] ?? '' ), $canonical['start_utc'], $canonical['end_utc'] );
+			if ( is_wp_error( $external ) ) { return $external; }
+			if ( $external ) { return new WP_Error( 'wca_external_calendar_busy', __( 'The selected time conflicts with the practitioner external calendar.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
+		}
+		return WCA_Repository::hold_slot( $canonical );
+	}
+
+	/** @return array<string,mixed>|WP_Error */
 	public static function request_appointment( $data, $actor_user_id = 0 ) {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
 		$claims = WCA_Authorization::claims( $actor_user_id );
@@ -779,6 +804,13 @@ final class WCA_Service {
 				if ( is_wp_error( $hold ) ) { return $hold; }
 				$hold_check = WCA_Plan_Guard::validate_reschedule_hold( $hold, $appointment_id, $actor_user_id );
 				if ( is_wp_error( $hold_check ) ) { return $hold_check; }
+				if ( 'reschedule_pending' === $current ) {
+					$previous_token = (string) SWC_Helpers::meta( $appointment_id, 'proposed_hold_token', '' );
+					if ( $previous_token && ! hash_equals( $previous_token, $hold_token ) ) {
+						$released_previous = WCA_Repository::release_slot_hold( $previous_token );
+						if ( is_wp_error( $released_previous ) ) { return $released_previous; }
+					}
+				}
 				foreach ( array(
 					'proposed_at_utc' => $hold['start_utc'],
 					'proposed_end_utc' => $hold['end_utc'],
@@ -824,6 +856,17 @@ final class WCA_Service {
 				if ( is_wp_error( $completion_write ) ) { return $completion_write; }
 			}
 			if ( in_array( $next, array( 'cancelled','declined','no_show' ), true ) ) {
+				if ( 'reschedule_pending' === $current ) {
+					$proposal_token = (string) SWC_Helpers::meta( $appointment_id, 'proposed_hold_token', '' );
+					if ( $proposal_token ) {
+						$released_proposal = WCA_Repository::release_slot_hold( $proposal_token );
+						if ( is_wp_error( $released_proposal ) ) { return $released_proposal; }
+					}
+					foreach ( array( 'proposed_at_utc','proposed_end_utc','proposed_branch_id','proposed_hold_token','proposed_by_user_id','proposed_expires_at' ) as $proposal_key ) {
+						$deleted = SWC_Helpers::delete_meta_strict( $appointment_id, '_swc_' . $proposal_key, 'wca_terminal_reschedule_cleanup' );
+						if ( is_wp_error( $deleted ) ) { return $deleted; }
+					}
+				}
 				$released_slot = WCA_Repository::release_appointment_slot( $appointment_id );
 				if ( false === $released_slot ) { return new WP_Error( 'wca_terminal_slot_release', __( 'The appointment slot could not be released safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			}

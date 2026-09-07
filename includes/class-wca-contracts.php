@@ -65,29 +65,29 @@ final class WCA_Contracts {
 			'patient' => array(
 				'requested' => array( 'cancelled' ),
 				'confirmed' => array( 'cancelled', 'reschedule_pending' ),
-				'reschedule_pending' => array( 'confirmed', 'cancelled' ),
+				'reschedule_pending' => array( 'confirmed', 'reschedule_pending', 'cancelled' ),
 			),
 			'guardian' => array(
 				'requested' => array( 'cancelled' ),
 				'confirmed' => array( 'cancelled', 'reschedule_pending' ),
-				'reschedule_pending' => array( 'confirmed', 'cancelled' ),
+				'reschedule_pending' => array( 'confirmed', 'reschedule_pending', 'cancelled' ),
 			),
 			'doctor' => array(
 				'requested' => array( 'confirmed', 'declined', 'reschedule_pending' ),
 				'confirmed' => array( 'reschedule_pending', 'checked_in', 'cancelled', 'no_show' ),
-				'reschedule_pending' => array( 'confirmed', 'declined', 'cancelled' ),
+				'reschedule_pending' => array( 'confirmed', 'reschedule_pending', 'declined', 'cancelled' ),
 				'checked_in' => array( 'completed', 'no_show', 'cancelled' ),
 			),
 			'clinic_staff' => array(
 				'requested' => array( 'confirmed', 'declined', 'reschedule_pending' ),
 				'confirmed' => array( 'reschedule_pending', 'checked_in', 'cancelled', 'no_show' ),
-				'reschedule_pending' => array( 'confirmed', 'declined', 'cancelled' ),
+				'reschedule_pending' => array( 'confirmed', 'reschedule_pending', 'declined', 'cancelled' ),
 				'checked_in' => array( 'completed', 'no_show', 'cancelled' ),
 			),
 			'admin' => array(
 				'requested' => array( 'confirmed', 'declined', 'reschedule_pending', 'cancelled' ),
 				'confirmed' => array( 'reschedule_pending', 'checked_in', 'cancelled', 'no_show' ),
-				'reschedule_pending' => array( 'confirmed', 'declined', 'cancelled' ),
+				'reschedule_pending' => array( 'confirmed', 'reschedule_pending', 'declined', 'cancelled' ),
 				'checked_in' => array( 'completed', 'cancelled', 'no_show' ),
 			),
 			'clinical_governance' => array(

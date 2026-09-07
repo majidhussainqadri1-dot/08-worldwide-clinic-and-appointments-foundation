@@ -32,6 +32,11 @@ final class WCA_Opaque_API {
 			'callback'            => array( __CLASS__, 'transition' ),
 			'permission_callback' => array( 'WCA_REST', 'authenticated' ),
 		) );
+		register_rest_route( 'wca/v1', '/appointment-refs/(?P<ref>[0-9a-fA-F-]{36})/reschedule-holds', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'reschedule_hold' ),
+			'permission_callback' => array( 'WCA_REST', 'authenticated' ),
+		) );
 		register_rest_route( 'wca/v1', '/appointment-refs/(?P<ref>[0-9a-fA-F-]{36})/calendar.ics', array(
 			'methods'             => WP_REST_Server::READABLE,
 			'callback'            => array( __CLASS__, 'calendar' ),
@@ -96,6 +101,13 @@ final class WCA_Opaque_API {
 			return new WP_Error( 'wca_invalid_status', __( 'A valid target status is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
 		return self::respond( WCA_Service::transition_appointment( $id, $next, $data ) );
+	}
+
+	public static function reschedule_hold( WP_REST_Request $request ) {
+		$id = self::appointment_id( $request['ref'] );
+		if ( is_wp_error( $id ) ) { return $id; }
+		if ( ! $id ) { return self::not_found(); }
+		return self::respond( WCA_Service::hold_reschedule_slot( $id, self::data( $request ), get_current_user_id() ), 201 );
 	}
 
 	public static function calendar( WP_REST_Request $request ) {

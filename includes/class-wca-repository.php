@@ -809,6 +809,21 @@ final class WCA_Repository {
 		return 1 === (int) $updated ? true : new WP_Error( 'wca_hold_stale', __( 'The slot hold changed or expired before booking.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 	}
 
+	/** Release one unbooked hold without touching an appointment's booked slot. */
+	public static function release_slot_hold( $hold_token, $status = 'released' ) {
+		global $wpdb;
+		$table = WCA_Schema::tables()['slot_holds'];
+		$status = in_array( $status, array( 'released', 'expired' ), true ) ? $status : 'released';
+		$updated = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$table} SET status=%s,updated_at=%s WHERE hold_token=%s AND status='held' AND appointment_id=0",
+			$status, self::now(), sanitize_text_field( $hold_token )
+		) );
+		if ( false === $updated ) {
+			return new WP_Error( 'wca_hold_release_failed', __( 'The slot hold could not be released safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return true;
+	}
+
 	public static function release_appointment_slot( $appointment_id, $status = 'released', $except_hold_token = '' ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['slot_holds'];
