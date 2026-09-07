@@ -1,0 +1,41 @@
+name: File 08 T20 R9 Frozen Ledger Correction
+on:
+  push:
+    branches: [review/file08-t20-twenty-round-2026-09-07]
+    paths:
+      - .github/scripts/t20-r9-fix.py
+      - .github/scripts/t20-r9-testfix.py
+      - .github/workflows/t20-r9-correct.yml
+permissions:
+  contents: write
+concurrency:
+  group: file08-t20-r9-correct
+  cancel-in-progress: false
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none}
+      - name: Apply frozen R9 correction
+        run: |
+          python3 .github/scripts/t20-r9-fix.py
+          python3 .github/scripts/t20-r9-testfix.py
+      - name: PHP syntax
+        run: |
+          php -l includes/class-wca-calendar-link.php
+          php -l includes/class-wca-repository.php
+          php -l tests/t20-r9-calendar-provider-regressions.php
+      - name: Targeted R9 regression
+        run: php tests/t20-r9-calendar-provider-regressions.php
+      - name: Commit R9 correction
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-wca-calendar-link.php includes/class-wca-repository.php tests/run-all.php tests/t20-r9-calendar-provider-regressions.php
+          git commit -m "fix(file08): close T20 R9 calendar provider ledger"
+          git push origin HEAD:review/file08-t20-twenty-round-2026-09-07
