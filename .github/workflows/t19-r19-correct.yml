@@ -41,7 +41,7 @@ jobs:
           s=s.replace('"array_key_exists( \'hydrate_children\', $args )"', "'array_key_exists( \\'hydrate_children\\', $args )'")
           s=s.replace('"is_wp_error( $result ) ? \'failed\' : \'done\'"', "'is_wp_error( $result ) ? \\'failed\\' : \\'done\\''")
           s=s.replace('"\'outbox_queue\'     => $queue"', "\"'outbox_queue'     => \\$queue\"")
-          s=s.replace('"try {\\n\\t\\t$legacy_upgrade"', "'try {\\n\\t\\t$legacy_upgrade'")
+          s=s.replace('( $t = strpos( $plugin, "try {\\n\\t\\t$legacy_upgrade" )', "( $t = strpos( $plugin, 'SWC_Activator::maybe_upgrade();' )")
           p.write_text(s)
           PY
       - name: PHP syntax
