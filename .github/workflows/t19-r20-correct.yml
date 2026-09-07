@@ -49,12 +49,16 @@ jobs:
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
-      - name: Commit corrected R20 tree
+      - name: Commit non-workflow R20 correction tree
         shell: bash
         run: |
           set -euo pipefail
+          # GitHub Actions' token lacks workflow-file mutation permission. Preserve
+          # workflow files for this push; the authenticated repository connector
+          # will retire/harden them as the final R20 workflow-only correction.
+          git restore --source=HEAD -- .github/workflows
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "fix(file08): close T19 R20 frozen ledger"
+          git commit -m "fix(file08): apply T19 R20 non-workflow frozen ledger"
           git push origin HEAD:review/file08-t19-twenty-round-2026-09-06
