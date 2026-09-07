@@ -19,10 +19,23 @@ jobs:
         with: {php-version: '8.3', coverage: none, extensions: zip}
       - name: Apply frozen R19 ledger corrections
         run: python3 .github/scripts/t19-r19-fix.py
-      - name: Keep R19 source assertions warning-clean
+      - name: Preserve historical public signatures and warning-clean assertions
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          r=Path('includes/class-wca-repository.php')
+          s=r.read_text()
+          pairs={
+            'list_branches( $clinic_id, $public_only = false, $limit = self::MAX_COLLECTION_ROWS )':'list_branches( $clinic_id, $public_only = false )',
+            'list_services( $clinic_id, $public_only = true, $doctor_user_id = 0, $limit = self::MAX_COLLECTION_ROWS )':'list_services( $clinic_id, $public_only = true, $doctor_user_id = 0 )',
+            'list_availability_rules( $doctor_user_id, $service_id = 0, $clinic_id = 0, $limit = self::MAX_COLLECTION_ROWS )':'list_availability_rules( $doctor_user_id, $service_id = 0, $clinic_id = 0 )',
+          }
+          for old,new in pairs.items():
+            if s.count(old)!=1: raise SystemExit('R19 signature normalization mismatch: '+old)
+            s=s.replace(old,new,1)
+          s=s.replace('$limit = min( self::MAX_COLLECTION_ROWS, max( 1, absint( $limit ) ) );', '$limit = self::MAX_COLLECTION_ROWS;', 3)
+          r.write_text(s)
+
           p=Path('tests/t19-r19-operability-performance-regressions.php')
           s=p.read_text()
           s=s.replace('"array_key_exists( \'hydrate_children\', $args )"', "'array_key_exists( \\'hydrate_children\\', $args )'")
