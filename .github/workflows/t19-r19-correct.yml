@@ -1,0 +1,51 @@
+name: File 08 T19 R19 Frozen Ledger Correction
+on:
+  push:
+    branches: [review/file08-t19-twenty-round-2026-09-06]
+permissions:
+  contents: write
+concurrency:
+  group: file08-t19-r19-correct
+  cancel-in-progress: false
+jobs:
+  correct:
+    if: ${{ !contains(github.event.head_commit.message, 'close T19 R19 frozen ledger') && !contains(github.event.head_commit.message, 'retire T19 R19 correction runner') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {fetch-depth: 0}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - name: Apply frozen R19 ledger corrections
+        run: python3 .github/scripts/t19-r19-fix.py
+      - name: Keep R19 source assertions warning-clean
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/t19-r19-operability-performance-regressions.php')
+          s=p.read_text()
+          s=s.replace('"array_key_exists( \'hydrate_children\', $args )"', "'array_key_exists( \\'hydrate_children\\', $args )'")
+          s=s.replace('"is_wp_error( $result ) ? \'failed\' : \'done\'"', "'is_wp_error( $result ) ? \\'failed\\' : \\'done\\''")
+          s=s.replace('"\'outbox_queue\'     => $queue"', "\"'outbox_queue'     => \\$queue\"")
+          s=s.replace('"try {\\n\\t\\t$legacy_upgrade"', "'try {\\n\\t\\t$legacy_upgrade'")
+          p.write_text(s)
+          PY
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Full regression suite
+        run: php tests/run-all.php
+      - name: JavaScript syntax
+        run: |
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Commit corrected R19 tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-wca-repository.php includes/class-wca-rest.php includes/class-wca-service.php includes/class-wca-admin.php includes/class-wca-observability.php includes/class-wca-cli.php includes/class-swc-admin.php worldwide-clinic.php tests/run-all.php tests/t19-r19-operability-performance-regressions.php
+          git commit -m "fix(file08): close T19 R19 frozen ledger"
+          git push origin HEAD:review/file08-t19-twenty-round-2026-09-06
