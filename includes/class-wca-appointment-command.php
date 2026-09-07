@@ -39,6 +39,10 @@ final class WCA_Appointment_Command {
 		}
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : $request->get_params();
+		if ( empty( $data['idempotency_key'] ) ) {
+			$header_key = trim( (string) $request->get_header( 'Idempotency-Key' ) );
+			if ( $header_key ) { $data['idempotency_key'] = $header_key; }
+		}
 		$result = self::request( $data, $user_id );
 		if ( is_wp_error( $result ) ) { return $result; }
 		$response = rest_ensure_response( $result );
