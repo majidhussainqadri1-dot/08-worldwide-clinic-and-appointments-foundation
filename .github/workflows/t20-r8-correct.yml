@@ -4,6 +4,7 @@ on:
     branches: [review/file08-t20-twenty-round-2026-09-07]
     paths:
       - .github/scripts/t20-r8-fix.py
+      - .github/scripts/t20-r8-testfix.py
       - .github/workflows/t20-r8-correct.yml
 permissions:
   contents: write
@@ -20,7 +21,9 @@ jobs:
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none}
       - name: Apply frozen R8 correction
-        run: python3 .github/scripts/t20-r8-fix.py
+        run: |
+          python3 .github/scripts/t20-r8-fix.py
+          python3 .github/scripts/t20-r8-testfix.py
       - name: PHP syntax
         run: php -l includes/class-wca-repository.php && php -l tests/t20-r8-payment-currency-persistence-regressions.php
       - name: Targeted R8 regression
