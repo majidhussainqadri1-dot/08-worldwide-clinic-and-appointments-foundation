@@ -1,12 +1,11 @@
 # Changelog
 
-## 1.2.15 — 2026-08-13
+## 1.2.15 — current repository candidate
 
-- Sixteenth fresh sequential 20-round audit completed with strict review-then-batch-fix sequencing. Defect rounds: R1, R4 and R6-R20; clean rounds: R2, R3 and R5. R14-R19 closed payment snapshot/status, calendar webhook/busy-state, complaint lifecycle, guardian/consent degraded-state, migration/rollback/purge integrity, and frontend localization/race defects. R20 closed repository/release-evidence hygiene without finding a new functional PHP/JavaScript defect.
-- R20 removes one-shot T16 correction workflows/scripts/diagnostic residue, adds permanent closure-hygiene regression coverage, and makes the canonical quality workflow emit the exact candidate SHA-256. Exact-final-head CI/package evidence remains distinct from staging/live evidence.
-- Fifteenth fresh 20-round corrective audit advanced the runtime identity after R1-R16 substantive corrections: fail-closed authoritative reads, privacy/retention completion integrity, outbox/idempotency recovery, exact currency validation, stricter object/cross-file authorization, migration snapshot provenance, Future24 nested transaction/read/scope safety, opaque REST privacy/replay, browser replay/deep-link safety, public discovery read failure propagation, and operational health/CLI error handling.
-- R17 aligned runtime/tests/docs/package identity to 1.2.15 without schema inflation; R18 corrected repository/evidence hygiene, R19 was a clean corrected-state review, and R20 found no new product-code defect while correcting stale closure/PR evidence. The two extra post-correction verification sweeps and exact-final-head package/CI were subsequently completed on `56a1ee4a59722e6574c4722e2c6bda791b15be39`; staging/live evidence remains separate.
-- Core schema remains 3.2.0; continuity 1.1.0; Future24 1.0.0.
+- T19 fresh sequential R1–R20 source review/correction sequence completed under Review → Ledger Freeze → Fix → Regression → Exact-head CI discipline. Defect-bearing rounds: R1–R9, R11, R18, R19 and R20; clean rounds: R10 and R12–R17.
+- T19 corrections include test aggregation and workflow hygiene; release/schema/contract truth; query/object/participant authorization; appointment commit semantics; practitioner/service projection reconciliation; availability exception correctness; signed calendar-link and patient-timezone presentation; bounded repository reads; queue/dead-letter observability; migration/recovery operability; and final release-surface hygiene.
+- Runtime remains **1.2.15**. Current core schema is **3.4.0**; restricted continuity schema/contract **1.1.0**; Future24 schema/contract **1.1.0**; Public Clinic and CF-01 contracts **1.1.0**.
+- The former T15/T16/T17/T18 exact heads, schemas and package hashes remain historical evidence only. Current Packaged/Automated-QA status is valid only for the exact current HEAD with a successful canonical deterministic package run. Staging/live acceptance remains separate and is not claimed by repository evidence.
 
 ## 1.2.14 — 2026-08-12
 

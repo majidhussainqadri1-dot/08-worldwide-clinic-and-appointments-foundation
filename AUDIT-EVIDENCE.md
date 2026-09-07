@@ -1,4 +1,6 @@
-# File 08 Audit Evidence
+# Historical File 08 Audit Evidence — original 0.1.0 baseline only
+
+> **Historical evidence only.** This document records the original 0.1.0 archive/source audit. It does not describe the current T19 candidate, current schema/contracts, current source behavior, or any staging/live deployment. Current repository truth is governed by `STATUS.md` plus the exact-head candidate manifest/CI evidence.
 
 ## Source identity
 
@@ -18,7 +20,7 @@
 
 ## Reproducible date-validation observations
 
-The current helper uses `DateTime::createFromFormat('!Y-m-d H:i', ...)` without checking parser warnings or round-tripping the local value.
+The original 0.1.0 helper used `DateTime::createFromFormat('!Y-m-d H:i', ...)` without checking parser warnings or round-tripping the local value.
 
 Observed behavior:
 
