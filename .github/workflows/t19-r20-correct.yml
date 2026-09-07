@@ -4,6 +4,7 @@ on:
     branches: [review/file08-t19-twenty-round-2026-09-06]
     paths:
       - .github/workflows/t19-r20-correct.yml
+      - .github/scripts/t19-r20-fix.py
 permissions:
   contents: write
 concurrency:
