@@ -18,9 +18,9 @@ $checks=array(
  'status current Future24 schema is 1.1.0'=>strpos($status,'Future24 additive operational schema/contract: **1.1.0**')!==false,
  'current evidence does not claim old exact-head package as current'=>strpos($current_status,'56a1ee4a59722e6574c4722e2c6bda791b15be39')===false,
  'current evidence does not claim old CI as current'=>strpos($current_status,'31741321738')===false,
- 'current package evidence is head-specific'=>strpos($status,'| Packaged | **Head-specific only.**')!==false,
- 'current automated QA evidence is head-specific'=>strpos($status,'| Automated-QA Green | **Head-specific only.**')!==false,
- 'historical T18 evidence is explicitly non-current'=>strpos($status,'Earlier T13–T18 and prior-cycle evidence files are intentionally retained as historical provenance.')!==false,
+ 'current package evidence is exact-head-specific'=>strpos($status,'| Packaged | **Exact-head only**')!==false,
+ 'current automated QA evidence is exact-head-specific'=>strpos($status,'| Automated-QA Green | **Exact-head only**')!==false,
+ 'historical T18 evidence is explicitly non-current'=>strpos($status,'T13–T18, earlier corrective cycles')!==false && strpos($status,'historical provenance only')!==false,
 );
 foreach($checks as $name=>$ok){if(!$ok){fwrite(STDERR,"T18 R10 FAIL: {$name}\n");exit(1);}}
 echo "T18 R10 release-truth regressions: PASS\n";
