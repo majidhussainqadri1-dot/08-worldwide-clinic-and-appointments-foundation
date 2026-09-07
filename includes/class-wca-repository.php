@@ -1050,7 +1050,7 @@ final class WCA_Repository {
 			'created_at'                 => self::now(),
 			'updated_at'                 => self::now(),
 		);
-		if ( ! $row['appointment_id'] || ! preg_match( '/^[A-Z]{3}$/', $row['currency'] ) ) { return new WP_Error( 'wca_payment_required', __( 'Valid appointment and ISO-style three-letter currency are required.', 'worldwide-clinic-appointments' ) ); }
+		if ( ! $row['appointment_id'] || ! WCA_Service::valid_currency( $row['currency'] ) ) { return new WP_Error( 'wca_payment_required', __( 'Valid appointment and a currently supported ISO currency are required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		if ( false === $wpdb->insert( $table, $row ) ) {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE appointment_id=%d AND provider=%s AND request_key=%s LIMIT 1", $appointment_id, $provider, $request_key ), ARRAY_A );
 			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_payment_race_read_failed', __( 'Concurrent payment-intent state could not be reconciled safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
