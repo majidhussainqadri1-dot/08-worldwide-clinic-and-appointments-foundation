@@ -267,7 +267,10 @@ final class WCA_REST {
 	public static function hold_slot( WP_REST_Request $request ) {
 		$rate = self::rate_limit( 'slot_hold', 30, 300 );
 		if ( is_wp_error( $rate ) ) { return $rate; }
-		return self::respond( WCA_Service::hold_slot( self::data( $request ) ), 201 );
+		$data = self::data( $request );
+		$header_key = trim( (string) $request->get_header( 'Idempotency-Key' ) );
+		if ( empty( $data['idempotency_key'] ) && $header_key ) { $data['idempotency_key'] = $header_key; }
+		return self::respond( WCA_Service::hold_slot( $data ), 201 );
 	}
 
 	public static function request_appointment( WP_REST_Request $request ) {

@@ -107,7 +107,10 @@ final class WCA_Opaque_API {
 		$id = self::appointment_id( $request['ref'] );
 		if ( is_wp_error( $id ) ) { return $id; }
 		if ( ! $id ) { return self::not_found(); }
-		return self::respond( WCA_Service::hold_reschedule_slot( $id, self::data( $request ), get_current_user_id() ), 201 );
+		$data = self::data( $request );
+		$header_key = trim( (string) $request->get_header( 'Idempotency-Key' ) );
+		if ( empty( $data['idempotency_key'] ) && $header_key ) { $data['idempotency_key'] = $header_key; }
+		return self::respond( WCA_Service::hold_reschedule_slot( $id, $data, get_current_user_id() ), 201 );
 	}
 
 	public static function calendar( WP_REST_Request $request ) {
