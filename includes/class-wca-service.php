@@ -460,13 +460,16 @@ final class WCA_Service {
 		$service = absint( $rule['service_id'] ) ? WCA_Repository::get_service( absint( $rule['service_id'] ), false ) : null;
 		$practitioner_ref = WCA_Plan_Guard::practitioner_ref( absint( $rule['doctor_user_id'] ) );
 		if ( ! $clinic || ! $practitioner_ref ) { return array(); }
+		/* A rule cannot keep a retired/private branch discoverable merely because the
+		 * rule itself is still active. Search projections and canonical holds must agree. */
+		if ( absint( $rule['branch_id'] ) && ( ! $branch || 'active' !== (string) ( $branch['status'] ?? '' ) || 'public' !== (string) ( $branch['visibility'] ?? '' ) ) ) { return array(); }
 		while ( $cursor <= $end_date && count( $slots ) < $limit ) {
 			$day_key = strtolower( $cursor->format( 'l' ) );
 			$date_key = $cursor->format( 'Y-m-d' );
 			$exception = self::exception_for_date( $rule['exceptions'], $date_key );
-			$closed = $exception && 'closed' === $exception['type'];
+			$closed_day = $exception && 'closed' === $exception['type'] && empty( $exception['start'] ) && empty( $exception['end'] );
 			$open_override = $exception && 'open' === $exception['type'];
-			$eligible_day = ( isset( $days[ $day_key ] ) || $open_override ) && $cursor >= $effective_from && $cursor <= $effective_until && ! $closed;
+			$eligible_day = ( isset( $days[ $day_key ] ) || $open_override ) && $cursor >= $effective_from && $cursor <= $effective_until && ! $closed_day;
 			$date_capacity = ( $exception && 'capacity' === $exception['type'] && absint( $exception['capacity'] ?? 0 ) >= 1 )
 				? min( 50, absint( $exception['capacity'] ) )
 				: max( 1, absint( $rule['capacity'] ?? 1 ) );
@@ -487,7 +490,7 @@ final class WCA_Service {
 						$conflict_start = $start_utc->modify( '-' . $buffer_before . ' minutes' );
 						$conflict_end   = $end_utc->modify( '+' . $buffer_after . ' minutes' );
 						$conflict_minutes = max( 1, (int) ceil( ( $conflict_end->getTimestamp() - $conflict_start->getTimestamp() ) / 60 ) );
-						if ( $inside_display && $start_utc->getTimestamp() > time() + $buffer_before * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_end->format( 'Y-m-d H:i:s' ), $ignore_hold_key, strtolower( (string) $rule['public_ref'] ), $date_capacity ) ) {
+						if ( $inside_display && $start_utc->getTimestamp() > time() + $buffer_before * 60 && ! self::in_break( $slot, $slot_end, $rule['breaks'] ) && ! self::in_closed_exception( $slot, $slot_end, $exception ) && ! self::has_active_hold( absint( $rule['doctor_user_id'] ), $conflict_start->format( 'Y-m-d H:i:s' ), $conflict_end->format( 'Y-m-d H:i:s' ), $ignore_hold_key, strtolower( (string) $rule['public_ref'] ), $date_capacity ) ) {
 							$slots[] = array(
 								'slot_ref'       => hash( 'sha256', $rule['public_ref'] . '|' . $start_utc->format( 'c' ) . '|' . $duration ),
 								'rule_ref'       => $rule['public_ref'],
@@ -536,6 +539,16 @@ final class WCA_Service {
 			if ( $break_start && $break_end && $start < $break_end && $end > $break_start ) { return true; }
 		}
 		return false;
+	}
+
+	/** A bounded closed exception acts like a date-specific break; invalid DST
+	 * boundaries fail closed rather than silently exposing a supposedly closed slot. */
+	private static function in_closed_exception( DateTimeImmutable $start, DateTimeImmutable $end, $exception ) {
+		if ( ! is_array( $exception ) || 'closed' !== (string) ( $exception['type'] ?? '' ) || empty( $exception['start'] ) || empty( $exception['end'] ) ) { return false; }
+		$closed_start = self::local_datetime( $start->format( 'Y-m-d' ), $exception['start'], $start->getTimezone() );
+		$closed_end   = self::local_datetime( $start->format( 'Y-m-d' ), $exception['end'], $start->getTimezone() );
+		if ( ! $closed_start || ! $closed_end ) { return true; }
+		return $start < $closed_end && $end > $closed_start;
 	}
 
 	private static function has_active_hold( $doctor_id, $start_utc, $end_utc, $ignore_idempotency_key = '', $rule_ref = '', $capacity = 1 ) {
