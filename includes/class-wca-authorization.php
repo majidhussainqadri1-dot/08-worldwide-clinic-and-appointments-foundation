@@ -173,15 +173,20 @@ final class WCA_Authorization {
 
 	public static function appointment_actor( $appointment_id, $user_id = 0 ) {
 		$user_id = absint( $user_id ?: get_current_user_id() );
-		if ( user_can( $user_id, 'manage_worldwide_clinic' ) ) { return 'admin'; }
-		if ( SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) { return 'doctor'; }
-		if ( self::can_staff_access_appointment( $appointment_id, $user_id, 'appointments' ) ) { return 'clinic_staff'; }
+		/* Relationship-specific authority is evaluated before global administration.
+		 * Otherwise a treating participant who also holds a global capability could
+		 * silently acquire the broader admin transition matrix without traversing the
+		 * purpose/step-up/audit branch required for administrative appointment access. */
+		if ( SWC_Helpers::can_patient_manage( $appointment_id, $user_id ) ) { return 'patient'; }
 		$claims = self::claims( $user_id );
 		if ( ! is_wp_error( $claims ) && ! empty( $claims['guardian'] ) && class_exists( 'WCA_Central_Governance' ) ) {
 			$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
 			$guardian = WCA_Central_Governance::validate_patient_guardian( $patient_id, $user_id, $user_id );
 			if ( ! is_wp_error( $guardian ) ) { return 'guardian'; }
 		}
+		if ( SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) { return 'doctor'; }
+		if ( self::can_staff_access_appointment( $appointment_id, $user_id, 'appointments' ) ) { return 'clinic_staff'; }
+		if ( user_can( $user_id, 'manage_worldwide_clinic' ) ) { return 'admin'; }
 		return 'patient';
 	}
 

@@ -112,11 +112,12 @@ final class SWC_Plugin {
 		if ( ! $appointment_id || SWC_Helpers::TYPE !== get_post_type( $appointment_id ) ) {
 			return array( 'do_not_allow' );
 		}
-		if ( user_can( $user_id, 'manage_worldwide_clinic' ) ) {
-			return array( 'manage_worldwide_clinic' );
-		}
-		if ( 'read_swc_appointment' === $cap && ( SWC_Helpers::can_patient_manage( $appointment_id, $user_id ) || SWC_Helpers::can_doctor_manage( $appointment_id, $user_id ) ) ) {
-			return array( 'read' );
+		/* Generic WordPress post capabilities are not an administrative mutation surface.
+		 * Purpose-limited administrators must use File 08 governed commands, where
+		 * current identity, step-up and audit evidence are enforced. */
+		if ( 'read_swc_appointment' === $cap ) {
+			$access = WCA_Authorization::can_view_appointment( $appointment_id, $user_id );
+			return is_wp_error( $access ) ? array( 'do_not_allow' ) : array( 'read' );
 		}
 		return array( 'do_not_allow' );
 	}
