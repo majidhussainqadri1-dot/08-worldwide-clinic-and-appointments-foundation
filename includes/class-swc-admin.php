@@ -331,10 +331,16 @@ final class SWC_Admin {
 		try {
 			SWC_Activator::add_capabilities();
 			SWC_Activator::install_schema();
+			WCA_Schema::install();
+			WCA_Continuity::install_schema();
+			WCA_Future24::install_schema();
+			WCA_Outbox::schedule();
 			SWC_Activator::repair_pages();
 			SWC_Activator::migrate_existing_records();
-			$written = SWC_Helpers::update_option_strict( 'swc_db_version', SWC_Activator::DB_VERSION, 'swc_repair_db_version_write' );
-			if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 repair version state could not be persisted.' ); }
+			foreach ( array( 'swc_db_version' => SWC_Activator::DB_VERSION, 'swc_version' => SWC_VERSION ) as $option => $value ) {
+				$written = SWC_Helpers::update_option_strict( $option, $value, 'swc_repair_version_write' );
+				if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 repair version state could not be persisted.' ); }
+			}
 			global $wpdb;
 			$cleaned = $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}swc_rate_limits WHERE expires_at < %s", current_time( 'mysql', true ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( false === $cleaned ) { throw new RuntimeException( 'File 08 repair rate-limit cleanup failed.' ); }

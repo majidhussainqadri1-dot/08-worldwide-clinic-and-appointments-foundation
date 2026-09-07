@@ -172,6 +172,7 @@ final class WCA_REST {
 			'city'         => sanitize_text_field( $request->get_param( 'city' ) ),
 			'search'       => sanitize_text_field( $request->get_param( 'search' ) ),
 			'per_page'     => min( 50, max( 1, absint( $request->get_param( 'per_page' ) ?: 20 ) ) ),
+			'hydrate_children' => false,
 		);
 		$filter_hash = hash( 'sha256', wp_json_encode( array( $args['country_code'], $args['city'], $args['search'], $args['per_page'] ) ) );
 		$cursor = sanitize_text_field( (string) $request->get_param( 'cursor' ) );

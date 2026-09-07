@@ -84,6 +84,8 @@ function wca_start_plugin() {
 		} );
 		return;
 	}
+	// Register recovery CLI before migrations so a failed migration remains operable.
+	WCA_CLI::register();
 	try {
 		$legacy_upgrade = SWC_Activator::maybe_upgrade();
 		if ( is_wp_error( $legacy_upgrade ) ) { throw new RuntimeException( $legacy_upgrade->get_error_message() ); }

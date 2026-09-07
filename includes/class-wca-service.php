@@ -900,12 +900,14 @@ final class WCA_Service {
 	/** @return array<string,mixed> */
 	public static function public_clinic_projection( $id_or_slug ) {
 		WCA_Repository::clear_read_error();
-		$private = WCA_Repository::get_clinic( $id_or_slug, false );
+		$private = WCA_Repository::get_clinic( $id_or_slug, false, false );
 		$read_error = WCA_Repository::consume_read_error();
 		if ( is_wp_error( $read_error ) ) { return $read_error; }
 		if ( ! $private || 'active' !== (string) $private['status'] ) { return array(); }
 		$owner_id = absint( $private['owner_user_id'] ?? 0 );
 		if ( ! $owner_id || ! SWC_Doctor_Authority::is_eligible( $owner_id ) ) { return array(); }
+		$private_services = self::repository_read( static function () use ( $private ) { return WCA_Repository::list_services( $private['id'], false ); } );
+		if ( is_wp_error( $private_services ) ) { return $private_services; }
 		WCA_Repository::clear_read_error();
 		$clinic = WCA_Repository::get_clinic( $private['id'], true );
 		$read_error = WCA_Repository::consume_read_error();
@@ -914,7 +916,7 @@ final class WCA_Service {
 		// A service is public only while its assigned practitioner has a current
 		// clinic-serving relationship. Global File 09 eligibility alone is insufficient.
 		$eligible_service_refs = array();
-		foreach ( (array) ( $private['services'] ?? array() ) as $private_service ) {
+		foreach ( (array) $private_services as $private_service ) {
 			if ( 'active' !== (string) ( $private_service['status'] ?? '' ) ) { continue; }
 			$service_doctor_id = absint( $private_service['doctor_user_id'] ?? 0 ) ?: $owner_id;
 			if ( ! $service_doctor_id || ! SWC_Doctor_Authority::is_eligible( $service_doctor_id ) ) { continue; }

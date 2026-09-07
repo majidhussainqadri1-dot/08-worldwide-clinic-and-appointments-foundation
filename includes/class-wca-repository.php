@@ -8,6 +8,8 @@
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Repository {
+	const MAX_COLLECTION_ROWS = 100;
+
 	private static $transaction_depth = 0;
 	private static $transaction_state_uncertain = false;
 	private static $read_error = null;
@@ -122,7 +124,7 @@ final class WCA_Repository {
 	}
 
 	/** @return array<string,mixed>|null */
-	public static function get_clinic( $id_or_ref, $public_only = false ) {
+	public static function get_clinic( $id_or_ref, $public_only = false, $hydrate_children = true ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['clinics'];
 		if ( is_numeric( $id_or_ref ) ) {
@@ -137,7 +139,7 @@ final class WCA_Repository {
 		if ( ! $row || ( $public_only && 'active' !== $row['status'] ) ) {
 			return null;
 		}
-		return self::hydrate_clinic( $row, $public_only );
+		return self::hydrate_clinic( $row, $public_only, (bool) $hydrate_children );
 	}
 
 	/** @return array<int,array<string,mixed>> */
@@ -154,6 +156,7 @@ final class WCA_Repository {
 		$city     = sanitize_text_field( $args['city'] ?? '' );
 		$cursor_updated_at = sanitize_text_field( $args['cursor_updated_at'] ?? '' );
 		$cursor_id = absint( $args['cursor_id'] ?? 0 );
+		$hydrate_children = ! array_key_exists( 'hydrate_children', $args ) || (bool) $args['hydrate_children'];
 		$where    = array( '1=1' );
 		$params   = array();
 		$join     = '';
@@ -172,7 +175,7 @@ final class WCA_Repository {
 		$rows_raw = $wpdb->get_results( $prepared, ARRAY_A );
 		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_clinic_list_read_failed', __( 'Clinic discovery data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		$rows = (array) $rows_raw;
-		return array_map( static function ( $row ) use ( $status ) { return self::hydrate_clinic( $row, 'active' === $status ); }, $rows );
+		return array_map( static function ( $row ) use ( $status, $hydrate_children ) { return self::hydrate_clinic( $row, 'active' === $status, $hydrate_children ); }, $rows );
 	}
 
 	/** @return true|WP_Error */
@@ -266,8 +269,9 @@ final class WCA_Repository {
 	public static function list_branches( $clinic_id, $public_only = false ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['branches'];
-		$sql = "SELECT * FROM {$table} WHERE clinic_id=%d" . ( $public_only ? " AND status='active' AND visibility='public'" : '' ) . ' ORDER BY name ASC,id ASC';
-		$rows_raw = $wpdb->get_results( $wpdb->prepare( $sql, absint( $clinic_id ) ), ARRAY_A );
+		$limit = self::MAX_COLLECTION_ROWS;
+		$sql = "SELECT * FROM {$table} WHERE clinic_id=%d" . ( $public_only ? " AND status='active' AND visibility='public'" : '' ) . ' ORDER BY name ASC,id ASC LIMIT %d';
+		$rows_raw = $wpdb->get_results( $wpdb->prepare( $sql, array( absint( $clinic_id ), $limit ) ), ARRAY_A );
 		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_branch_list_read_failed', __( 'Clinic branch data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		$rows = (array) $rows_raw;
 		return array_map( static function ( $row ) use ( $public_only ) {
@@ -381,11 +385,13 @@ final class WCA_Repository {
 	public static function list_services( $clinic_id, $public_only = true, $doctor_user_id = 0 ) {
 		global $wpdb;
 		$table  = WCA_Schema::tables()['services'];
+		$limit  = min( self::MAX_COLLECTION_ROWS, max( 1, absint( $limit ) ) );
 		$where  = array( 'clinic_id=%d' );
 		$params = array( absint( $clinic_id ) );
 		if ( $public_only ) { $where[] = "status='active'"; }
 		if ( $doctor_user_id ) { $where[] = '(doctor_user_id=0 OR doctor_user_id=%d)'; $params[] = absint( $doctor_user_id ); }
-		$sql = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY name ASC,id ASC';
+		$sql = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY name ASC,id ASC LIMIT %d';
+		$params[] = $limit;
 		$rows_raw = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_service_list_read_failed', __( 'Clinic service data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		$rows = (array) $rows_raw;
@@ -554,11 +560,13 @@ final class WCA_Repository {
 	public static function list_availability_rules( $doctor_user_id, $service_id = 0, $clinic_id = 0 ) {
 		global $wpdb;
 		$table = WCA_Schema::tables()['availability'];
+		$limit = self::MAX_COLLECTION_ROWS;
 		$where = 'doctor_user_id=%d AND status=%s';
 		$params = array( absint( $doctor_user_id ), 'active' );
 		if ( $service_id ) { $where .= ' AND (service_id=0 OR service_id=%d)'; $params[] = absint( $service_id ); }
 		if ( $clinic_id ) { $where .= ' AND clinic_id=%d'; $params[] = absint( $clinic_id ); }
-		$rows_raw = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY id ASC", $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$params[] = $limit;
+		$rows_raw = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY id ASC LIMIT %d", $params ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { self::note_read_error( 'wca_availability_list_read_failed', __( 'Availability data could not be read safely.', 'worldwide-clinic-appointments' ) ); }
 		$rows = (array) $rows_raw;
 		return array_map( static function ( $row ) {
@@ -1178,6 +1186,35 @@ final class WCA_Repository {
 		return (int) $updated;
 	}
 
+
+	/** Aggregate bounded operator view of current outbox state. @return array<string,mixed>|WP_Error */
+	public static function outbox_queue_status() {
+		global $wpdb;
+		$table = WCA_Schema::tables()['outbox'];
+		$wpdb->last_error = '';
+		$rows = $wpdb->get_results( "SELECT status,COUNT(*) AS total FROM {$table} WHERE status IN ('pending','retry','processing','dead_letter') GROUP BY status", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $rows || '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_outbox_status_read_failed', __( 'Outbox queue state could not be inspected safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$counts = array( 'pending' => 0, 'retry' => 0, 'processing' => 0, 'dead_letter' => 0 );
+		foreach ( (array) $rows as $row ) {
+			$status = sanitize_key( $row['status'] ?? '' );
+			if ( array_key_exists( $status, $counts ) ) { $counts[ $status ] = absint( $row['total'] ?? 0 ); }
+		}
+		$now = self::now();
+		$wpdb->last_error = '';
+		$due = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) AS total,MIN(next_attempt_at) AS oldest FROM {$table} WHERE status IN ('pending','retry') AND next_attempt_at<=%s", $now ), ARRAY_A );
+		if ( null === $due || '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_outbox_due_read_failed', __( 'Due outbox work could not be inspected safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return array_merge( $counts, array(
+			'due'           => absint( $due['total'] ?? 0 ),
+			'oldest_due_at' => sanitize_text_field( (string) ( $due['oldest'] ?? '' ) ),
+			'db_read_ok'    => true,
+			'healthy'       => 0 === $counts['dead_letter'],
+		) );
+	}
+
 	/** @return array<int,array<string,mixed>>|WP_Error */
 	public static function claim_outbox( $limit = 20, $worker = '' ) {
 		global $wpdb;
@@ -1337,13 +1374,13 @@ final class WCA_Repository {
 		return false !== $wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
-	private static function hydrate_clinic( $row, $public_only ) {
+	private static function hydrate_clinic( $row, $public_only, $hydrate_children = true ) {
 		$row['languages'] = self::decode( $row['languages_json'] );
 		$row['contacts']  = self::decode( $row['contacts_json'] );
 		$row['policies']  = self::decode( $row['policies_json'] );
 		unset( $row['languages_json'], $row['contacts_json'], $row['policies_json'] );
-		$row['branches'] = self::list_branches( $row['id'], $public_only );
-		$row['services'] = self::list_services( $row['id'], $public_only );
+		$row['branches'] = $hydrate_children ? self::list_branches( $row['id'], $public_only ) : array();
+		$row['services'] = $hydrate_children ? self::list_services( $row['id'], $public_only ) : array();
 		if ( $public_only ) {
 			unset( $row['owner_user_id'], $row['owner_subject_uuid'], $row['archived_at'] );
 			$row['contacts'] = array_intersect_key( $row['contacts'], array_flip( array( 'public_phone', 'public_email', 'public_website', 'public_whatsapp' ) ) );

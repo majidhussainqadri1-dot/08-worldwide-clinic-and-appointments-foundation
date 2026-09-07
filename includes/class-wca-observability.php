@@ -88,6 +88,8 @@ final class WCA_Observability {
 	/** @return array<string,mixed> */
 	public static function health() {
 		$runtime_failure = get_option( 'wca_runtime_migration_failure', false );
+		$queue = WCA_Repository::outbox_queue_status();
+		if ( is_wp_error( $queue ) ) { $queue = array( 'pending' => 0, 'retry' => 0, 'processing' => 0, 'dead_letter' => 0, 'due' => 0, 'oldest_due_at' => '', 'db_read_ok' => false, 'healthy' => false ); }
 		$checks = array(
 			'runtime_version' => defined( 'WCA_VERSION' ) ? WCA_VERSION : '',
 			'schema'          => class_exists( 'WCA_Schema' ) ? WCA_Schema::health() : array( 'available' => false ),
@@ -100,12 +102,13 @@ final class WCA_Observability {
 				'outbox'      => (bool) wp_next_scheduled( WCA_Outbox::CRON_HOOK ),
 				'maintenance' => (bool) wp_next_scheduled( WCA_Outbox::MAINTENANCE_HOOK ),
 			),
+			'outbox_queue'     => $queue,
 			'circuit_breakers' => (array) get_option( 'wca_circuit_breakers', array() ),
 			'trace_id'         => self::trace_id(),
 			'generated_at_utc' => gmdate( 'c' ),
 		);
 		$continuity_ok = isset( $checks['continuity']['status'] ) && 'ok' === $checks['continuity']['status'] && ! empty( $checks['continuity']['schema_current'] );
-		$checks['ok'] = self::all_true( $checks['schema'] ) && $continuity_ok && self::all_true( $checks['future24'] ) && self::all_true( $checks['migration'] ) && (bool) $checks['dependencies'] && self::all_true( $checks['legacy_checks'] ) && self::all_true( $checks['cron'] );
+		$checks['ok'] = self::all_true( $checks['schema'] ) && $continuity_ok && self::all_true( $checks['future24'] ) && self::all_true( $checks['migration'] ) && (bool) $checks['dependencies'] && self::all_true( $checks['legacy_checks'] ) && self::all_true( $checks['cron'] ) && self::all_true( $checks['outbox_queue'] );
 		return $checks;
 	}
 
