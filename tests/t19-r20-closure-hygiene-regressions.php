@@ -24,7 +24,12 @@ $readme = file_get_contents( $root . '/readme.txt' );
 $workflow = file_get_contents( $root . '/.github/workflows/file08-complete-quality.yml' );
 $ignore = file_get_contents( $root . '/.gitignore' );
 foreach ( array( $status,$release,$change,$staging,$audit,$readme,$workflow,$ignore ) as $source ) { if ( ! is_string( $source ) ) { fwrite( STDERR, "T19 R20 source read failed\n" ); exit( 1 ); } }
-r20_check( 'status closes R1-R20 numbered source review', false !== strpos( $status, 'R1–R20 complete at source-review level' ) );
+r20_check(
+    'status preserves historical T19 R1-R20 closure',
+    false !== strpos( $status, '## Historical T19 twenty-round result' )
+        && false !== strpos( $status, 'R20 was defect-bearing at closure/release-hygiene level' )
+        && false !== strpos( $status, 'The final T19 R20 correction was release/repository hygiene and documentation truth' )
+);
 r20_check( 'status carries current core schema', false !== strpos( $status, 'Core File 08 schema: **3.4.0**' ) );
 r20_check( 'release status is no longer under active R3 audit', false === strpos( $release, 'REVIEWABLE CANDIDATE UNDER T19 SEQUENTIAL AUDIT' ) && false !== strpos( $release, 'T19 R1–R20 SOURCE REVIEW COMPLETE' ) );
 r20_check( 'current changelog carries core 3.4', false !== strpos( $change, 'Current core schema is **3.4.0**' ) );
