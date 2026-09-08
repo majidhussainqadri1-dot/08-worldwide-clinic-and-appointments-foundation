@@ -366,7 +366,7 @@ final class WCA_REST {
 	}
 
 
-	public static function complaint_detail( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_read',60,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} return self::respond(WCA_Service::complaint_projection($request['ref'],get_current_user_id())); }
+	public static function complaint_detail( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_read',60,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} $purpose=sanitize_key((string)$request->get_header('X-WCA-Access-Purpose')); return self::respond(WCA_Service::complaint_projection($request['ref'],get_current_user_id(),$purpose)); }
 
 	public static function complaint_appeal( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_appeal',10,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} $data=self::data($request); return self::respond(self::protected_mutation_projection(WCA_Service::appeal_complaint($request['ref'],$data['expected_version']??null,get_current_user_id()),'complaint')); }
 
