@@ -7,10 +7,14 @@ $release = file_get_contents( $root . '/docs/RELEASE-STATUS-1.0.0.md' );
 $manifest = file_get_contents( $root . '/MANIFEST.md' );
 $build = file_get_contents( $root . '/tools/build-candidate.php' );
 $verify = file_get_contents( $root . '/tools/verify-candidate.php' );
+$current_branch = '';
+if ( preg_match( '/Working review branch:\s*`([^`]+)`/', $status, $branch_match ) ) {
+	$current_branch = $branch_match[1];
+}
 $checks = array(
 	'current README core schema' => false !== strpos( $readme, 'Core schema: **3.4.0**' ),
 	'current README Future24 schema contract' => false !== strpos( $readme, 'Future24 additive schema/contract: **1.1.0**' ),
-	'current status branch T19' => false !== strpos( $status, 'review/file08-t19-twenty-round-2026-09-06' ),
+	'current status branch is T19 or a later review cycle' => '' !== $current_branch && 1 === preg_match( '/^review\/file08-t(?:19|[2-9][0-9]+)-/', $current_branch ),
 	'current status schema truth' => false !== strpos( $status, 'Core File 08 schema: **3.4.0**' ) && false !== strpos( $status, 'Future24 additive operational schema/contract: **1.1.0**' ),
 	'traceability distinguishes document and runtime versions' => false !== strpos( $trace, 'Current repository runtime candidate:** 1.2.15' ) && false !== strpos( $trace, 'Core schema:** 3.4.0' ),
 	'release status distinguishes document and runtime versions' => false !== strpos( $release, 'Runtime candidate: **1.2.15**' ) && false !== strpos( $release, 'Core schema: **3.4.0**' ),
