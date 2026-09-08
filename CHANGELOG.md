@@ -2,10 +2,12 @@
 
 ## 1.2.15 — current repository candidate
 
-- T19 fresh sequential R1–R20 source review/correction sequence completed under Review → Ledger Freeze → Fix → Regression → Exact-head CI discipline. Defect-bearing rounds: R1–R9, R11, R18, R19 and R20; clean rounds: R10 and R12–R17.
-- T19 corrections include test aggregation and workflow hygiene; release/schema/contract truth; query/object/participant authorization; appointment commit semantics; practitioner/service projection reconciliation; availability exception correctness; signed calendar-link and patient-timezone presentation; bounded repository reads; queue/dead-letter observability; migration/recovery operability; and final release-surface hygiene.
+- **T21 review resumed on 2026-09-09** from exact verified T20 baseline `79f18b5cb3ad9270a52027df7c3a6b50465fdfa4` after the user explicitly reopened review work. T21 uses the mandatory Review → Ledger Freeze → Fix → Regression → Exact-head CI discipline; current T21 corrections do not inherit Packaged/Automated-QA Green status until their own exact HEAD is green.
+- **T20 R1–R20 completed.** R1–R2 were clean; R3–R10 were defect/gap-bearing with R10 evidence-only; R11 was clean; R12 was defect-bearing; R13–R19 were clean; R20 was evidence-only defect-bearing. The latest T20 ten rounds were 8/10 clean (80%).
+- T20 materially hardened the same 1.2.15 runtime candidate with appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization-boundary hardening, availability-projection correction, payment-currency persistence parity, calendar-provider practitioner/source-order/idempotency hardening, and release-evidence alignment.
+- **Historical T19:** T19 R1–R20 completed before T20. Its defect-bearing rounds were R1–R9, R11, R18, R19 and R20; clean rounds were R10 and R12–R17. T19 corrections included test aggregation/workflow hygiene; release/schema/contract truth; query/object/participant authorization; appointment commit semantics; practitioner/service projection reconciliation; availability exception correctness; signed calendar-link/patient-timezone presentation; bounded reads; queue/dead-letter observability; migration/recovery operability; and release-surface hygiene.
 - Runtime remains **1.2.15**. Current core schema is **3.4.0**; restricted continuity schema/contract **1.1.0**; Future24 schema/contract **1.1.0**; Public Clinic and CF-01 contracts **1.1.0**.
-- The former T15/T16/T17/T18 exact heads, schemas and package hashes remain historical evidence only. Current Packaged/Automated-QA status is valid only for the exact current HEAD with a successful canonical deterministic package run. Staging/live acceptance remains separate and is not claimed by repository evidence.
+- Earlier exact heads, schemas and package hashes are historical evidence only. Current Packaged/Automated-QA status is valid only for the exact current HEAD with a successful canonical deterministic package run. Staging/live acceptance remains separate and is not claimed by repository evidence.
 
 ## 1.2.14 — 2026-08-12
 
