@@ -9,6 +9,10 @@ $current_branch = '';
 if ( preg_match( '/Working review branch:\s*`([^`]+)`/', $status, $branch_match ) ) {
  $current_branch = $branch_match[1];
 }
+$historical_note = '';
+if ( preg_match( '/## Historical evidence note\s*(.+)$/s', $status, $historical_match ) ) {
+ $historical_note = $historical_match[1];
+}
 $checks=array(
  'runtime contract remains 1.2.15'=>strpos($contracts,"RUNTIME_VERSION                 = '1.2.15'")!==false,
  'core runtime schema is 3.4.0'=>strpos($contracts,"SCHEMA_VERSION                  = '3.4.0'")!==false,
@@ -24,7 +28,7 @@ $checks=array(
  'current evidence does not claim old CI as current'=>strpos($current_status,'31741321738')===false,
  'current package evidence is exact-head-specific'=>strpos($status,'| Packaged | **Exact-head only**')!==false,
  'current automated QA evidence is exact-head-specific'=>strpos($status,'| Automated-QA Green | **Exact-head only**')!==false,
- 'historical T18 evidence is explicitly non-current'=>strpos($status,'T18')!==false && strpos($status,'historical provenance only')!==false,
+ 'historical T18 evidence is explicitly non-current'=>(strpos($historical_note,'historical provenance only')!==false && (strpos($historical_note,'T18')!==false || preg_match('/T(?:1[0-8]|[0-9])\s*[–-]\s*T(?:1[8-9]|[2-9][0-9])/', $historical_note)===1)),
 );
 foreach($checks as $name=>$ok){if(!$ok){fwrite(STDERR,"T18 R10 FAIL: {$name}\n");exit(1);}}
 echo "T18 R10 release-truth regressions: PASS\n";
