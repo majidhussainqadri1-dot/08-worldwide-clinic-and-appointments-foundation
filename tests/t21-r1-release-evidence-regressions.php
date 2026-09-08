@@ -23,6 +23,11 @@ t21r1_check( 'CHANGELOG records T21 resumed state', false !== strpos( $change, '
 t21r1_check( 'packaged readme records T21 resumed identity', false !== strpos( $plugin_readme, 'current repository review identity is the resumed **T21** cycle' ) );
 t21r1_check( 'packaged readme no longer calls T19 current', false === strpos( $plugin_readme, 'current T19 R1–R20 sequential source review is complete' ) );
 t21r1_check( 'T19 historical regression no longer forces T19 currentness', false !== strpos( $historical, 'without requiring T19 currentness' ) );
+t21r1_check( 'STATUS does not hard-code transient R1 correction-in-progress state', false === strpos( $status, 'R1 correction batch in progress' ) );
+t21r1_check( 'release status does not hard-code transient R1 correction-in-progress state', false === strpos( $release, 'R1 correction is repository/release-evidence work' ) );
+t21r1_check( 'STATUS makes package evidence exact-head only', false !== strpos( $status, '| Packaged | **Exact-head only**' ) );
+t21r1_check( 'STATUS makes QA evidence exact-head only', false !== strpos( $status, '| Automated-QA Green | **Exact-head only**' ) );
+t21r1_check( 'release status delegates dynamic closure to PR and workflow evidence', false !== strpos( $release, 'Exact numbered-round closure is tracked in PR #10 and its canonical exact-head workflow' ) );
 $ci_branch = getenv( 'GITHUB_HEAD_REF' );
 if ( ! $ci_branch ) { $ci_branch = getenv( 'GITHUB_REF_NAME' ); }
 if ( $ci_branch && 0 === strpos( $ci_branch, 'review/file08-t' ) ) {
