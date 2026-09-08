@@ -4,7 +4,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t19-twenty-round-2026-09-06`
+- Repository review branch: `review/file08-t20-twenty-round-2026-09-07`
 - Package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
 - Runtime candidate: **1.2.15**
@@ -33,7 +33,7 @@ The current source implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-
 
 Historical sequential audit evidence is preserved in the repository's dedicated review/evidence documents and `readme.txt` changelog. Historical schema or exact-head values are not current release evidence.
 
-Historical provenance label retained for permanent regression history: **Current sixteenth-cycle runtime alignment**. This phrase refers only to the older T16 checkpoint; the current identity is the T19 section above.
+Historical provenance label retained for permanent regression history: **Current sixteenth-cycle runtime alignment**. This phrase refers only to the older T16 checkpoint; the current repository review identity is the T20 section above.
 
 ## Canonical routes
 

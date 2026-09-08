@@ -2,9 +2,9 @@
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t19-twenty-round-2026-09-06`
-- Review discipline: **T19 fresh 20-round Review → Ledger Freeze → Fix → Regression → Exact-head CI → Next Round**
-- Numbered review sequence: **R1–R20 complete at source-review level**
+- Working review branch: `review/file08-t20-twenty-round-2026-09-07`
+- Review discipline: **T20 fresh 20-round Review → Ledger Freeze → Fix → Regression → Exact-head CI → Next Round**
+- Numbered review sequence: **T20 R1–R12 complete at source-review level; cycle remains in progress**
 - Runtime candidate: **1.2.15**
 - Core File 08 schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
@@ -16,11 +16,15 @@
 
 Repository release identity is always the exact candidate HEAD together with its exact-head canonical GitHub Actions run, deterministic manifest, artifact digest and candidate SHA-256. The manifest must independently match the runtime, plan, core schema, continuity schema/contract, Future24 schema/contract, Public Clinic contract and CF-01 contract embedded in that same artifact.
 
-## T19 twenty-round result
+## T20 progress
+
+R1 and R2 were clean. R3–R9 were defect-bearing and corrected/retested before the next round. R10 was defect-bearing at repository/PR evidence level only and corrected without changing runtime/schema/live state. R11 was clean. R12 found repository documentation/release-identity drift (`README.md` and `STATUS.md` still naming T19 as current) and its frozen correction updates only repository evidence plus a permanent regression. T20 remains open after R12; no R13+ result is claimed here.
+
+## Historical T19 twenty-round result
 
 R1–R9 were defect-bearing and were corrected/retested before R10. R10 was clean. R11 was defect-bearing; R12–R17 were clean; R18 and R19 were defect-bearing; R20 was defect-bearing at closure/release-hygiene level. Every defect-bearing round was reviewed completely before its ledger was frozen and its correction batch began.
 
-The final R20 correction is release/repository hygiene and documentation truth; it does not convert repository evidence into staging or live evidence. Automated-QA Green and Packaged apply only when the **current exact HEAD** has a successful canonical PHP 7.4/PHP 8.3 quality run and reproducible independently verified candidate package.
+The final T19 R20 correction was release/repository hygiene and documentation truth; it did not convert repository evidence into staging or live evidence. Automated-QA Green and Packaged apply only when the **current exact HEAD** has a successful canonical PHP 7.4/PHP 8.3 quality run and reproducible independently verified candidate package.
 
 ## Source implementation state
 
@@ -31,7 +35,7 @@ The candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-0
 | State | Repository evidence rule |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Complete candidate** — numbered T19 source review/correction sequence is complete. |
+| Coded | **Complete candidate** — current T20 source review/correction sequence is still in progress on an already implemented candidate. |
 | Packaged | **Exact-head only** — true only for the exact HEAD whose deterministic candidate package verifies. |
 | Automated-QA Green | **Exact-head only** — true only for the exact HEAD whose canonical quality workflow is green. |
 | Staging-Accepted | **Pending / not claimed.** |
@@ -50,4 +54,4 @@ This repository does not prove the current staging or live installation. Exact d
 
 ## Historical evidence note
 
-T13–T18, earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only. Historical regression labels such as **Fifteenth fresh 20-round main-cycle closure**, **Sixteenth fresh 20-round sequential audit**, and **Current sixteenth-cycle runtime alignment** are retained only where old regression evidence requires them; they are not current release identity.
+T13–T19, earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only. Historical regression labels such as **Fifteenth fresh 20-round main-cycle closure**, **Sixteenth fresh 20-round sequential audit**, and **Current sixteenth-cycle runtime alignment** are retained only where old regression evidence requires them; they are not current release identity.
