@@ -30,8 +30,8 @@ $checks=array(
  'status current Future24 schema is 1.1.0'=>strpos($status,'Future24 additive operational schema/contract: **1.1.0**')!==false,
  'current evidence does not claim old exact-head package as current'=>strpos($current_status,'56a1ee4a59722e6574c4722e2c6bda791b15be39')===false,
  'current evidence does not claim old CI as current'=>strpos($current_status,'31741321738')===false,
- 'current package evidence requires current exact HEAD'=>strpos($status,'Packaged')!==false && strpos($status,'current T21 correction HEAD')!==false && strpos($status,'exact HEAD')!==false,
- 'current automated QA evidence requires current exact HEAD'=>strpos($status,'Automated-QA Green')!==false && strpos($status,"current T21 correction HEAD")!==false && strpos($status,'canonical quality workflow')!==false,
+ 'current package evidence is exact-head only'=>strpos($status,'| Packaged | **Exact-head only**')!==false && strpos($status,'canonical reproducible-candidate job succeeds')!==false,
+ 'current automated QA evidence is exact-head only'=>strpos($status,'| Automated-QA Green | **Exact-head only**')!==false && strpos($status,'PHP 7.4/PHP 8.3/source/JS/hygiene gates are green')!==false,
  'historical T18 evidence is explicitly non-current'=>(strpos($historical_note,'historical provenance only')!==false && $historical_t18_covered),
 );
 foreach($checks as $name=>$ok){if(!$ok){fwrite(STDERR,"T18 R10 FAIL: {$name}\n");exit(1);}}
