@@ -31,13 +31,21 @@ r20_check(
         && false !== strpos( $status, 'The final T19 R20 correction was release/repository hygiene and documentation truth' )
 );
 r20_check( 'status carries current core schema', false !== strpos( $status, 'Core File 08 schema: **3.4.0**' ) );
-r20_check( 'release status is no longer under active R3 audit', false === strpos( $release, 'REVIEWABLE CANDIDATE UNDER T19 SEQUENTIAL AUDIT' ) && false !== strpos( $release, 'T19 R1–R20 SOURCE REVIEW COMPLETE' ) );
+r20_check(
+    'release status preserves T19 as history without requiring T19 currentness',
+    false === strpos( $release, 'REVIEWABLE CANDIDATE UNDER T19 SEQUENTIAL AUDIT' )
+        && false !== strpos( $release, 'T19 R1–R20 and earlier review cycles remain historical evidence' )
+);
 r20_check( 'current changelog carries core 3.4', false !== strpos( $change, 'Current core schema is **3.4.0**' ) );
 r20_check( 'current changelog carries Future24 1.1', false !== strpos( $change, 'Future24 schema/contract **1.1.0**' ) );
 r20_check( 'staging handoff carries core 3.4', false !== strpos( $staging, 'core schema `3.4.0`' ) );
 r20_check( 'staging handoff carries Future24 1.1', false !== strpos( $staging, 'Future24 additive schema/contract `1.1.0`' ) );
 r20_check( 'audit evidence explicitly historical', false !== strpos( $audit, 'Historical evidence only.' ) && false !== strpos( $audit, 'original 0.1.0 helper used' ) );
-r20_check( 'plugin readme records T19 closure', false !== strpos( $readme, 'current T19 R1–R20 sequential source review is complete' ) );
+r20_check(
+    'plugin readme preserves T19 closure as historical provenance',
+    false !== strpos( $readme, 'Historical T19 R1–R20 source review/correction sequence completed' )
+        && false === strpos( $readme, 'current T19 R1–R20 sequential source review is complete' )
+);
 r20_check( 'canonical workflow enforces one workflow', false !== strpos( $workflow, 'find .github/workflows -maxdepth 1' ) );
 r20_check( 'canonical workflow rejects obsolete development builder', false !== strpos( $workflow, 'test ! -e tools/build-development-candidate.php' ) );
 r20_check( 'local deterministic build output ignored', false !== strpos( $ignore, "build/\n" ) );
