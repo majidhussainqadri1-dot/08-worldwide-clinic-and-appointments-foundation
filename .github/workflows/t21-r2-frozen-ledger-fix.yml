@@ -1,0 +1,68 @@
+name: File 08 T21 R2 Frozen Ledger Correction
+on:
+  push:
+    branches: [review/file08-t21-ten-round-2026-09-09]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  correct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/file08-t21-ten-round-2026-09-09
+      - name: Apply frozen R2 correction
+        shell: python
+        run: |
+          from pathlib import Path
+
+          service = Path('includes/class-wca-service.php')
+          text = service.read_text()
+          old = """\tpublic static function complaint_projection( $ref, $actor_user_id=0 ) {\n\t\t$actor_user_id=absint($actor_user_id?:get_current_user_id()); $row=WCA_Repository::get_complaint_by_ref($ref,false); if(is_wp_error($row)){return $row;} if(!$row){return new WP_Error('wca_complaint_not_found',__('Complaint was not found.','worldwide-clinic-appointments'),array('status'=>404));}\n\t\t$allowed=$actor_user_id===absint($row['complainant_user_id']) || current_user_can('manage_worldwide_clinic') || current_user_can('manage_options');\n\t\tif(!$allowed){return new WP_Error('wca_complaint_forbidden',__('You cannot view this complaint.','worldwide-clinic-appointments'),array('status'=>403));}\n\t\treturn array('public_ref'=>(string)$row['public_ref'],'appointment_ref'=>$row['appointment_id']?(string)SWC_Helpers::meta(absint($row['appointment_id']),'public_ref'):'','category'=>(string)$row['category'],'summary'=>(string)$row['summary'],'evidence_refs'=>WCA_Repository::decode_json($row['evidence_refs_json'],array()),'purpose_limit'=>'case_resolution_only','status'=>(string)$row['status'],'version'=>absint($row['version']),'created_at'=>(string)$row['created_at'],'updated_at'=>(string)$row['updated_at']);\n\t}\n"""
+          new = """\tpublic static function complaint_projection( $ref, $actor_user_id = 0, $purpose = '' ) {\n\t\t$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );\n\t\t$row = WCA_Repository::get_complaint_by_ref( $ref, false );\n\t\tif ( is_wp_error( $row ) ) { return $row; }\n\t\tif ( ! $row ) { return new WP_Error( 'wca_complaint_not_found', __( 'Complaint was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }\n\t\tif ( $actor_user_id !== absint( $row['complainant_user_id'] ) ) {\n\t\t\t$claims = WCA_Authorization::claims( $actor_user_id );\n\t\t\tif ( is_wp_error( $claims ) ) { return $claims; }\n\t\t\t$admin_allowed = user_can( $actor_user_id, 'manage_worldwide_clinic' ) || user_can( $actor_user_id, 'manage_wca_complaints' ) || user_can( $actor_user_id, 'manage_options' );\n\t\t\t$purpose = sanitize_key( $purpose );\n\t\t\t$allowed_purposes = array( 'complaint', 'support_case', 'privacy_request', 'incident' );\n\t\t\tif ( ! $admin_allowed || ! in_array( $purpose, $allowed_purposes, true ) ) {\n\t\t\t\treturn new WP_Error( 'wca_complaint_forbidden', __( 'You cannot view this complaint.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );\n\t\t\t}\n\t\t\t$step = WCA_Authorization::require_step_up( 'complaint_' . $purpose, $actor_user_id );\n\t\t\tif ( is_wp_error( $step ) ) { return new WP_Error( 'wca_complaint_step_up', __( 'Recent security verification is required for this purpose-limited complaint access.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }\n\t\t\t$trace = WCA_Observability::trace_id();\n\t\t\t$audit = WCA_Repository::append_event( 'ComplaintAccessed.v1', 'complaint', (string) $row['public_ref'], array( 'complaint_ref' => (string) $row['public_ref'], 'purpose' => $purpose, 'trace_id' => $trace ), $actor_user_id, $trace );\n\t\t\tif ( is_wp_error( $audit ) ) { return new WP_Error( 'wca_complaint_access_audit_failed', __( 'Purpose-limited complaint access could not be audited safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }\n\t\t}\n\t\treturn array( 'public_ref' => (string) $row['public_ref'], 'appointment_ref' => $row['appointment_id'] ? (string) SWC_Helpers::meta( absint( $row['appointment_id'] ), 'public_ref' ) : '', 'category' => (string) $row['category'], 'summary' => (string) $row['summary'], 'evidence_refs' => WCA_Repository::decode_json( $row['evidence_refs_json'], array() ), 'purpose_limit' => 'case_resolution_only', 'status' => (string) $row['status'], 'version' => absint( $row['version'] ), 'created_at' => (string) $row['created_at'], 'updated_at' => (string) $row['updated_at'] );\n\t}\n"""
+          if old not in text:
+              raise SystemExit('complaint_projection target not found')
+          service.write_text(text.replace(old, new, 1))
+
+          rest = Path('includes/class-wca-rest.php')
+          text = rest.read_text()
+          old = "public static function complaint_detail( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_read',60,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} return self::respond(WCA_Service::complaint_projection($request['ref'],get_current_user_id())); }"
+          new = "public static function complaint_detail( WP_REST_Request $request ) { $rate=self::rate_limit('complaint_read',60,HOUR_IN_SECONDS); if(is_wp_error($rate)){return $rate;} $purpose=sanitize_key((string)$request->get_header('X-WCA-Access-Purpose')); return self::respond(WCA_Service::complaint_projection($request['ref'],get_current_user_id(),$purpose)); }"
+          if old not in text:
+              raise SystemExit('REST complaint_detail target not found')
+          rest.write_text(text.replace(old, new, 1))
+
+          test = Path('tests/t21-r2-complaint-authorization-regressions.php')
+          test.write_text(r'''<?php
+          $root = dirname(__DIR__);
+          $service = file_get_contents($root . '/includes/class-wca-service.php');
+          $rest = file_get_contents($root . '/includes/class-wca-rest.php');
+          $fail = static function($m){ fwrite(STDERR, "T21 R2 regression failed: {$m}\n"); exit(1); };
+          if (strpos($service, "complaint_projection( $ref, $actor_user_id = 0, $purpose = '' )") === false) $fail('complaint projection lacks explicit purpose');
+          if (strpos($service, "user_can( $actor_user_id, 'manage_worldwide_clinic' )") === false) $fail('complaint admin authority is not bound to explicit actor');
+          if (strpos($service, "current_user_can('manage_worldwide_clinic')") !== false) $fail('ambient current-user complaint authority remains');
+          if (strpos($service, "allowed_purposes = array( 'complaint', 'support_case', 'privacy_request', 'incident' )") === false) $fail('complaint purpose allowlist missing');
+          if (strpos($service, "require_step_up( 'complaint_' . $purpose, $actor_user_id )") === false) $fail('complaint step-up missing');
+          if (strpos($service, "ComplaintAccessed.v1") === false || strpos($service, "wca_complaint_access_audit_failed") === false) $fail('complaint access audit fail-closed contract missing');
+          if (strpos($rest, "X-WCA-Access-Purpose") === false || strpos($rest, "complaint_projection($request['ref'],get_current_user_id(),$purpose)") === false) $fail('REST purpose is not propagated');
+          echo "T21 R2 complaint authorization regressions passed.\n";
+          ''')
+
+          runall = Path('tests/run-all.php')
+          text = runall.read_text()
+          needle = "'t21-r1-release-evidence-regressions.php' );"
+          replacement = "'t21-r1-release-evidence-regressions.php', 't21-r2-complaint-authorization-regressions.php' );"
+          if needle not in text:
+              raise SystemExit('run-all target not found')
+          runall.write_text(text.replace(needle, replacement, 1))
+      - name: Targeted regression
+        run: php tests/t21-r2-complaint-authorization-regressions.php
+      - name: Commit correction
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add includes/class-wca-service.php includes/class-wca-rest.php tests/t21-r2-complaint-authorization-regressions.php tests/run-all.php
+          git commit -m "fix(file08): close T21 R2 complaint authorization gaps"
+          git push origin HEAD:review/file08-t21-ten-round-2026-09-09
