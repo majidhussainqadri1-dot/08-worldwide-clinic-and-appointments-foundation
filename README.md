@@ -4,7 +4,9 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t20-twenty-round-2026-09-07`
+- Repository review branch: `review/file08-t21-ten-round-2026-09-09`
+- Current review cycle: **T21 resumed 10-round Review → Ledger Freeze → Fix → Regression → Exact-head CI → Next Round**
+- Verified pre-T21 baseline: `79f18b5cb3ad9270a52027df7c3a6b50465fdfa4` — T20 closed with 8/10 clean rounds in its latest ten; the user explicitly resumed review work after that stopping threshold.
 - Package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
 - Runtime candidate: **1.2.15**
@@ -31,9 +33,7 @@ The runtime does not introduce automated diagnosis/prescribing, emergency-servic
 
 The current source implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24`, including clinic identity and activation, branches, services/fees, timezone/DST-safe availability and slot projection, atomic holds, appointment request/decision/reschedule/cancel/check-in/complete/no-show lifecycle, patient/guardian/doctor/delegated-staff authorization, opaque protected references, emergency diversion, versioned consent, secure continuity, expiring review eligibility, calendar/payment/complaint adapters, privacy lifecycle, audit/outbox/observability, migration/rollback metadata, accessibility/localization, waitlist/series/resource/group scheduling, readiness/prerequisite governance, queue/disruption/support/interpreter contracts, consent-gated File 17 virtual-room requests, privacy-safe interoperability adapters, external busy projections, and episode chains.
 
-Historical sequential audit evidence is preserved in the repository's dedicated review/evidence documents and `readme.txt` changelog. Historical schema or exact-head values are not current release evidence.
-
-Historical provenance label retained for permanent regression history: **Current sixteenth-cycle runtime alignment**. This phrase refers only to the older T16 checkpoint; the current repository review identity is the T20 section above.
+T20 materially hardened the same 1.2.15 candidate after T19, including appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization-boundary hardening, availability projection correction, payment-currency persistence parity, calendar-provider practitioner/order/idempotency hardening, and release-evidence alignment. T19 and all earlier review cycles remain historical provenance rather than current candidate identity.
 
 ## Canonical routes
 
@@ -60,5 +60,7 @@ The canonical GitHub Actions quality workflow repeats PHP 7.4/8.3 syntax and sou
 ## Evidence-state law
 
 A repository candidate may be called **Coded**, **Packaged**, or **Automated-QA Green** only when the respective evidence applies to the exact same HEAD. It is not `Staging-Accepted`, `Live-Deployed`, or `Operational` from repository evidence alone.
+
+T21 is currently a resumed review/correction cycle. Any T21 correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before the corrected T21 HEAD may inherit `Packaged` or `Automated-QA Green` status.
 
 Before production, run `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, recording actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback and Founder acceptance. After an explicitly authorized production deployment, freeze the exact deployed artifact/version/schema/migration state and perform live parity re-test before any live resolution claim.
