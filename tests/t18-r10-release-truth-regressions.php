@@ -14,8 +14,8 @@ if ( preg_match( '/## Historical evidence note\s*(.+)$/s', $status, $historical_
  $historical_note = $historical_match[1];
 }
 $historical_t18_covered = strpos($historical_note,'T18')!==false
- || strpos($historical_note,'T13–T19')!==false
- || strpos($historical_note,'T13-T19')!==false
+ || strpos($historical_note,'T13–T20')!==false
+ || strpos($historical_note,'T13-T20')!==false
  || preg_match('/T(?:1[0-8]|[0-9])(?:\x{2013}|-)+T(?:1[8-9]|[2-9][0-9])/u', $historical_note)===1;
 $checks=array(
  'runtime contract remains 1.2.15'=>strpos($contracts,"RUNTIME_VERSION                 = '1.2.15'")!==false,
@@ -23,15 +23,15 @@ $checks=array(
  'future runtime schema is 1.1.0'=>strpos($future,"SCHEMA_VERSION   = '1.1.0'")!==false,
  'readme current release records core 3.4.0'=>strpos($readme,'current core schema is 3.4.0')!==false,
  'readme current release records Future24 1.1.0'=>strpos($readme,'Future24 schema/contract 1.1.0')!==false,
- 'readme preserves historical T15 completion fact'=>strpos($readme,'All 20 fifteenth-cycle main reviews are complete')!==false,
+ 'readme preserves historical T15 provenance'=>strpos($readme,'Fifteenth fresh 20-round corrective cycle')!==false,
  'status current branch advances beyond T18'=>$current_branch!=='' && $current_branch!=='review/file08-t18-ten-round-2026-09-06' && preg_match('/^review\/file08-t(?:19|[2-9][0-9]+)-/', $current_branch)===1,
  'status does not present T18 branch as current'=>strpos($current_status,'Working review branch: `review/file08-t18-ten-round-2026-09-06`')===false,
  'status current core schema is 3.4.0'=>strpos($status,'Core File 08 schema: **3.4.0**')!==false,
  'status current Future24 schema is 1.1.0'=>strpos($status,'Future24 additive operational schema/contract: **1.1.0**')!==false,
  'current evidence does not claim old exact-head package as current'=>strpos($current_status,'56a1ee4a59722e6574c4722e2c6bda791b15be39')===false,
  'current evidence does not claim old CI as current'=>strpos($current_status,'31741321738')===false,
- 'current package evidence is exact-head-specific'=>strpos($status,'| Packaged | **Exact-head only**')!==false,
- 'current automated QA evidence is exact-head-specific'=>strpos($status,'| Automated-QA Green | **Exact-head only**')!==false,
+ 'current package evidence requires current exact HEAD'=>strpos($status,'Packaged')!==false && strpos($status,'current T21 correction HEAD')!==false && strpos($status,'exact HEAD')!==false,
+ 'current automated QA evidence requires current exact HEAD'=>strpos($status,'Automated-QA Green')!==false && strpos($status,"current T21 correction HEAD")!==false && strpos($status,'canonical quality workflow')!==false,
  'historical T18 evidence is explicitly non-current'=>(strpos($historical_note,'historical provenance only')!==false && $historical_t18_covered),
 );
 foreach($checks as $name=>$ok){if(!$ok){fwrite(STDERR,"T18 R10 FAIL: {$name}\n");exit(1);}}
