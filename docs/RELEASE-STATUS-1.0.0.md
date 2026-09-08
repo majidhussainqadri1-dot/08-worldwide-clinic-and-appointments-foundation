@@ -18,22 +18,22 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 
 The prior **T20 R1–R20** sequence is complete. T20's latest ten rounds (R11–R20) were 8/10 clean: R11 and R13–R19 clean; R12 and R20 defect-bearing. That satisfied the previous stopping threshold. The user explicitly resumed review work, so **T21** is a fresh review cycle from the exact verified T20 baseline.
 
-T21 R1 has completed its review-only phase and frozen its defect ledger before correction. R1 correction is repository/release-evidence work; R2 must not begin until the entire R1 correction batch has permanent regression coverage and the resulting exact HEAD passes the canonical PHP 7.4/PHP 8.3 quality and reproducible-candidate gates.
+T21 R1 completed its full review-only pass before correction, froze its release-evidence/currentness ledger, and applied that correction batch plus permanent regression coverage. Exact numbered-round closure is tracked in PR #10 and its canonical exact-head workflow because a static status document cannot truthfully embed a CI result that occurs only after the commit containing the document itself.
 
 Implemented repository scope includes 18/18 FR, 10/10 NFR and Future24 24/24 capability governance; canonical data/schema and migration/rollback/recovery controls; security/privacy/reliability/accessibility/localization/observability; warning-clean source regression aggregation; and deterministic candidate engineering whose manifest binds exact commit, runtime, plan and core/continuity/Future24/Public-Clinic/CF-01 schema-contract identity.
 
 ## Evidence-state classification
 
-- Source implementation: **CODED CANDIDATE — T21 REVIEW/CORRECTION IN PROGRESS**
-- Automated source checks: **PENDING FOR CURRENT T21 CORRECTION HEAD**
-- Deterministic candidate: **PENDING FOR CURRENT T21 CORRECTION HEAD**
+- Source implementation: **CODED CANDIDATE — T21 REVIEW CYCLE ACTIVE**
+- Automated source checks: **EXACT-HEAD ONLY — consult PR #10/current canonical workflow for the latest T21 HEAD**
+- Deterministic candidate: **EXACT-HEAD ONLY — consult PR #10/current canonical workflow for the latest T21 HEAD**
 - Prior verified T20 exact-head CI/package: **HISTORICAL BASELINE EVIDENCE after any T21 HEAD change**
 - Hostinger staging acceptance: **NO / NOT CLAIMED**
 - Founder staging acceptance: **NO / NOT CLAIMED**
 - Production release/deployment: **NO / UNVERIFIED**
 - Operational status: **NO / NOT CLAIMED**
 
-A correction changes HEAD and makes prior CI/package evidence historical for final-release purposes. Packaged/Automated-QA Green status therefore applies only when the current exact HEAD itself passes the canonical PHP 7.4/PHP 8.3 quality jobs and reproducible candidate verification.
+A correction changes HEAD and makes prior CI/package evidence historical for final-release purposes. Packaged/Automated-QA Green status therefore applies only when the exact HEAD under consideration itself passes the canonical PHP 7.4/PHP 8.3 quality jobs and reproducible candidate verification.
 
 ## Historical review provenance
 
