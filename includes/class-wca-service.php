@@ -777,7 +777,14 @@ final class WCA_Service {
 			return $response;
 		}, 'wca_appointment_request_transaction' );
 		if ( is_wp_error( $result ) ) {
-			WCA_Repository::release_idempotency( $claim['id'] );
+			$error_data = $result->get_error_data();
+			$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );
+			if ( ! $state_uncertain ) {
+				WCA_Repository::release_idempotency( $claim['id'] );
+			} else {
+				WCA_Observability::metric( 'appointment_request_uncertain_idempotency_retained_total', 1 );
+				WCA_Observability::log( 'error', 'appointment_request_transaction_state_uncertain', array( 'idempotency_reservation_id' => absint( $claim['id'] ) ) );
+			}
 			if ( $created_appointment_id ) { clean_post_cache( $created_appointment_id ); }
 			return $result;
 		}
