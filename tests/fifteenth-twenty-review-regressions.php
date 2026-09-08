@@ -118,8 +118,10 @@ t15missing('R18 temporary T15 probe removed','.github/workflows/t15-probe.yml');
 t15h('R18 old corrective status explicitly historical','CORRECTIVE-STATUS.md','Historical evidence only.');
 t15h('R18 master-plan version label truthful','tests/master-plan-contract.php','plugin version is 1.2.15');
 
-t15h('R20 packaged readme records all main rounds complete','readme.txt','All 20 fifteenth-cycle main reviews are complete');
-t15h('R20 repository history preserves fifteenth closure','STATUS.md','Fifteenth fresh 20-round main-cycle closure');
-t15h('R20 STATUS records main-cycle closure','STATUS.md','Fifteenth fresh 20-round main-cycle closure');
-t15h('R20 current T19 clean-round classification is explicit','CHANGELOG.md','clean rounds: R10 and R12–R17');
+/* Historical T15/T19 closure evidence must remain recognizable, but historical
+ * regressions must never require an old cycle to remain the current release identity. */
+t15h('R20 packaged readme preserves fifteenth-cycle provenance','readme.txt','Fifteenth fresh 20-round corrective cycle');
+t15h('R20 STATUS preserves T19 historical closure','STATUS.md','## Historical T19 twenty-round result');
+t15h('R20 STATUS preserves T20 historical closure','STATUS.md','## Historical T20 twenty-round result');
+t15h('R20 historical T19 clean-round classification is explicit','CHANGELOG.md','clean rounds were R10 and R12–R17');
 if($fail){fwrite(STDERR,"T15 regression gate failed:\n- ".implode("\n- ",$fail)."\n");exit(1);}echo 'T15 regression assertions passed: '.$pass.'/'.$pass."\n";
