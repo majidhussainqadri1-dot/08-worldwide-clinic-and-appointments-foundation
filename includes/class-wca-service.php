@@ -939,7 +939,7 @@ final class WCA_Service {
 				$review_outbox = WCA_Repository::enqueue( 'ReviewEligibilityGranted.v1', $eligibility['public_ref'], $review_payload, $trace );
 				if ( is_wp_error( $review_outbox ) ) { return $review_outbox; }
 			}
-			if ( ! SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) ) ) {
+			if ( ! SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'actor_id' => $actor_user_id, 'actor_role' => $actor, 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) ) ) {
 				return new WP_Error( 'wca_transition_audit', __( 'The appointment transition could not be audited safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) );
 			}
 			WCA_Observability::metric( 'appointment_transition_total', 1, array( 'from' => $current, 'to' => $next, 'actor' => $actor ) );

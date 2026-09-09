@@ -652,6 +652,7 @@ final class SWC_Helpers {
 	public static function audit( $appointment, $event, $args = array() ) {
 		global $wpdb;
 		$defaults = array(
+			'actor_id'       => get_current_user_id(),
 			'actor_role'     => self::actor_role(),
 			'old_status'     => '',
 			'new_status'     => '',
@@ -664,7 +665,7 @@ final class SWC_Helpers {
 		$args = wp_parse_args( $args, $defaults );
 		$data = array(
 			'appointment_id' => absint( $appointment ),
-			'actor_id'       => get_current_user_id(),
+			'actor_id'       => absint( $args['actor_id'] ),
 			'actor_role'     => sanitize_key( $args['actor_role'] ),
 			'action'         => sanitize_key( $event ),
 			'event'          => sanitize_key( $event ),
