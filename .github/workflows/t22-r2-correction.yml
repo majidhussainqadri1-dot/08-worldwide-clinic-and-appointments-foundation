@@ -1,0 +1,95 @@
+name: T22 R2 Frozen-Defect Correction
+
+on:
+  push:
+    branches:
+      - review/file08-t21-ten-round-2026-09-09
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    if: ${{ !contains(github.event.head_commit.message, '[t22-r2-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply frozen R2-D1 correction and permanent regression
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          helper = Path('includes/class-swc-helpers.php')
+          text = helper.read_text()
+          old = "\t\t$defaults = array(\n\t\t\t'actor_role'     => self::actor_role(),"
+          new = "\t\t$defaults = array(\n\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => self::actor_role(),"
+          if text.count(old) != 1:
+              raise SystemExit('helper defaults anchor mismatch')
+          text = text.replace(old, new, 1)
+          old = "\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),"
+          new = "\t\t\t'actor_id'       => absint( $args['actor_id'] ),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),"
+          if text.count(old) != 1:
+              raise SystemExit('helper actor persistence anchor mismatch')
+          helper.write_text(text)
+
+          service = Path('includes/class-wca-service.php')
+          text = service.read_text()
+          old = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          new = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'actor_id' => $actor_user_id, 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          if text.count(old) != 1:
+              raise SystemExit('transition audit anchor mismatch')
+          service.write_text(text.replace(old, new, 1))
+
+          regression = Path('tests/t22-r2-audit-actor-provenance-regressions.php')
+          regression.write_text(r'''<?php
+          $helper = file_get_contents( dirname( __DIR__ ) . '/includes/class-swc-helpers.php' );
+          $service = file_get_contents( dirname( __DIR__ ) . '/includes/class-wca-service.php' );
+          if ( false === $helper || false === $service ) {
+              fwrite( STDERR, "T22 R2 FAIL: source unreadable\n" );
+              exit( 1 );
+          }
+          if ( false === strpos( $helper, "'actor_id'       => get_current_user_id()," ) ) {
+              fwrite( STDERR, "T22 R2 FAIL: legacy audit actor default is not preserved\n" );
+              exit( 1 );
+          }
+          if ( false === strpos( $helper, "'actor_id'       => absint( \$args['actor_id'] )," ) ) {
+              fwrite( STDERR, "T22 R2 FAIL: audit persistence does not honor explicit actor_id\n" );
+              exit( 1 );
+          }
+          if ( false !== strpos( $helper, "'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => sanitize_key( \$args['actor_role'] )," ) ) {
+              fwrite( STDERR, "T22 R2 FAIL: audit row still hard-codes ambient current user\n" );
+              exit( 1 );
+          }
+          $transition_anchor = "SWC_Helpers::audit( \$appointment_id, 'wca-transition', array( 'actor_id' => \$actor_user_id,";
+          if ( false === strpos( $service, $transition_anchor ) ) {
+              fwrite( STDERR, "T22 R2 FAIL: canonical transition does not pass explicit actor provenance\n" );
+              exit( 1 );
+          }
+          echo "T22 R2 audit actor-provenance regression checks passed.\n";
+          ''')
+
+          runner = Path('tests/run-all.php')
+          text = runner.read_text()
+          old = "'t21-r10-candidate-required-payload-regressions.php' );"
+          new = "'t21-r10-candidate-required-payload-regressions.php', 't22-r2-audit-actor-provenance-regressions.php' );"
+          if text.count(old) != 1:
+              raise SystemExit('run-all anchor mismatch')
+          runner.write_text(text.replace(old, new, 1))
+          PY
+
+          php -l includes/class-swc-helpers.php
+          php -l includes/class-wca-service.php
+          php -l tests/t22-r2-audit-actor-provenance-regressions.php
+          php tests/t22-r2-audit-actor-provenance-regressions.php
+          php tests/run-all.php
+
+          rm .github/workflows/t22-r2-correction.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-swc-helpers.php includes/class-wca-service.php tests/run-all.php tests/t22-r2-audit-actor-provenance-regressions.php .github/workflows/t22-r2-correction.yml
+          git commit -m "fix(review): correct T22 R2 audit actor provenance [t22-r2-applied]"
+          git push origin HEAD:review/file08-t21-ten-round-2026-09-09
