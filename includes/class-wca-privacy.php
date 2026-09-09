@@ -56,20 +56,8 @@ final class WCA_Privacy {
 		$page = max( 1, absint( $page ) );
 		$data = array();
 
-		$appointments = get_posts( array(
-			'post_type'      => SWC_Helpers::TYPE,
-			'post_status'    => array( 'private', 'publish', 'draft' ),
-			'posts_per_page' => 50,
-			'paged'          => $page,
-			'fields'         => 'ids',
-			'orderby'        => 'ID',
-			'order'          => 'ASC',
-			'meta_query'     => array( 'relation' => 'OR',
-				array( 'key' => '_swc_patient_user_id', 'value' => $user->ID ),
-				array( 'key' => '_swc_doctor_id', 'value' => $user->ID ),
-				array( 'key' => '_swc_guardian_user_id', 'value' => $user->ID ),
-			),
-		) );
+		$appointments = self::appointment_ids_page( absint( $user->ID ), $page, 50 );
+		if ( is_wp_error( $appointments ) ) { return $appointments; }
 		foreach ( $appointments as $appointment_id ) {
 			$fields = array();
 			foreach ( array( 'public_ref','status','preferred_at_utc','appointment_end_utc','patient_timezone','consultation_type','clinic_id','service_id','created_via','consent_version','consent_at','checked_in_at_utc','completed_at_utc' ) as $key ) {
@@ -143,6 +131,7 @@ final class WCA_Privacy {
 			$is_patient = absint( SWC_Helpers::meta( $id, 'patient_user_id', 0 ) ) === $user_id || absint( get_post_field( 'post_author', $id ) ) === $user_id;
 			$is_guardian = absint( SWC_Helpers::meta( $id, 'guardian_user_id', 0 ) ) === $user_id;
 			$is_doctor = absint( SWC_Helpers::meta( $id, 'doctor_id', 0 ) ) === $user_id;
+			$is_proposed_doctor = absint( SWC_Helpers::meta( $id, 'proposed_doctor_id', 0 ) ) === $user_id;
 			$erase_error = null;
 			if ( $is_patient ) {
 				foreach ( array( 'reason','patient_message','phone','whatsapp','country','city' ) as $key ) {
@@ -155,6 +144,7 @@ final class WCA_Privacy {
 			if ( ! $erase_error && $is_patient && absint( SWC_Helpers::meta( $id, 'patient_user_id', 0 ) ) === $user_id ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_patient_user_id', 0, 'wca_privacy_patient_anonymize' ); }
 			if ( ! $erase_error && $is_guardian ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_guardian_user_id', 0, 'wca_privacy_guardian_anonymize' ); }
 			if ( ! $erase_error && $is_doctor ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_doctor_id', 0, 'wca_privacy_doctor_anonymize' ); }
+			if ( ! $erase_error && $is_proposed_doctor ) { $erase_error = SWC_Helpers::update_meta_strict( $id, '_swc_proposed_doctor_id', 0, 'wca_privacy_proposed_doctor_anonymize' ); }
 			if ( ! $erase_error && absint( get_post_field( 'post_author', $id ) ) === $user_id ) {
 				$post_update = wp_update_post( array( 'ID' => $id, 'post_author' => 0 ), true );
 				if ( is_wp_error( $post_update ) || ! $post_update || 0 !== absint( get_post_field( 'post_author', $id ) ) ) { $erase_error = new WP_Error( 'wca_privacy_author_anonymize', __( 'Appointment author identity could not be anonymized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
@@ -237,21 +227,51 @@ final class WCA_Privacy {
 		return array( 'items_removed' => $removed, 'items_retained' => $retained, 'messages' => array_unique( $messages ), 'done' => $done );
 	}
 
+	private static function appointment_ids_page( $user_id, $page, $limit ) {
+		global $wpdb;
+		$user_id = absint( $user_id );
+		$page = max( 1, absint( $page ) );
+		$limit = min( 500, max( 1, absint( $limit ) ) );
+		$offset = ( $page - 1 ) * $limit;
+		$sql = $wpdb->prepare(
+			"SELECT p.ID
+			 FROM {$wpdb->posts} p
+			 WHERE p.post_type=%s
+			   AND p.post_status IN ('private','publish','draft')
+			   AND (p.post_author=%d OR EXISTS (
+			       SELECT 1 FROM {$wpdb->postmeta} pm
+			       WHERE pm.post_id=p.ID
+			         AND pm.meta_key IN ('_swc_patient_user_id','_swc_guardian_user_id','_swc_doctor_id','_swc_proposed_doctor_id')
+			         AND CAST(pm.meta_value AS UNSIGNED)=%d
+			   ))
+			 ORDER BY p.ID ASC LIMIT %d OFFSET %d",
+			SWC_Helpers::TYPE, $user_id, $user_id, $limit, $offset
+		);
+		$wpdb->last_error = '';
+		$raw = $wpdb->get_col( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		if ( null === $raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_privacy_appointment_export_read_failed', __( 'Appointment privacy records could not be read safely for export.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		return array_map( 'absint', (array) $raw );
+	}
+
 	private static function appointment_ids_after( $user_id, $cursor, $limit ) {
 		global $wpdb;
 		$user_id = absint( $user_id );
 		$cursor = absint( $cursor );
 		$limit = min( 500, max( 1, absint( $limit ) ) );
 		$sql = $wpdb->prepare(
-			"SELECT DISTINCT p.ID
+			"SELECT p.ID
 			 FROM {$wpdb->posts} p
-			 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id=p.ID
 			 WHERE p.post_type=%s
 			   AND p.post_status IN ('private','publish','draft')
 			   AND p.ID>%d
-			   AND ((pm.meta_key='_swc_patient_user_id' AND pm.meta_value=%d) OR (pm.meta_key='_swc_guardian_user_id' AND pm.meta_value=%d) OR (pm.meta_key='_swc_doctor_id' AND pm.meta_value=%d))
+			   AND (p.post_author=%d OR EXISTS (
+			       SELECT 1 FROM {$wpdb->postmeta} pm
+			       WHERE pm.post_id=p.ID
+			         AND pm.meta_key IN ('_swc_patient_user_id','_swc_guardian_user_id','_swc_doctor_id','_swc_proposed_doctor_id')
+			         AND CAST(pm.meta_value AS UNSIGNED)=%d
+			   ))
 			 ORDER BY p.ID ASC LIMIT %d",
-			SWC_Helpers::TYPE, $cursor, $user_id, $user_id, $user_id, $limit
+			SWC_Helpers::TYPE, $cursor, $user_id, $user_id, $limit
 		);
 		$wpdb->last_error = '';
 		$raw = $wpdb->get_col( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
