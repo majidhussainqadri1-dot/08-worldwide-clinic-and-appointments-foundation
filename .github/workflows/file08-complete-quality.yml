@@ -2,9 +2,7 @@ name: File 08 Complete Master Plan Quality
 on:
   push:
     branches:
-      - codex/file08-complete-master-plan-1.0.0
-      - codex/file08-new-governing-plans-completion-2026
-      - review/file08-t19-twenty-round-2026-09-06
+      - main
   pull_request:
     branches: [main]
 permissions:
@@ -44,6 +42,7 @@ jobs:
           ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
           test "$(find .github/workflows -maxdepth 1 -type f -name '*.yml' | wc -l | tr -d ' ')" = "1"
           test "$(find .github/scripts -maxdepth 1 -type f -name 't*-correct*.py' 2>/dev/null | wc -l | tr -d ' ')" = "0"
+          test "$(find tools -maxdepth 1 -type f -name 't*-correct*.py' 2>/dev/null | wc -l | tr -d ' ')" = "0"
           test ! -e tools/build-development-candidate.php
           test ! -e tools/verify-development-candidate.php
           test ! -e CHECKSUMS.sha256
