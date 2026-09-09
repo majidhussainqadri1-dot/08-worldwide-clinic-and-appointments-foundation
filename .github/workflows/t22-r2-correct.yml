@@ -20,44 +20,33 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          helper = Path('includes/class-swc-helpers.php')
-          s = helper.read_text()
-          old = "\t\t$defaults = array(\n\t\t\t'actor_role'     => self::actor_role(),"
-          new = "\t\t$defaults = array(\n\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => self::actor_role(),"
-          if old not in s: raise SystemExit('helper defaults anchor missing')
-          s = s.replace(old, new, 1)
-          old = "\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),"
-          new = "\t\t\t'actor_id'       => absint( $args['actor_id'] ),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),"
-          if old not in s: raise SystemExit('helper actor persistence anchor missing')
-          s = s.replace(old, new, 1)
-          helper.write_text(s)
-          service = Path('includes/class-wca-service.php')
-          s = service.read_text()
-          old = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
-          new = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'actor_id' => $actor_user_id, 'actor_role' => $actor, 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
-          if old not in s: raise SystemExit('transition audit anchor missing')
-          s = s.replace(old, new, 1)
-          service.write_text(s)
-          test = Path('tests/t22-r2-audit-actor-provenance-regressions.php')
-          test.write_text("""<?php
-/** T22 R2 permanent regression: explicit lifecycle actor must govern mandatory audit provenance. */
-$root = dirname( __DIR__ ); $failures = array(); $checks = 0;
-function t22r2src( $path ) { global $root, $failures; $file = $root . '/' . $path; if ( ! is_file( $file ) ) { $failures[] = 'Missing ' . $path; return ''; } $source = file_get_contents( $file ); return is_string( $source ) ? $source : ''; }
-function t22r2has( $label, $source, $needle ) { global $failures, $checks; $checks++; if ( false === strpos( $source, $needle ) ) { $failures[] = $label . ' missing: ' . $needle; } }
-$helpers = t22r2src( 'includes/class-swc-helpers.php' ); $service = t22r2src( 'includes/class-wca-service.php' );
-t22r2has( 'audit accepts explicit actor id default', $helpers, "'actor_id'       => get_current_user_id()" );
-t22r2has( 'audit persists caller-selected actor id', $helpers, "'actor_id'       => absint( \$args['actor_id'] )" );
-t22r2has( 'transition passes canonical actor id', $service, "'actor_id' => \$actor_user_id, 'actor_role' => \$actor, 'old_status' => \$current" );
-if ( $failures ) { foreach ( $failures as $failure ) { fwrite( STDERR, "FAIL: {$failure}\n" ); } exit( 1 ); }
-echo "T22 R2 audit actor provenance regressions passed ({$checks} checks).\n";
-""")
-          runner = Path('tests/run-all.php')
-          s = runner.read_text()
-          old = "'t21-r10-candidate-required-payload-regressions.php' );"
-          new = "'t21-r10-candidate-required-payload-regressions.php', 't22-r2-audit-actor-provenance-regressions.php' );"
-          if old not in s: raise SystemExit('run-all anchor missing')
-          runner.write_text(s.replace(old, new, 1))
+          p=Path('includes/class-swc-helpers.php'); s=p.read_text()
+          a="\t\t$defaults = array(\n\t\t\t'actor_role'     => self::actor_role(),"; b="\t\t$defaults = array(\n\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => self::actor_role(),"
+          if a not in s: raise SystemExit('helper defaults anchor missing')
+          s=s.replace(a,b,1)
+          a="\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),"; b="\t\t\t'actor_id'       => absint( $args['actor_id'] ),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),"
+          if a not in s: raise SystemExit('helper actor anchor missing')
+          p.write_text(s.replace(a,b,1))
+          p=Path('includes/class-wca-service.php'); s=p.read_text()
+          a="SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          b="SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'actor_id' => $actor_user_id, 'actor_role' => $actor, 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          if a not in s: raise SystemExit('transition audit anchor missing')
+          p.write_text(s.replace(a,b,1))
+          p=Path('tests/run-all.php'); s=p.read_text(); a="'t21-r10-candidate-required-payload-regressions.php' );"; b="'t21-r10-candidate-required-payload-regressions.php', 't22-r2-audit-actor-provenance-regressions.php' );"
+          if a not in s: raise SystemExit('runner anchor missing')
+          p.write_text(s.replace(a,b,1))
           PY
+          cat > tests/t22-r2-audit-actor-provenance-regressions.php <<'PHP'
+          <?php
+          $root=dirname(__DIR__); $fail=array(); $checks=0;
+          function r2src($p){global $root,$fail;$s=file_get_contents($root.'/'.$p);if(!is_string($s)){$fail[]='missing '.$p;return '';}return $s;}
+          function r2has($l,$s,$n){global $fail,$checks;$checks++;if(false===strpos($s,$n)){$fail[]=$l;}}
+          $h=r2src('includes/class-swc-helpers.php'); $s=r2src('includes/class-wca-service.php');
+          r2has('audit actor default',$h,"'actor_id'       => get_current_user_id()");
+          r2has('audit explicit actor persistence',$h,"'actor_id'       => absint( \$args['actor_id'] )");
+          r2has('transition canonical actor audit',$s,"'actor_id' => \$actor_user_id, 'actor_role' => \$actor, 'old_status' => \$current");
+          if($fail){foreach($fail as $f){fwrite(STDERR,"FAIL: $f\n");}exit(1);} echo "T22 R2 actor provenance regressions passed ($checks checks).\n";
+          PHP
           php -l includes/class-swc-helpers.php
           php -l includes/class-wca-service.php
           php -l tests/t22-r2-audit-actor-provenance-regressions.php
