@@ -1,1 +1,1 @@
-Temporary trigger for the already-frozen T22 R2 correction executor. Corrected executor retry; this file is removed in the same correction batch.
+Temporary trigger for the already-frozen T22 R2 correction executor. Final self-clean ordering retry; removed by the correction batch.
