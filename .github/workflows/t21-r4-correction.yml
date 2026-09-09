@@ -1,0 +1,42 @@
+name: File 08 T21 R4 Frozen Ledger Correction
+
+on:
+  push:
+    branches:
+      - review/file08-t21-ten-round-2026-09-09
+    paths:
+      - .github/scripts/t21-r4-fix.py
+      - .github/workflows/t21-r4-correction.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-frozen-ledger-correction:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: review/file08-t21-ten-round-2026-09-09
+          fetch-depth: 0
+
+      - name: Apply frozen R4 correction
+        run: python3 .github/scripts/t21-r4-fix.py
+
+      - name: Run R4 regression and canonical source suite
+        run: |
+          php -d display_errors=1 -d error_reporting=E_ALL tests/t21-r4-calendar-provider-uncertain-rollback-regressions.php
+          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php
+
+      - name: Commit corrected source and permanent regression
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-wca-calendar-link.php tests/run-all.php tests/t21-r4-calendar-provider-uncertain-rollback-regressions.php
+          if git diff --cached --quiet; then
+            echo "No correction changes produced" >&2
+            exit 1
+          fi
+          git commit -m "fix(file08): retain calendar-provider idempotency on uncertain rollback"
+          git push origin HEAD:review/file08-t21-ten-round-2026-09-09
