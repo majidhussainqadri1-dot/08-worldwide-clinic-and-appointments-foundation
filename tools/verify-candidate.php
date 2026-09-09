@@ -94,6 +94,12 @@ foreach ( (array) ( $manifest['files'] ?? array() ) as $file ) {
 		fwrite( STDERR, "Payload verification failed: {$path}\n" ); exit( 9 );
 	}
 }
+foreach ( array( 'worldwide-clinic.php', 'readme.txt', 'uninstall.php' ) as $requiredPath ) {
+	if ( empty( $manifestPaths[ $requiredPath ] ) || empty( $seen[ $prefix . $requiredPath ] ) ) {
+		fwrite( STDERR, "Required candidate payload is missing: {$requiredPath}\n" );
+		exit( 9 );
+	}
+}
 ksort( $expectedEntries, SORT_STRING );
 ksort( $seen, SORT_STRING );
 if ( array_keys( $expectedEntries ) !== array_keys( $seen ) ) {
