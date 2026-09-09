@@ -9,6 +9,8 @@ sort( $workflow_names, SORT_STRING );
 r20_check( 'single canonical workflow', array( 'file08-complete-quality.yml' ) === $workflow_names );
 $scripts = glob( $root . '/.github/scripts/*' );
 r20_check( 'historical correction script surface retired', ! is_array( $scripts ) || 0 === count( $scripts ) );
+$tool_corrections = glob( $root . '/tools/t*-correct*.py' );
+r20_check( 'historical correction tools retired from active tools namespace', ! is_array( $tool_corrections ) || 0 === count( $tool_corrections ) );
 r20_check( 'obsolete development builder retired', ! is_file( $root . '/tools/build-development-candidate.php' ) );
 r20_check( 'obsolete development verifier retired', ! is_file( $root . '/tools/verify-development-candidate.php' ) );
 r20_check( 'ambiguous root original checksums retired', ! is_file( $root . '/CHECKSUMS.sha256' ) );
@@ -48,6 +50,9 @@ r20_check(
 );
 r20_check( 'canonical workflow enforces one workflow', false !== strpos( $workflow, 'find .github/workflows -maxdepth 1' ) );
 r20_check( 'canonical workflow rejects obsolete development builder', false !== strpos( $workflow, 'test ! -e tools/build-development-candidate.php' ) );
+r20_check( 'canonical workflow rejects active correction tools', false !== strpos( $workflow, "find tools -maxdepth 1 -type f -name 't*-correct*.py'") );
+r20_check( 'canonical workflow verifies main pushes', false !== strpos( $workflow, "branches:\n      - main") );
+r20_check( 'canonical workflow no longer carries historical T19 push trigger', false === strpos( $workflow, 'review/file08-t19-twenty-round-2026-09-06' ) );
 r20_check( 'local deterministic build output ignored', false !== strpos( $ignore, "build/\n" ) );
 if ( $failures ) { fwrite( STDERR, "T19 R20 closure hygiene failed:\n- " . implode( "\n- ", $failures ) . "\n" ); exit( 1 ); }
 echo "T19 R20 closure-hygiene regressions: PASS {$checks}/{$checks}.\n";
