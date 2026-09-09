@@ -434,7 +434,7 @@ final class WCA_Schema {
 				}
 			}
 			$expected_columns[ strtolower( $col[1] ) ] = array(
-				'type'        => self::normalize_schema_type( $col[2] ),
+				'type'        => self::normalize_schema_type( $col[2] . ( preg_match( '/^\s*unsigned\b/i', $tail ) ? ' unsigned' : '' ) ),
 				'null'        => preg_match( '/\bNOT\s+NULL\b/i', $tail ) ? 'NO' : 'YES',
 				'has_default' => $has_default,
 				'default'     => $default,
