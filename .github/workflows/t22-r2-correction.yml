@@ -9,8 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  correct-r2:
-    if: ${{ !contains(github.event.head_commit.message, '[r2-fix]') }}
+  correct:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,56 +24,69 @@ jobs:
 
           helper = Path('includes/class-swc-helpers.php')
           h = helper.read_text()
-          anchors = [
+          replacements = [
               ("\t\tglobal $wpdb;\n\t\t$defaults = array(\n\t\t\t'actor_role'     => self::actor_role(),",
                "\t\tglobal $wpdb;\n\t\t$ambient_actor_id = absint( get_current_user_id() );\n\t\t$defaults = array(\n\t\t\t'actor_id'       => $ambient_actor_id,\n\t\t\t'actor_role'     => '',"),
               ("\t\t$args = wp_parse_args( $args, $defaults );\n\t\t$data = array(\n\t\t\t'appointment_id' => absint( $appointment ),\n\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),",
-               "\t\t$args = wp_parse_args( $args, $defaults );\n\t\t$actor_id = absint( $args['actor_id'] );\n\t\t$actor_role = sanitize_key( $args['actor_role'] );\n\t\tif ( '' === $actor_role ) { $actor_role = self::actor_role( $actor_id ); }\n\t\t$data = array(\n\t\t\t'appointment_id' => absint( $appointment ),\n\t\t\t'actor_id'       => $actor_id,\n\t\t\t'actor_role'     => $actor_role,"),
+               "\t\t$args = wp_parse_args( $args, $defaults );\n\t\t$actor_id = absint( $args['actor_id'] );\n\t\t$actor_role = sanitize_key( $args['actor_role'] );\n\t\tif ( '' === $actor_role ) {\n\t\t\t$actor_role = self::actor_role( $actor_id );\n\t\t}\n\t\t$data = array(\n\t\t\t'appointment_id' => absint( $appointment ),\n\t\t\t'actor_id'       => $actor_id,\n\t\t\t'actor_role'     => $actor_role,"),
               ("\tprivate static function actor_role() {\n\t\tif ( current_user_can( 'manage_worldwide_clinic' ) ) {\n\t\t\treturn 'admin';\n\t\t}\n\t\tif ( self::is_verified_doctor( get_current_user_id() ) ) {\n\t\t\treturn 'doctor';\n\t\t}\n\t\treturn is_user_logged_in() ? 'patient' : 'system';\n\t}",
                "\tprivate static function actor_role( $user_id = 0 ) {\n\t\t$user_id = absint( $user_id );\n\t\tif ( $user_id && user_can( $user_id, 'manage_worldwide_clinic' ) ) {\n\t\t\treturn 'admin';\n\t\t}\n\t\tif ( $user_id && self::is_verified_doctor( $user_id ) ) {\n\t\t\treturn 'doctor';\n\t\t}\n\t\treturn $user_id ? 'patient' : 'system';\n\t}")
           ]
-          for old, new in anchors:
-              if old not in h: raise SystemExit('helper anchor missing: ' + old[:50])
+          for old, new in replacements:
+              if old not in h:
+                  raise SystemExit('helper anchor missing')
               h = h.replace(old, new, 1)
           helper.write_text(h)
 
           service = Path('includes/class-wca-service.php')
           s = service.read_text()
-          old = "array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) )"
-          new = "array( 'actor_id' => $actor_user_id, 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) )"
-          marker = "SWC_Helpers::audit( $appointment_id, 'wca-transition', " + old
-          if marker not in s: raise SystemExit('service transition audit anchor missing')
-          service.write_text(s.replace(marker, "SWC_Helpers::audit( $appointment_id, 'wca-transition', " + new, 1))
+          old = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          new = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'actor_id' => $actor_user_id, 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          if old not in s:
+              raise SystemExit('service transition audit anchor missing')
+          service.write_text(s.replace(old, new, 1))
 
-          Path('tests/t22-r2-audit-actor-provenance-regressions.php').write_text(r'''<?php
+          test = Path('tests/t22-r2-audit-actor-provenance-regressions.php')
+          test.write_text(r'''<?php
 $root = dirname( __DIR__ );
 $helper = file_get_contents( $root . '/includes/class-swc-helpers.php' );
 $service = file_get_contents( $root . '/includes/class-wca-service.php' );
-if ( false === $helper || false === $service ) { fwrite( STDERR, "T22 R2 source unavailable.\n" ); exit( 1 ); }
+if ( false === $helper || false === $service ) {
+    fwrite( STDERR, "T22 R2 source unavailable.\n" );
+    exit( 1 );
+}
 $checks = array(
     'audit supports explicit actor id' => false !== strpos( $helper, "'actor_id'       => $ambient_actor_id" ),
     'audit persists resolved actor id' => false !== strpos( $helper, "'actor_id'       => $actor_id" ),
     'actor role derives from explicit actor' => false !== strpos( $helper, 'private static function actor_role( $user_id = 0 )' ) && false !== strpos( $helper, "user_can( $user_id, 'manage_worldwide_clinic' )" ),
     'transition audit passes canonical explicit actor' => false !== strpos( $service, "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'actor_id' => $actor_user_id" ),
 );
-foreach ( $checks as $label => $ok ) { if ( ! $ok ) { fwrite( STDERR, "T22 R2 regression failed: {$label}\n" ); exit( 1 ); } }
+foreach ( $checks as $label => $ok ) {
+    if ( ! $ok ) {
+        fwrite( STDERR, "T22 R2 regression failed: {$label}\n" );
+        exit( 1 );
+    }
+}
 echo "T22 R2 audit actor provenance regressions passed.\n";
 ''')
 
           runner = Path('tests/run-all.php')
           r = runner.read_text()
           needle = "'t21-r10-candidate-required-payload-regressions.php' );"
-          if needle not in r: raise SystemExit('run-all anchor missing')
+          if needle not in r:
+              raise SystemExit('run-all anchor missing')
           runner.write_text(r.replace(needle, "'t21-r10-candidate-required-payload-regressions.php', 't22-r2-audit-actor-provenance-regressions.php' );", 1))
           PY
           php -l includes/class-swc-helpers.php
           php -l includes/class-wca-service.php
           php -l tests/t22-r2-audit-actor-provenance-regressions.php
-      - name: Commit correction batch
+          php tests/t22-r2-audit-actor-provenance-regressions.php
+      - name: Commit correction and remove executor
         shell: bash
         run: |
           git config user.name "File 08 Review Automation"
           git config user.email "actions@users.noreply.github.com"
           git add includes/class-swc-helpers.php includes/class-wca-service.php tests/t22-r2-audit-actor-provenance-regressions.php tests/run-all.php
+          git rm .github/workflows/t22-r2-correction.yml
           git commit -m "fix(file08): close T22 R2 actor provenance defect [r2-fix]"
           git push origin HEAD:review/file08-t21-ten-round-2026-09-09
