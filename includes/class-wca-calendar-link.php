@@ -101,7 +101,17 @@ final class WCA_Calendar_Link {
 			if ( ! WCA_Repository::complete_idempotency( $claim['id'], 202, $response ) ) { return new WP_Error( 'wca_calendar_webhook_finalize', __( 'Calendar provider reconciliation could not be finalized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			return $response;
 		}, 'wca_calendar_provider_webhook_transaction' );
-		if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); return $result; }
+		if ( is_wp_error( $result ) ) {
+			$error_data = $result->get_error_data();
+			$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );
+			if ( ! $state_uncertain ) {
+				WCA_Repository::release_idempotency( $claim['id'] );
+			} else {
+				WCA_Observability::metric( 'calendar_provider_webhook_uncertain_idempotency_retained_total', 1, array( 'provider' => $provider ) );
+				WCA_Observability::log( 'error', 'calendar_provider_webhook_transaction_state_uncertain', array( 'provider' => $provider, 'event_id' => $event_id, 'idempotency_reservation_id' => absint( $claim['id'] ) ) );
+			}
+			return $result;
+		}
 		$response = rest_ensure_response( $result );
 		$response->set_status( 202 );
 		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
