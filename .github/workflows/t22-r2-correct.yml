@@ -47,13 +47,13 @@ jobs:
           r2has('transition canonical actor audit',$s,"'actor_id' => \$actor_user_id, 'actor_role' => \$actor, 'old_status' => \$current");
           if($fail){foreach($fail as $f){fwrite(STDERR,"FAIL: $f\n");}exit(1);} echo "T22 R2 actor provenance regressions passed ($checks checks).\n";
           PHP
+          rm .github/workflows/t22-r2-correct.yml
+          rm -f docs/T22-R2-CORRECTION-TRIGGER.md
           php -l includes/class-swc-helpers.php
           php -l includes/class-wca-service.php
           php -l tests/t22-r2-audit-actor-provenance-regressions.php
           php tests/t22-r2-audit-actor-provenance-regressions.php
           php tests/run-all.php
-          rm .github/workflows/t22-r2-correct.yml
-          rm -f docs/T22-R2-CORRECTION-TRIGGER.md
       - name: Commit frozen correction batch
         shell: bash
         run: |
