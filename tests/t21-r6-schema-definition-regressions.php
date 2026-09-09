@@ -12,6 +12,7 @@ $checks = array(
     'column extra verification' => 'wca_schema_column_extra_mismatch',
     'index uniqueness verification' => 'wca_schema_index_uniqueness_mismatch',
     'index ordered-column verification' => 'wca_schema_index_columns_mismatch',
+    'unsigned type preservation' => "preg_match( '/^\\s*unsigned\\b/i', $tail )",
 );
 foreach ( $checks as $label => $needle ) {
     if ( false === strpos( $schema, $needle ) ) {
