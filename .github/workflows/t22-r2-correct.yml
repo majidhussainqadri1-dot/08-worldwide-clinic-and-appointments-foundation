@@ -46,20 +46,20 @@ jobs:
 
           test = Path('tests/t22-r2-audit-actor-provenance-regressions.php')
           test.write_text("""<?php
-          /** T22 R2 permanent regression: explicit lifecycle actor must govern mandatory audit provenance. */
-          $root = dirname( __DIR__ );
-          $failures = array();
-          $checks = 0;
-          function t22r2src( $path ) { global $root, $failures; $file = $root . '/' . $path; if ( ! is_file( $file ) ) { $failures[] = 'Missing ' . $path; return ''; } $source = file_get_contents( $file ); return is_string( $source ) ? $source : ''; }
-          function t22r2has( $label, $source, $needle ) { global $failures, $checks; $checks++; if ( false === strpos( $source, $needle ) ) { $failures[] = $label . ' missing: ' . $needle; } }
-          $helpers = t22r2src( 'includes/class-swc-helpers.php' );
-          $service = t22r2src( 'includes/class-wca-service.php' );
-          t22r2has( 'audit accepts explicit actor id default', $helpers, "'actor_id'       => get_current_user_id()" );
-          t22r2has( 'audit persists caller-selected actor id', $helpers, "'actor_id'       => absint( $args['actor_id'] )" );
-          t22r2has( 'transition passes canonical actor id', $service, "'actor_id' => $actor_user_id, 'actor_role' => $actor, 'old_status' => $current" );
-          if ( $failures ) { foreach ( $failures as $failure ) { fwrite( STDERR, "FAIL: {$failure}\n" ); } exit( 1 ); }
-          echo "T22 R2 audit actor provenance regressions passed ({$checks} checks).\n";
-          """)
+/** T22 R2 permanent regression: explicit lifecycle actor must govern mandatory audit provenance. */
+$root = dirname( __DIR__ );
+$failures = array();
+$checks = 0;
+function t22r2src( $path ) { global $root, $failures; $file = $root . '/' . $path; if ( ! is_file( $file ) ) { $failures[] = 'Missing ' . $path; return ''; } $source = file_get_contents( $file ); return is_string( $source ) ? $source : ''; }
+function t22r2has( $label, $source, $needle ) { global $failures, $checks; $checks++; if ( false === strpos( $source, $needle ) ) { $failures[] = $label . ' missing: ' . $needle; } }
+$helpers = t22r2src( 'includes/class-swc-helpers.php' );
+$service = t22r2src( 'includes/class-wca-service.php' );
+t22r2has( 'audit accepts explicit actor id default', $helpers, "'actor_id'       => get_current_user_id()" );
+t22r2has( 'audit persists caller-selected actor id', $helpers, "'actor_id'       => absint( \$args['actor_id'] )" );
+t22r2has( 'transition passes canonical actor id', $service, "'actor_id' => \$actor_user_id, 'actor_role' => \$actor, 'old_status' => \$current" );
+if ( $failures ) { foreach ( $failures as $failure ) { fwrite( STDERR, "FAIL: {$failure}\n" ); } exit( 1 ); }
+echo "T22 R2 audit actor provenance regressions passed ({$checks} checks).\n";
+""")
 
           runner = Path('tests/run-all.php')
           s = runner.read_text()
