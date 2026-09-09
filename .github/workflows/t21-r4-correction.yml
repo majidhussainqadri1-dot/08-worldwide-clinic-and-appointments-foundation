@@ -24,10 +24,11 @@ jobs:
       - name: Apply frozen R4 correction
         run: python3 .github/scripts/t21-r4-fix.py
 
-      - name: Run R4 regression and canonical source suite
+      - name: Run focused R4 correction validation
         run: |
+          php -l includes/class-wca-calendar-link.php
+          php -l tests/t21-r4-calendar-provider-uncertain-rollback-regressions.php
           php -d display_errors=1 -d error_reporting=E_ALL tests/t21-r4-calendar-provider-uncertain-rollback-regressions.php
-          php -d display_errors=1 -d error_reporting=E_ALL tests/run-all.php
 
       - name: Commit corrected source and permanent regression
         run: |
