@@ -1,0 +1,69 @@
+name: T22 R2 correction
+
+on:
+  push:
+    branches:
+      - review/file08-t21-ten-round-2026-09-09
+
+permissions:
+  contents: write
+
+jobs:
+  correct-r2:
+    if: ${{ !contains(github.event.head_commit.message, '[r2-fix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/file08-t21-ten-round-2026-09-09
+          fetch-depth: 0
+      - name: Apply frozen R2 correction batch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          helper = Path('includes/class-swc-helpers.php')
+          text = helper.read_text()
+          old = """\tpublic static function audit( $appointment, $event, $args = array() ) {\n\t\tglobal $wpdb;\n\t\t$defaults = array(\n\t\t\t'actor_role'     => self::actor_role(),\n\t\t\t'old_status'     => '',\n\t\t\t'new_status'     => '',\n\t\t\t'old_doctor_id'  => 0,\n\t\t\t'new_doctor_id'  => 0,\n\t\t\t'source'         => 'web',\n\t\t\t'reason'         => '',\n\t\t\t'details'        => array(),\n\t\t);\n\t\t$args = wp_parse_args( $args, $defaults );\n\t\t$data = array(\n\t\t\t'appointment_id' => absint( $appointment ),\n\t\t\t'actor_id'       => get_current_user_id(),\n\t\t\t'actor_role'     => sanitize_key( $args['actor_role'] ),\n"""
+          new = """\tpublic static function audit( $appointment, $event, $args = array() ) {\n\t\tglobal $wpdb;\n\t\t$ambient_actor_id = absint( get_current_user_id() );\n\t\t$defaults = array(\n\t\t\t'actor_id'       => $ambient_actor_id,\n\t\t\t'actor_role'     => '',\n\t\t\t'old_status'     => '',\n\t\t\t'new_status'     => '',\n\t\t\t'old_doctor_id'  => 0,\n\t\t\t'new_doctor_id'  => 0,\n\t\t\t'source'         => 'web',\n\t\t\t'reason'         => '',\n\t\t\t'details'        => array(),\n\t\t);\n\t\t$args = wp_parse_args( $args, $defaults );\n\t\t$actor_id = absint( $args['actor_id'] );\n\t\t$actor_role = sanitize_key( $args['actor_role'] );\n\t\tif ( '' === $actor_role ) { $actor_role = self::actor_role( $actor_id ); }\n\t\t$data = array(\n\t\t\t'appointment_id' => absint( $appointment ),\n\t\t\t'actor_id'       => $actor_id,\n\t\t\t'actor_role'     => $actor_role,\n"""
+          if old not in text:
+              raise SystemExit('helper audit anchor not found')
+          text = text.replace(old, new, 1)
+          old_role = """\tprivate static function actor_role() {\n\t\tif ( current_user_can( 'manage_worldwide_clinic' ) ) {\n\t\t\treturn 'admin';\n\t\t}\n\t\tif ( self::is_verified_doctor( get_current_user_id() ) ) {\n\t\t\treturn 'doctor';\n\t\t}\n\t\treturn is_user_logged_in() ? 'patient' : 'system';\n\t}\n"""
+          new_role = """\tprivate static function actor_role( $user_id = 0 ) {\n\t\t$user_id = absint( $user_id );\n\t\tif ( $user_id && user_can( $user_id, 'manage_worldwide_clinic' ) ) {\n\t\t\treturn 'admin';\n\t\t}\n\t\tif ( $user_id && self::is_verified_doctor( $user_id ) ) {\n\t\t\treturn 'doctor';\n\t\t}\n\t\treturn $user_id ? 'patient' : 'system';\n\t}\n"""
+          if old_role not in text:
+              raise SystemExit('helper actor_role anchor not found')
+          helper.write_text(text.replace(old_role, new_role, 1))
+
+          service = Path('includes/class-wca-service.php')
+          text = service.read_text()
+          old_call = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          new_call = "SWC_Helpers::audit( $appointment_id, 'wca-transition', array( 'actor_id' => $actor_user_id, 'old_status' => $current, 'new_status' => $next, 'reason' => sanitize_text_field( $data['reason_code'] ?? '' ), 'details' => array( 'trace_id' => $trace ) ) )"
+          if old_call not in text:
+              raise SystemExit('service audit anchor not found')
+          service.write_text(text.replace(old_call, new_call, 1))
+
+          test = Path('tests/t22-r2-audit-actor-provenance-regressions.php')
+          test.write_text("""<?php\n$root = dirname( __DIR__ );\n$helper = file_get_contents( $root . '/includes/class-swc-helpers.php' );\n$service = file_get_contents( $root . '/includes/class-wca-service.php' );\nif ( false === $helper || false === $service ) { fwrite( STDERR, \"T22 R2 source unavailable.\\n\" ); exit( 1 ); }\n$checks = array(\n    'audit supports explicit actor id' => false !== strpos( $helper, \"'actor_id'       => \\$ambient_actor_id\" ),\n    'audit persists resolved actor id' => false !== strpos( $helper, \"'actor_id'       => \\$actor_id\" ),\n    'actor role is resolved for explicit actor' => false !== strpos( $helper, 'private static function actor_role( $user_id = 0 )' ) && false !== strpos( $helper, \"user_can( \\$user_id, 'manage_worldwide_clinic' )\" ),\n    'transition audit passes canonical explicit actor' => false !== strpos( $service, \"SWC_Helpers::audit( \\$appointment_id, 'wca-transition', array( 'actor_id' => \\$actor_user_id\" ),\n);\nforeach ( $checks as $label => $ok ) { if ( ! $ok ) { fwrite( STDERR, \"T22 R2 regression failed: {$label}\\n\" ); exit( 1 ); } }\necho \"T22 R2 audit actor provenance regressions passed.\\n\";\n""")
+
+          runner = Path('tests/run-all.php')
+          text = runner.read_text()
+          needle = "'t21-r10-candidate-required-payload-regressions.php' );"
+          repl = "'t21-r10-candidate-required-payload-regressions.php', 't22-r2-audit-actor-provenance-regressions.php' );"
+          if needle not in text:
+              raise SystemExit('run-all anchor not found')
+          runner.write_text(text.replace(needle, repl, 1))
+          PY
+          php -l includes/class-swc-helpers.php
+          php -l includes/class-wca-service.php
+          php tests/t22-r2-audit-actor-provenance-regressions.php
+          php tests/run-all.php
+      - name: Commit correction batch
+        shell: bash
+        run: |
+          git config user.name "File 08 Review Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add includes/class-swc-helpers.php includes/class-wca-service.php tests/t22-r2-audit-actor-provenance-regressions.php tests/run-all.php
+          git commit -m "fix(file08): close T22 R2 actor provenance defect [r2-fix]"
+          git push origin HEAD:review/file08-t21-ten-round-2026-09-09
