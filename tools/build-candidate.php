@@ -79,7 +79,13 @@ $checksumPath = rtrim( $out, '/' ) . '/' . $base . '.sha256';
 $allowRoots = array( 'assets','includes','languages','templates' );
 $allowFiles = array( 'worldwide-clinic.php','readme.txt','uninstall.php' );
 $files = array();
-foreach ( $allowFiles as $file ) { if ( is_file( $root . '/' . $file ) ) { $files[] = $file; } }
+foreach ( $allowFiles as $file ) {
+	if ( ! is_file( $root . '/' . $file ) ) {
+		fwrite( STDERR, "Required candidate file is missing: {$file}\n" );
+		exit( 3 );
+	}
+	$files[] = $file;
+}
 foreach ( $allowRoots as $dir ) {
 	if ( ! is_dir( $root . '/' . $dir ) ) { continue; }
 	$it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root . '/' . $dir, FilesystemIterator::SKIP_DOTS ) );
