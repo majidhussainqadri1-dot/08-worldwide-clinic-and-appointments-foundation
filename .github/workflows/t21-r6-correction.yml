@@ -1,0 +1,33 @@
+name: T21 R6 temporary correction
+
+on:
+  push:
+    branches:
+      - review/file08-t21-ten-round-2026-09-09
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/file08-t21-ten-round-2026-09-09
+          fetch-depth: 0
+      - name: Apply frozen R6 correction
+        run: python3 tools/t21-r6-correct.py
+      - name: Run permanent R6 regression
+        run: php tests/t21-r6-schema-definition-regressions.php
+      - name: Commit correction when needed
+        run: |
+          if git diff --quiet; then
+            echo "No correction diff remains."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add includes/class-wca-schema.php
+          git commit -m "T21 R6: verify full schema structure before version advance"
+          git push origin HEAD:review/file08-t21-ten-round-2026-09-09
