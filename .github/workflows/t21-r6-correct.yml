@@ -15,7 +15,7 @@ jobs:
           ref: review/file08-t21-ten-round-2026-09-09
           fetch-depth: 0
       - name: Apply frozen R6-D1 correction
-        shell: python
+        shell: python {0}
         run: |
           from pathlib import Path
           import re
@@ -78,7 +78,7 @@ jobs:
 \t\t\tif ( $expected['type'] !== $normalize_type( $actual['Type'] ?? '' ) ) { return new WP_Error( 'wca_schema_column_type_mismatch', __( 'File 08 schema verification found a column type mismatch.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'column' => $name ) ); }
 \t\t\tif ( $expected['nullable'] !== ( 'YES' === strtoupper( (string) ( $actual['Null'] ?? '' ) ) ) ) { return new WP_Error( 'wca_schema_column_nullability_mismatch', __( 'File 08 schema verification found a column nullability mismatch.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'column' => $name ) ); }
 \t\t\tif ( $expected['has_default'] && $normalize_default( $expected['default'] ) !== $normalize_default( $actual['Default'] ?? null ) ) { return new WP_Error( 'wca_schema_column_default_mismatch', __( 'File 08 schema verification found a column default mismatch.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'column' => $name ) ); }
-\t\t\tif ( $expected['extra'] !== strtolower( trim( (string) ( $actual['Extra'] ?? '' ) ) ) ) { return new WP_Error( 'wca_schema_column_extra_mismatch', __( 'File 08 schema verification found a column extra-attribute mismatch.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'column' => $name ) ); }
+\t\t\tif ( $expected['extra'] !== strtolower( trim( (string) ( $actual['Extra'] ?? '' ) ) ) { return new WP_Error( 'wca_schema_column_extra_mismatch', __( 'File 08 schema verification found a column extra-attribute mismatch.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'column' => $name ) ); }
 \t\t}
 \t\t$wpdb->last_error = '';
 \t\t$indexes_raw = $wpdb->get_results( 'SHOW INDEX FROM `' . esc_sql( $table ) . '`', ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
