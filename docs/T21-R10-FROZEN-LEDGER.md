@@ -24,13 +24,13 @@ PR #10 described R8 as exact-head retest in progress and said R9 must not begin,
 
 Impact: the governing progress surface contradicted current repository/CI evidence. This was evidence/documentation drift only; no runtime/live defect was claimed.
 
-Correction: PR #10 was updated after R10 exact-head verification with the complete T21 result and exact evidence.
+Correction: PR #10 is to carry the complete T21 result and final external exact-head evidence after the branch head containing this closure note passes canonical QA.
 
-## Exact-head closure
+## Correction verification before closure-note commit
 
-Final R10 exact HEAD: `7ac12c25a1898217e03eb6c1121ce53f0dbe528b`
+The R10 implementation/test correction candidate `7ac12c25a1898217e03eb6c1121ce53f0dbe528b` passed canonical run `34373622092`: PHP 7.4/source contracts, PHP 8.3/source contracts, JavaScript syntax, repository hygiene, deterministic double-build, independent candidate verification and artifact upload all passed.
 
-Canonical run: `34373622092` — completed successfully on that exact HEAD. PHP 7.4/source contracts, PHP 8.3/source contracts, JavaScript syntax, repository hygiene, deterministic double-build, independent candidate verification and artifact upload all passed.
+Because this closure ledger itself is tracked repository content, final T21 exact-head evidence must be taken from the canonical run on the branch head that contains this note. That final SHA/run is recorded on PR #10 rather than embedded here, avoiding a self-referential commit identity.
 
 ## T21 ten-round result
 
@@ -49,6 +49,6 @@ Clean rounds: **2/10 = 20%**. The project stopping threshold requires **more tha
 
 ## Classification
 
-R10 is **CLOSED / defect-bearing / exact-head automated-QA green** with **2 proven defects corrected**. T21 is complete at repository/source review level only.
+R10 is **defect-bearing with both frozen defects corrected**. Formal exact-head closure is established only by the canonical QA run on the final branch head containing this ledger note. T21 is repository/source review evidence only.
 
 Staging acceptance, deployed/live parity, production DB/schema, executed migration state and live behavior remain separate unverified evidence domains.
