@@ -18,6 +18,21 @@ jobs:
           fetch-depth: 0
       - name: Apply frozen R6 correction
         run: python3 tools/t21-r6-correct.py
+      - name: Preserve unsigned type modifiers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('includes/class-wca-schema.php')
+          s = p.read_text(encoding='utf-8')
+          old = "\t\t\t\t'type'        => self::normalize_schema_type( $col[2] ),"
+          new = "\t\t\t\t'type'        => self::normalize_schema_type( $col[2] . ( preg_match( '/^\\s*unsigned\\b/i', $tail ) ? ' unsigned' : '' ) ),"
+          if old not in s:
+              if new not in s:
+                  raise SystemExit('unsigned type patch anchor missing')
+          else:
+              s = s.replace(old, new, 1)
+              p.write_text(s, encoding='utf-8')
+          PY
       - name: Run permanent R6 regression
         run: php tests/t21-r6-schema-definition-regressions.php
       - name: Commit correction when needed
