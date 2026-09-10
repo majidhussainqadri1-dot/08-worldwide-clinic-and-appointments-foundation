@@ -20,6 +20,14 @@
 		return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);
 	}
 
+	function localDateValue(date) {
+		date = date || new Date();
+		var year = date.getFullYear();
+		var month = String(date.getMonth() + 1).padStart(2, '0');
+		var day = String(date.getDate()).padStart(2, '0');
+		return year + '-' + month + '-' + day;
+	}
+
 	async function api(path, options) {
 		options = options || {};
 		var headers = Object.assign({'Accept': 'application/json'}, options.headers || {});
@@ -85,7 +93,15 @@
 		if (tz) {
 			try {
 				var browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-				if (browserTimezone) tz.value = browserTimezone;
+				if (browserTimezone) {
+					tz.value = browserTimezone;
+					var dateFrom = form.elements.date_from;
+					var browserDate = localDateValue(new Date());
+					if (dateFrom) {
+						dateFrom.value = browserDate;
+						dateFrom.min = browserDate;
+					}
+				}
 			} catch (e) {}
 		}
 
@@ -210,7 +226,8 @@
 		Array.prototype.forEach.call(card.querySelectorAll('[data-wca-transition]'), function (button) {
 			button.addEventListener('click', async function () {
 				var next = button.dataset.wcaTransition;
-				if (!window.confirm(tr('Continue with') + ' “' + next.replace(/_/g, ' ') + '”?')) return;
+				var actionLabel = String(button.textContent || '').trim() || tr('this appointment change');
+				if (!window.confirm(tr('Continue with') + ' “' + actionLabel + '”?')) return;
 				button.disabled = true;
 				try {
 					var result = await api('appointment-refs/' + encodeURIComponent(ref) + '/transitions', {method: 'POST', body: JSON.stringify({
@@ -222,7 +239,7 @@
 					})});
 					card.dataset.wcaStatus = result.status;
 					card.dataset.wcaVersion = result.version || result.record_version || card.dataset.wcaVersion;
-					setStatus(card, tr('Appointment updated to') + ' ' + result.status.replace(/_/g, ' ') + '.', false);
+					setStatus(card, 'Appointment updated successfully.', false);
 					window.setTimeout(function () { window.location.reload(); }, 700);
 				} catch (error) { setStatus(card, error.message, true); button.disabled = false; }
 			});
