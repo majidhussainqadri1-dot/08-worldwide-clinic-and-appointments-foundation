@@ -11,7 +11,7 @@ $checks = array(
     'patient projection consumes stored timezone' => false !== strpos( $front, "'timezone'] ?? 'UTC'" ) && false !== strpos( $front, 'appointment_time_label( ' . '$when, $timezone' . ' )' ),
     'legacy detail card consumes stored patient timezone' => false !== strpos( $front, "'patient_timezone', 'UTC'" ),
     'timezone projection validates IANA timezone' => false !== strpos( $front, 'WCA_Service::valid_timezone( ' . '$timezone' . ' )' ),
-    'timezone projection converts from canonical UTC' => false !== strpos( $front, "new DateTimeZone( 'UTC' )" ) && false !== strpos( $front, 'setTimezone( ' . '$target' . ' )'),
+    'timezone projection converts canonical UTC using locale-aware target timezone' => false !== strpos( $front, "new DateTimeZone( 'UTC' )" ) && false !== strpos( $front, 'new DateTimeZone( $timezone )' ) && false !== strpos( $front, "wp_date( 'F j, Y g:i a', \$moment->getTimestamp(), \$target )" ),
     'site-timezone get_date_from_gmt appointment rendering retired' => false === strpos( $front, 'get_date_from_gmt( ' . '$when' ),
 );
 foreach ( $checks as $name => $ok ) { if ( ! $ok ) { fwrite( STDERR, "T19 R18 FAIL: {$name}\n" ); exit( 1 ); } }
