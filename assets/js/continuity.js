@@ -111,6 +111,20 @@
     return out;
   }
 
+  function intakeFieldLabel(name) {
+    var labels = {
+      reason: tr('Reason for visit'),
+      category: tr('Category'),
+      symptoms_summary: tr('Short symptom summary'),
+      medications_summary: tr('Current medicines summary'),
+      allergies_summary: tr('Allergies or sensitivities'),
+      accessibility_needs: tr('Accessibility or communication needs'),
+      preferred_language: tr('Preferred language'),
+      notes: tr('Other necessary pre-visit notes')
+    };
+    return labels[name] || tr('Additional information');
+  }
+
   function setField(form, name, value) {
     var field = form.querySelector('[name="' + name + '"]');
     if (field && typeof value !== 'undefined' && value !== null) {
@@ -143,7 +157,7 @@
             if (!data.payload[name]) return;
             var row = document.createElement('div');
             var strong = document.createElement('strong');
-            strong.textContent = name.replace(/_/g, ' ') + ': ';
+            strong.textContent = intakeFieldLabel(name) + ': ';
             row.appendChild(strong);
             row.appendChild(document.createTextNode(String(data.payload[name])));
             target.appendChild(row);
@@ -302,7 +316,7 @@
       privacy_notice: tr('Current privacy notice'),
       followup: tr('Follow-up plan and reminders')
     };
-    return labels[scope] || scope.replace(/_/g, ' ');
+    return labels[scope] || tr('Consent scope');
   }
 
   function wireConsents(root) {
@@ -407,7 +421,7 @@
           ['notes', 'Other necessary pre-visit notes', 2000, false]
         ].forEach(function (spec) {
           var label = document.createElement('label');
-          label.appendChild(document.createTextNode(spec[1]));
+          label.appendChild(document.createTextNode(tr(spec[1])));
           var field = spec[0] === 'category' ? document.createElement('input') : document.createElement('textarea');
           field.name = spec[0];
           field.maxLength = spec[2];
