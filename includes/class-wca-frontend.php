@@ -53,7 +53,7 @@ final class WCA_Frontend {
 					<?php foreach ( (array) $clinic['services'] as $service ) : ?>
 						<article class="wca-card">
 							<h3><?php echo esc_html( $service['name'] ); ?></h3>
-							<p><?php echo esc_html( sprintf( __( '%1$d minutes · %2$s', 'worldwide-clinic-appointments' ), absint( $service['duration_minutes'] ), ucfirst( $service['consultation_type'] ) ) ); ?></p>
+							<p><?php echo esc_html( sprintf( __( '%1$d minutes · %2$s', 'worldwide-clinic-appointments' ), absint( $service['duration_minutes'] ), self::consultation_type_label( $service['consultation_type'] ?? '' ) ) ); ?></p>
 							<p class="wca-price"><?php echo esc_html( self::money( $service['fee_minor'], $service['currency'] ) ); ?></p>
 							<a class="wca-button" href="<?php echo esc_url( home_url( '/appointments/book/' . rawurlencode( $clinic['public_ref'] ) . '/?service=' . rawurlencode( $service['public_ref'] ) ) ); ?>"><?php esc_html_e( 'Choose appointment', 'worldwide-clinic-appointments' ); ?></a>
 						</article>
@@ -132,8 +132,8 @@ final class WCA_Frontend {
 		$actions = array_values( array_filter( array_map( 'sanitize_key', (array) ( $item['allowed_actions'] ?? array() ) ) ) );
 		ob_start(); ?>
 		<article class="wca-card wca-appointment" data-wca-appointment-ref="<?php echo esc_attr( $ref ); ?>" data-wca-version="<?php echo esc_attr( $version ); ?>" data-wca-status="<?php echo esc_attr( $status ); ?>">
-			<header><h2><?php echo esc_html( ucfirst( str_replace( '_', ' ', $status ) ) ); ?></h2><p><time datetime="<?php echo esc_attr( $when ? gmdate( 'c', strtotime( $when . ' UTC' ) ) : '' ); ?>"><?php echo esc_html( $display_when ); ?></time></p></header>
-			<div class="wca-actions"><?php foreach ( $actions as $action ) : ?><button type="button" class="wca-button wca-button-secondary" data-wca-transition="<?php echo esc_attr( $action ); ?>"><?php echo esc_html( ucfirst( str_replace( '_', ' ', $action ) ) ); ?></button><?php endforeach; ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointment/' . rawurlencode( $ref ) . '/' ) ); ?>"><?php esc_html_e( 'View details', 'worldwide-clinic-appointments' ); ?></a><button type="button" class="wca-button wca-button-secondary" data-wca-calendar-download><?php esc_html_e( 'Calendar file', 'worldwide-clinic-appointments' ); ?></button></div>
+			<header><h2><?php echo esc_html( self::appointment_status_label( $status ) ); ?></h2><p><time datetime="<?php echo esc_attr( $when ? gmdate( 'c', strtotime( $when . ' UTC' ) ) : '' ); ?>"><?php echo esc_html( $display_when ); ?></time></p></header>
+			<div class="wca-actions"><?php foreach ( $actions as $action ) : ?><button type="button" class="wca-button wca-button-secondary" data-wca-transition="<?php echo esc_attr( $action ); ?>"><?php echo esc_html( self::appointment_status_label( $action ) ); ?></button><?php endforeach; ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointment/' . rawurlencode( $ref ) . '/' ) ); ?>"><?php esc_html_e( 'View details', 'worldwide-clinic-appointments' ); ?></a><button type="button" class="wca-button wca-button-secondary" data-wca-calendar-download><?php esc_html_e( 'Calendar file', 'worldwide-clinic-appointments' ); ?></button></div>
 			<p data-wca-status role="status" aria-live="polite"></p>
 		</article>
 		<?php return ob_get_clean();
@@ -160,9 +160,9 @@ final class WCA_Frontend {
 		$display_when = self::appointment_time_label( $when, $timezone );
 		ob_start(); ?>
 		<article class="wca-card wca-appointment" data-wca-appointment-ref="<?php echo esc_attr( strtolower( $ref ) ); ?>" data-wca-version="<?php echo esc_attr( SWC_Helpers::record_version( $id ) ); ?>" data-wca-status="<?php echo esc_attr( $status ); ?>">
-			<header><h2><?php echo esc_html( ucfirst( str_replace( '_', ' ', $status ) ) ); ?></h2><p><time datetime="<?php echo esc_attr( $when ? gmdate( 'c', strtotime( $when . ' UTC' ) ) : '' ); ?>"><?php echo esc_html( $display_when ); ?></time></p></header>
-			<?php if ( $detailed ) : ?><dl><dt><?php esc_html_e( 'Reference', 'worldwide-clinic-appointments' ); ?></dt><dd><?php echo esc_html( strtolower( $ref ) ); ?></dd><dt><?php esc_html_e( 'Consultation', 'worldwide-clinic-appointments' ); ?></dt><dd><?php echo esc_html( (string) SWC_Helpers::meta( $id, 'consultation_type' ) ); ?></dd></dl><?php endif; ?>
-			<div class="wca-actions"><?php foreach ( $actions as $action ) : ?><button type="button" class="wca-button wca-button-secondary" data-wca-transition="<?php echo esc_attr( $action ); ?>"><?php echo esc_html( ucfirst( str_replace( '_', ' ', $action ) ) ); ?></button><?php endforeach; ?><?php if ( ! $detailed ) : ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointment/' . rawurlencode( strtolower( $ref ) ) . '/' ) ); ?>"><?php esc_html_e( 'View details', 'worldwide-clinic-appointments' ); ?></a><?php endif; ?><button type="button" class="wca-button wca-button-secondary" data-wca-calendar-download><?php esc_html_e( 'Calendar file', 'worldwide-clinic-appointments' ); ?></button></div>
+			<header><h2><?php echo esc_html( self::appointment_status_label( $status ) ); ?></h2><p><time datetime="<?php echo esc_attr( $when ? gmdate( 'c', strtotime( $when . ' UTC' ) ) : '' ); ?>"><?php echo esc_html( $display_when ); ?></time></p></header>
+			<?php if ( $detailed ) : ?><dl><dt><?php esc_html_e( 'Reference', 'worldwide-clinic-appointments' ); ?></dt><dd><?php echo esc_html( strtolower( $ref ) ); ?></dd><dt><?php esc_html_e( 'Consultation', 'worldwide-clinic-appointments' ); ?></dt><dd><?php echo esc_html( self::consultation_type_label( (string) SWC_Helpers::meta( $id, 'consultation_type' ) ) ); ?></dd></dl><?php endif; ?>
+			<div class="wca-actions"><?php foreach ( $actions as $action ) : ?><button type="button" class="wca-button wca-button-secondary" data-wca-transition="<?php echo esc_attr( $action ); ?>"><?php echo esc_html( self::appointment_status_label( $action ) ); ?></button><?php endforeach; ?><?php if ( ! $detailed ) : ?><a class="wca-button wca-button-secondary" href="<?php echo esc_url( home_url( '/appointment/' . rawurlencode( strtolower( $ref ) ) . '/' ) ); ?>"><?php esc_html_e( 'View details', 'worldwide-clinic-appointments' ); ?></a><?php endif; ?><button type="button" class="wca-button wca-button-secondary" data-wca-calendar-download><?php esc_html_e( 'Calendar file', 'worldwide-clinic-appointments' ); ?></button></div>
 			<p data-wca-status role="status" aria-live="polite"></p>
 		</article>
 		<?php return ob_get_clean();
@@ -193,10 +193,47 @@ final class WCA_Frontend {
 		<main class="wca-shell" aria-labelledby="wca-dashboard-title"><h1 id="wca-dashboard-title"><?php esc_html_e( 'Clinic dashboard', 'worldwide-clinic-appointments' ); ?></h1>
 		<p><?php esc_html_e( 'Manage only clinics you own or for which you hold a current explicit clinic-management delegation. Platform commission is always 0%.', 'worldwide-clinic-appointments' ); ?></p>
 		<?php if ( ! $clinics ) : ?><p><?php esc_html_e( 'No manageable clinics were found.', 'worldwide-clinic-appointments' ); ?></p><?php endif; ?>
-		<div class="wca-grid"><?php foreach ( $clinics as $clinic ) : ?><article class="wca-card"><h2><?php echo esc_html( $clinic['name'] ); ?></h2><p><?php echo esc_html( ucfirst( $clinic['status'] ) ); ?> · v<?php echo esc_html( $clinic['version'] ); ?></p><a class="wca-button" href="<?php echo esc_url( home_url( '/clinic/' . rawurlencode( $clinic['slug'] ) . '/' ) ); ?>"><?php esc_html_e( 'View public clinic', 'worldwide-clinic-appointments' ); ?></a></article><?php endforeach; ?></div>
+		<div class="wca-grid"><?php foreach ( $clinics as $clinic ) : ?><article class="wca-card"><h2><?php echo esc_html( $clinic['name'] ); ?></h2><p><?php echo esc_html( self::clinic_status_label( $clinic['status'] ?? '' ) ); ?> · v<?php echo esc_html( $clinic['version'] ); ?></p><a class="wca-button" href="<?php echo esc_url( home_url( '/clinic/' . rawurlencode( $clinic['slug'] ) . '/' ) ); ?>"><?php esc_html_e( 'View public clinic', 'worldwide-clinic-appointments' ); ?></a></article><?php endforeach; ?></div>
 		</main><?php return ob_get_clean();
 	}
 
+	private static function appointment_status_label( $status ) {
+		$status = sanitize_key( (string) $status );
+		$labels = array(
+			'requested'          => __( 'Requested', 'worldwide-clinic-appointments' ),
+			'confirmed'          => __( 'Confirmed', 'worldwide-clinic-appointments' ),
+			'declined'           => __( 'Declined', 'worldwide-clinic-appointments' ),
+			'reschedule_pending' => __( 'Reschedule pending', 'worldwide-clinic-appointments' ),
+			'checked_in'         => __( 'Checked in', 'worldwide-clinic-appointments' ),
+			'completed'          => __( 'Completed', 'worldwide-clinic-appointments' ),
+			'cancelled'          => __( 'Cancelled', 'worldwide-clinic-appointments' ),
+			'no_show'            => __( 'No show', 'worldwide-clinic-appointments' ),
+		);
+		return $labels[ $status ] ?? __( 'Appointment status unavailable', 'worldwide-clinic-appointments' );
+	}
+
+	private static function consultation_type_label( $type ) {
+		$type = sanitize_key( str_replace( '-', '_', (string) $type ) );
+		$labels = array(
+			'online'    => __( 'Online', 'worldwide-clinic-appointments' ),
+			'in_person' => __( 'In person', 'worldwide-clinic-appointments' ),
+			'hybrid'    => __( 'Hybrid', 'worldwide-clinic-appointments' ),
+		);
+		return $labels[ $type ] ?? __( 'Consultation type unavailable', 'worldwide-clinic-appointments' );
+	}
+
+	private static function clinic_status_label( $status ) {
+		$status = sanitize_key( (string) $status );
+		$labels = array(
+			'draft'     => __( 'Draft', 'worldwide-clinic-appointments' ),
+			'review'    => __( 'In review', 'worldwide-clinic-appointments' ),
+			'active'    => __( 'Active', 'worldwide-clinic-appointments' ),
+			'paused'    => __( 'Paused', 'worldwide-clinic-appointments' ),
+			'suspended' => __( 'Suspended', 'worldwide-clinic-appointments' ),
+			'archived'  => __( 'Archived', 'worldwide-clinic-appointments' ),
+		);
+		return $labels[ $status ] ?? __( 'Clinic status unavailable', 'worldwide-clinic-appointments' );
+	}
 
 	private static function appointment_time_label( $when, $timezone ) {
 		$when = trim( (string) $when );
@@ -211,7 +248,7 @@ final class WCA_Frontend {
 			if ( ! $moment || ( is_array( $errors ) && ( ! empty( $errors['warning_count'] ) || ! empty( $errors['error_count'] ) ) ) ) {
 				return __( 'Time pending', 'worldwide-clinic-appointments' );
 			}
-			return $moment->setTimezone( $target )->format( 'F j, Y g:i a' ) . ' ' . $timezone;
+			return wp_date( 'F j, Y g:i a', $moment->getTimestamp(), $target ) . ' ' . $timezone;
 		} catch ( Exception $e ) {
 			return __( 'Time pending', 'worldwide-clinic-appointments' );
 		}
