@@ -148,10 +148,9 @@ final class SWC_Privacy {
 					if ( is_wp_error( $patient_write ) ) { return $patient_write; }
 					$post_update = wp_update_post( array( 'ID' => $appointment_id, 'post_author' => 0, 'post_title' => sprintf( 'Anonymized Appointment #%d', $appointment_id ) ), true );
 					if ( is_wp_error( $post_update ) || ! $post_update || 0 !== absint( get_post_field( 'post_author', $appointment_id ) ) ) { return new WP_Error( 'swc_privacy_post_anonymize', __( 'The appointment post could not be anonymized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-					if ( SWC_Helpers::can_transition( 'patient', SWC_Helpers::status( $appointment_id ), 'cancelled' ) ) {
-						$status_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_status', 'cancelled', 'swc_privacy_status_anonymize' );
-						if ( is_wp_error( $status_write ) ) { return $status_write; }
-					}
+					/* Privacy erasure is identity/data minimization, not an appointment lifecycle command.
+					 * Never write _swc_status here: canonical transition ownership must retain slot,
+					 * version, event/outbox/audit and other lifecycle side effects. */
 					$erased_write = SWC_Helpers::update_meta_strict( $appointment_id, '_swc_erased', '1', 'swc_privacy_erased_marker' );
 					if ( is_wp_error( $erased_write ) ) { return $erased_write; }
 					$changed = true; $retain = true;
