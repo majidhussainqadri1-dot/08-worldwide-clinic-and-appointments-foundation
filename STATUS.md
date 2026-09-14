@@ -3,10 +3,9 @@
 ## Current repository candidate
 
 - Working review branch: `review/file08-t21-ten-round-2026-09-09`
-- Review discipline: **T21 resumed 10-round Review → Ledger Freeze → Fix → Regression → Exact-head CI → Next Round**
-- Verified pre-T21 baseline: **`79f18b5cb3ad9270a52027df7c3a6b50465fdfa4`**
-- T20 closure: **R1–R20 complete**; latest ten (R11–R20) were **8/10 clean = 80%**. The prior automatic stopping threshold was reached, and the user explicitly resumed review work on 2026-09-09.
-- T21 R1: review completed before correction; the frozen R1 release-evidence/currentness defects were corrected in the T21 branch. Exact R1 closure (the HEAD that is actually green/package-verified) is intentionally recorded in PR #10 / its canonical workflow rather than hard-coded here, so this status file does not become stale merely because CI finishes after the commit containing it.
+- Current review discipline: **T22 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
+- Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
+- T22 current progress through R9: R1 clean; R2 defect-bearing/corrected; R3–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected and exact-head green at `c3b46247b69bd87534e5fab4133ebf423a1da893` with canonical run `34838735323`.
 - Runtime candidate: **1.2.15**
 - Core File 08 schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
@@ -18,11 +17,15 @@
 
 Repository release identity is always the exact candidate HEAD together with its exact-head canonical GitHub Actions run, deterministic manifest, artifact digest and candidate SHA-256. The manifest must independently match the runtime, plan, core schema, continuity schema/contract, Future24 schema/contract, Public Clinic contract and CF-01 contract embedded in that same artifact.
 
-## T21 progress evidence law
+## Current T22 evidence law
 
-Numbered-round checkpoints are maintained in PR #10 because a static repository file cannot truthfully claim a CI result that occurs only after the file's own commit. For every T21 round, the governing order remains: full review-only pass → frozen ledger → complete correction batch → permanent regression → exact-head canonical CI/package → next round. A round is not closed merely because its correction source exists; the exact corrected HEAD itself must pass the canonical gates.
+Numbered-round checkpoints are maintained in PR #10 and frozen ledgers because a static repository file cannot truthfully claim a future CI result that occurs only after its own commit. For every T22 round, the governing order remains: full review-only pass → frozen ledger → complete correction batch → permanent regression → exact-head canonical CI/package → next round. A round is not closed merely because correction source exists; the exact corrected HEAD itself must pass the canonical gates.
 
-R1's frozen defect class covered current repository/release identity drift: stale T20/T19 current-state documentation, stale packaged/current lineage metadata, and historical cycle regressions that incorrectly forced T15/T16/T18/T19 to remain current identities. Those historical regressions now preserve their old evidence without pinning the current release identity.
+T22 has so far materially hardened audit-actor provenance, File26 whole-clinic/practitioner reconciliation and delegation invalidation, and localization/timezone/continuity-label presentation. R9 exact-head closure is `c3b46247b69bd87534e5fab4133ebf423a1da893` / run `34838735323`; later corrections require fresh exact-head evidence.
+
+## Historical T21 result
+
+T21 R1–R10 are closed. Defect-bearing rounds: R1, R2, R3, R4, R5, R6, R9, R10. Clean rounds: R7, R8. Clean rate: 2/10.
 
 ## Historical T20 twenty-round result
 
@@ -38,14 +41,14 @@ The final T19 R20 correction was release/repository hygiene and documentation tr
 
 The candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving File 08 ownership boundaries. Current source includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback and recovery, accessibility/localization, and Future24 scheduling/interoperability.
 
-T20 materially hardened that source after the T19 checkpoint, including appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization boundary corrections, availability projection correction, payment-currency persistence parity, calendar-provider scope/order/idempotency hardening, and release-evidence alignment.
+T20 materially hardened that source after the T19 checkpoint, including appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization boundary corrections, availability projection correction, payment-currency persistence parity, calendar-provider scope/order/idempotency hardening, and release-evidence alignment. T21 and T22 then added further governance, reconciliation and presentation hardening without changing the runtime candidate identity.
 
 ## Evidence-state classification
 
 | State | Repository evidence rule |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Complete candidate** — current T21 review/correction sequence operates on the implemented 1.2.15 candidate. |
+| Coded | **Complete candidate** — current T22 review/correction sequence operates on the implemented 1.2.15 candidate. |
 | Packaged | **Exact-head only** — valid only for a HEAD whose canonical reproducible-candidate job succeeds; see PR #10/current workflow evidence for the latest result. |
 | Automated-QA Green | **Exact-head only** — valid only for a HEAD whose PHP 7.4/PHP 8.3/source/JS/hygiene gates are green; see PR #10/current workflow evidence for the latest result. |
 | Staging-Accepted | **Pending / not claimed.** |
@@ -64,4 +67,4 @@ This repository does not prove the current staging or live installation. Exact d
 
 ## Historical evidence note
 
-T13–T20, earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T21 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+T13–T21, earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T22 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
