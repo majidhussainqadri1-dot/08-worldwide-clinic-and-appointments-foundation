@@ -5,8 +5,9 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 ## Canonical repository identity
 
 - Repository review branch: `review/file08-t21-ten-round-2026-09-09`
-- Current review cycle: **T21 resumed 10-round Review → Ledger Freeze → Fix → Regression → Exact-head CI → Next Round**
-- Verified pre-T21 baseline: `79f18b5cb3ad9270a52027df7c3a6b50465fdfa4` — T20 closed with 8/10 clean rounds in its latest ten; the user explicitly resumed review work after that stopping threshold.
+- Current review cycle: **T22 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
+- Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
+- Current T22 through R9: R1 clean; R2 defect-bearing/corrected; R3–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected and exact-head green at `c3b46247b69bd87534e5fab4133ebf423a1da893` / run `34838735323`.
 - Package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
 - Runtime candidate: **1.2.15**
@@ -33,7 +34,7 @@ The runtime does not introduce automated diagnosis/prescribing, emergency-servic
 
 The current source implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24`, including clinic identity and activation, branches, services/fees, timezone/DST-safe availability and slot projection, atomic holds, appointment request/decision/reschedule/cancel/check-in/complete/no-show lifecycle, patient/guardian/doctor/delegated-staff authorization, opaque protected references, emergency diversion, versioned consent, secure continuity, expiring review eligibility, calendar/payment/complaint adapters, privacy lifecycle, audit/outbox/observability, migration/rollback metadata, accessibility/localization, waitlist/series/resource/group scheduling, readiness/prerequisite governance, queue/disruption/support/interpreter contracts, consent-gated File 17 virtual-room requests, privacy-safe interoperability adapters, external busy projections, and episode chains.
 
-T20 materially hardened the same 1.2.15 candidate after T19, including appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization-boundary hardening, availability projection correction, payment-currency persistence parity, calendar-provider practitioner/order/idempotency hardening, and release-evidence alignment. T19 and all earlier review cycles remain historical provenance rather than current candidate identity.
+T20 materially hardened the same 1.2.15 candidate after T19, including appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization-boundary hardening, availability projection correction, payment-currency persistence parity, calendar-provider practitioner/order/idempotency hardening, and release-evidence alignment. T21 then closed a further ten-round sequence. T22 has so far added audit-actor provenance hardening, File26 clinic/delegation reconciliation hardening, and localization/timezone/continuity-label corrections. Earlier cycles remain historical provenance rather than current candidate identity.
 
 ## Canonical routes
 
@@ -61,6 +62,6 @@ The canonical GitHub Actions quality workflow repeats PHP 7.4/8.3 syntax and sou
 
 A repository candidate may be called **Coded**, **Packaged**, or **Automated-QA Green** only when the respective evidence applies to the exact same HEAD. It is not `Staging-Accepted`, `Live-Deployed`, or `Operational` from repository evidence alone.
 
-T21 is currently a resumed review/correction cycle. Any T21 correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before the corrected T21 HEAD may inherit `Packaged` or `Automated-QA Green` status.
+T22 is the current closure cycle. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status.
 
 Before production, run `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, recording actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback and Founder acceptance. After an explicitly authorized production deployment, freeze the exact deployed artifact/version/schema/migration state and perform live parity re-test before any live resolution claim.
