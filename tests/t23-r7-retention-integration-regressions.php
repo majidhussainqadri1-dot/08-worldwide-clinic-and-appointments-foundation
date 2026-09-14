@@ -15,10 +15,10 @@ $checks = array(
     'retention normalizer is booted after canonical privacy hooks register' => false !== $plugin_boot && false !== $retention_boot && $retention_boot > $plugin_boot,
     'normalizer removes legacy privacy policy callback' => false !== strpos( $retention, "remove_action( 'admin_init', array( 'WCA_Privacy', 'register_policy' ) );" ),
     'normalizer installs replacement callback' => false !== strpos( $retention, "add_action( 'admin_init', array( __CLASS__, 'normalize' ), 10 );" ),
-    'unsupported appointment and event day keys are removed' => false !== strpos( $retention, "unset( $policy['completed_appointments_days'], $policy['cancelled_appointments_days'], $policy['events_days'] );" ),
-    'automatic appointment purge is explicitly disabled' => false !== strpos( $retention, "'automatic_appointment_purge' => false" ) && false !== strpos( $retention, "$policy['automatic_appointment_purge'] = false;" ),
-    'automatic event purge is explicitly disabled' => false !== strpos( $retention, "'automatic_event_purge'       => false" ) && false !== strpos( $retention, "$policy['automatic_event_purge'] = false;" ),
-    'legacy eraser does not directly write lifecycle status' => false === strpos( $legacy, "update_meta_strict( $appointment_id, '_swc_status'" ),
+    'unsupported appointment and event day keys are removed' => false !== strpos( $retention, "unset( \$policy['completed_appointments_days'], \$policy['cancelled_appointments_days'], \$policy['events_days'] );" ),
+    'automatic appointment purge is explicitly disabled' => false !== strpos( $retention, "'automatic_appointment_purge' => false" ) && false !== strpos( $retention, "\$policy['automatic_appointment_purge'] = false;" ),
+    'automatic event purge is explicitly disabled' => false !== strpos( $retention, "'automatic_event_purge'       => false" ) && false !== strpos( $retention, "\$policy['automatic_event_purge'] = false;" ),
+    'legacy eraser does not directly write lifecycle status' => false === strpos( $legacy, "update_meta_strict( \$appointment_id, '_swc_status'" ),
     'this permanent regression is bound into aggregate suite' => false !== strpos( $runner, "'t23-r7-retention-integration-regressions.php'" ),
 );
 $failures = array();
