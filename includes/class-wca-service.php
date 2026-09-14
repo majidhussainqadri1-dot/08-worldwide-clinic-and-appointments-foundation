@@ -1149,7 +1149,16 @@ final class WCA_Service {
 			if ( ! WCA_Repository::complete_idempotency( $claim['id'], 201, $payment ) ) { return new WP_Error( 'wca_payment_idempotency_complete', __( 'The payment request could not be finalized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			return $payment;
 		}, 'wca_payment_intent_transaction' );
-		if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); }
+		if ( is_wp_error( $result ) ) {
+			$error_data = $result->get_error_data();
+			$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );
+			if ( $state_uncertain ) {
+				WCA_Observability::metric( 'payment_intent_state_uncertain_total', 1, array( 'provider' => $provider ) );
+				WCA_Observability::log( 'critical', 'payment_intent_state_uncertain', array( 'appointment_id' => absint( $appointment_id ), 'provider' => $provider, 'idempotency_claim_id' => absint( $claim['id'] ) ) );
+			} else {
+				WCA_Repository::release_idempotency( $claim['id'] );
+			}
+		}
 		return $result;
 	}
 
