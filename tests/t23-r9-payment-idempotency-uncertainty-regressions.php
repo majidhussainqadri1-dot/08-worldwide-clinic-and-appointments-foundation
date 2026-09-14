@@ -8,9 +8,9 @@ $end = false !== $start ? strpos( $service, 'public static function appointment_
 $block = ( false !== $start && false !== $end ) ? substr( $service, $start, $end - $start ) : '';
 $checks = array(
     'payment transaction inspects error data' => false !== strpos( $block, '$error_data = $result->get_error_data();' ),
-    'payment transaction recognizes uncertain state' => false !== strpos( $block, "$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );" ),
-    'uncertain payment state is observed' => false !== strpos( $block, "payment_intent_state_uncertain_total" ) && false !== strpos( $block, "payment_intent_state_uncertain" ),
-    'idempotency release occurs only in safe branch' => false !== strpos( $block, '} else {' ) && false !== strpos( $block, "WCA_Repository::release_idempotency( $claim['id'] );" ),
+    'payment transaction recognizes uncertain state' => false !== strpos( $block, '$state_uncertain = is_array( $error_data ) && ! empty( $error_data[\'state_uncertain\'] );' ),
+    'uncertain payment state is observed' => false !== strpos( $block, 'payment_intent_state_uncertain_total' ) && false !== strpos( $block, 'payment_intent_state_uncertain' ),
+    'idempotency release occurs only in safe branch' => false !== strpos( $block, '} else {' ) && false !== strpos( $block, 'WCA_Repository::release_idempotency( $claim[\'id\'] );' ),
     'regression is bound into aggregate suite' => false !== strpos( $runner, "'t23-r9-payment-idempotency-uncertainty-regressions.php'" ),
 );
 $failures = array(); foreach ( $checks as $name => $ok ) { if ( ! $ok ) { $failures[] = $name; } }
