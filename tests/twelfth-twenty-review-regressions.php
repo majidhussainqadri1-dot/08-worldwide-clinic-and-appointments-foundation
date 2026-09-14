@@ -1,0 +1,33 @@
+<?php
+$root = dirname(__DIR__);
+$pass=0; $fail=array();
+function t12_has($label,$path,$needle){ global $root,$pass,$fail; $s=file_get_contents($root.'/'.$path); if(false!==strpos($s,$needle)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' missing: '.$needle;} }
+function t12_lacks($label,$path,$needle){ global $root,$pass,$fail; $s=file_get_contents($root.'/'.$path); if(false===strpos($s,$needle)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' forbidden: '.$needle;} }
+
+t12_has('R1 intake transaction','includes/class-wca-continuity-secure.php','wca_intake_mutation_transaction');
+t12_has('R2 consent revoke transaction','includes/class-wca-continuity-secure.php','wca_consent_revoke_transaction');
+t12_has('R3 followup create transaction','includes/class-wca-continuity-secure.php','wca_followup_create_transaction');
+t12_has('R4 followup complete transaction','includes/class-wca-continuity-secure.php','wca_followup_complete_transaction');
+t12_has('R5 reminder transaction','includes/class-wca-continuity-secure.php','wca_followup_reminder_transaction');
+t12_has('R6 waitlist offer transaction','includes/class-wca-future24.php','wca_waitlist_offer_transaction');
+t12_has('R7 group leave transaction','includes/class-wca-future24.php','wca_group_leave_transaction');
+t12_has('R8 group cancel transaction','includes/class-wca-future24.php','wca_group_cancel_transaction');
+t12_has('R9 participant add transaction','includes/class-wca-future24.php','wca_support_add_transaction');
+t12_has('R10 participant revoke transaction','includes/class-wca-future24.php','wca_support_revoke_transaction');
+t12_has('R11 virtual room transaction','includes/class-wca-future24.php','wca_virtual_room_transaction');
+t12_has('R12 protected mutation rate limits','includes/class-wca-rest.php',"'clinic_review', 20, HOUR_IN_SECONDS");
+t12_has('R13 sensitive read rate limits','includes/class-wca-rest.php',"'appointment_read', 120, 60");
+t12_has('R14 idempotency release CAS','includes/class-wca-repository.php','return 1 === (int) $deleted;');
+t12_has('R15 signed cursor integrity','includes/class-wca-rest.php',"hash_hmac( 'sha256', \$payload");
+t12_has('R15 cursor signature verification','includes/class-wca-rest.php','hash_equals( $expected, $matches[2] )');
+t12_lacks('R15 no transient cursor persistence','includes/class-wca-rest.php',"set_transient( 'wca_clinic_cursor_'");
+t12_has('R16 recurrence range validation','includes/class-wca-future24.php','wca_series_count_range');
+t12_has('R17 buffer range validation','includes/class-wca-future24.php','wca_buffer_policy_range');
+t12_has('R18 capacity range validation','includes/class-wca-future24.php','wca_resource_capacity_range');
+t12_has('R19 core numeric validation','includes/class-wca-service.php','wca_service_duration_range');
+t12_has('R20 disruption transaction','includes/class-wca-future24.php','wca_disruption_transaction');
+t12_has('release plugin 1.2.15','worldwide-clinic.php','Version: 1.2.15');
+t12_has('release runtime constant 1.2.15','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
+t12_has('twelfth evidence complete','TWELFTH-TWENTY-REVIEW-EVIDENCE.md','All 20 substantive review rounds completed');
+if($fail){fwrite(STDERR,"File 08 twelfth twenty-round regression gate failed:\n- ".implode("\n- ",$fail)."\n"); exit(1);}
+echo 'File 08 twelfth fresh twenty-round regression assertions passed: '.$pass.'/'.$pass."\n";
