@@ -3,7 +3,8 @@ $root = dirname( __DIR__ );
 $front = file_get_contents( $root . '/includes/class-wca-frontend.php' );
 $clinic_js = file_get_contents( $root . '/assets/js/clinic.js' );
 $continuity_js = file_get_contents( $root . '/assets/js/continuity.js' );
-if ( ! is_string( $front ) || ! is_string( $clinic_js ) || ! is_string( $continuity_js ) ) {
+$historical_timezone_test = file_get_contents( $root . '/tests/t18-r3-booking-timezone-regressions.php' );
+if ( ! is_string( $front ) || ! is_string( $clinic_js ) || ! is_string( $continuity_js ) || ! is_string( $historical_timezone_test ) ) {
     fwrite( STDERR, "T22 R9 source read failed\n" );
     exit( 1 );
 }
@@ -22,6 +23,7 @@ $checks = array(
     'continuity generated form labels pass through translation helper' => false !== strpos( $continuity_js, 'document.createTextNode(tr(spec[1]))' ),
     'continuity read-only payload uses translation-safe field label map' => false !== strpos( $continuity_js, 'function intakeFieldLabel(name)' ) && false !== strpos( $continuity_js, "strong.textContent = intakeFieldLabel(name) + ': '" ),
     'raw continuity payload keys are not shown as labels' => false === strpos( $continuity_js, "name.replace(/_/g, ' ') + ': '" ),
+    'historical timezone regression accepts strengthened block semantics' => false !== strpos( $historical_timezone_test, "strpos(\$js, 'if (browserTimezone) {')" ) && false !== strpos( $historical_timezone_test, "strpos(\$js, 'tz.value = browserTimezone;')" ) && false === strpos( $historical_timezone_test, "if (browserTimezone) tz.value = browserTimezone;" ),
 );
 
 $failures = array();
