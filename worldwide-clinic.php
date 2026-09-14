@@ -113,6 +113,9 @@ function wca_start_plugin() {
 	WCA_Central_Governance::boot();
 	WCA_Continuity::boot();
 	WCA_Continuity_Guards::boot();
+	// The canonical WCA_Continuity eraser is bounded and preserves native appointment legal holds.
+	// Retire the older replacement eraser so it cannot bypass those monotonic hold semantics.
+	remove_filter( 'wp_privacy_personal_data_erasers', array( 'WCA_Continuity_Guards', 'replace_continuity_eraser' ), 100 );
 	WCA_Verification_Reconciliation::boot();
 	WCA_Opaque_API::boot();
 	WCA_Query_API::boot();
