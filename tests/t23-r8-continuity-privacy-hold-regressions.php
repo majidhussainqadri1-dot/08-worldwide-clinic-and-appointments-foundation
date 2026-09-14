@@ -8,10 +8,10 @@ if ( ! is_string( $entry ) || ! is_string( $continuity ) || ! is_string( $guards
 $checks = array(
  'legacy replacement eraser is explicitly retired from runtime' => false !== strpos( $entry, "remove_filter( 'wp_privacy_personal_data_erasers', array( 'WCA_Continuity_Guards', 'replace_continuity_eraser' ), 100 );" ),
  'canonical continuity eraser remains registered' => false !== strpos( $continuity, "add_filter( 'wp_privacy_personal_data_erasers', array( __CLASS__, 'register_eraser' ) );" ),
- 'canonical legal hold is seeded from appointment hold' => false !== strpos( $continuity, "WCA_Privacy::legal_hold( $appointment_id )" ),
- 'canonical legal hold is monotonic through extension filter' => false !== strpos( $continuity, "return $native || $filtered;" ),
- 'guardian erasure uses bounded cursor' => false !== strpos( $continuity, "_guardian" ) && false !== strpos( $continuity, "guardian_user_id=%d AND id>%d ORDER BY id ASC LIMIT 100" ),
- 'guardian erasure checks legal hold per row' => false !== strpos( $continuity, "self::legal_hold( 'intake', $guardian_row )" ),
+ 'canonical legal hold is seeded from appointment hold' => false !== strpos( $continuity, "WCA_Privacy::legal_hold( \$appointment_id )" ),
+ 'canonical legal hold is monotonic through extension filter' => false !== strpos( $continuity, "return \$native || \$filtered;" ),
+ 'guardian erasure uses bounded cursor' => false !== strpos( $continuity, '_guardian' ) && false !== strpos( $continuity, 'guardian_user_id=%d AND id>%d ORDER BY id ASC LIMIT 100' ),
+ 'guardian erasure checks legal hold per row' => false !== strpos( $continuity, "self::legal_hold( 'intake', \$guardian_row )" ),
  'unsafe replacement implementation is not active despite remaining compatibility code' => false !== strpos( $guards, 'replace_continuity_eraser' ),
  'regression is bound into aggregate suite' => false !== strpos( $runner, "'t23-r8-continuity-privacy-hold-regressions.php'" ),
 );
