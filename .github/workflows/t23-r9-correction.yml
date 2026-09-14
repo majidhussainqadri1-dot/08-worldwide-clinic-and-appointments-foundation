@@ -1,0 +1,42 @@
+name: T23 R9 Temporary Correction
+on:
+  push:
+    branches:
+      - review/file08-t21-ten-round-2026-09-09
+permissions:
+  contents: write
+jobs:
+  correct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: review/file08-t21-ten-round-2026-09-09
+          fetch-depth: 0
+      - name: Apply frozen R9 correction
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('includes/class-wca-service.php')
+          s = p.read_text()
+          old = "\t\tif ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); }\n\t\treturn $result;\n\t}\n\n\t/** @return string|WP_Error */\n\tpublic static function appointment_ics"
+          new = "\t\tif ( is_wp_error( $result ) ) {\n\t\t\t$error_data = $result->get_error_data();\n\t\t\t$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );\n\t\t\tif ( $state_uncertain ) {\n\t\t\t\tWCA_Observability::metric( 'payment_intent_state_uncertain_total', 1, array( 'provider' => $provider ) );\n\t\t\t\tWCA_Observability::log( 'critical', 'payment_intent_state_uncertain', array( 'appointment_id' => absint( $appointment_id ), 'provider' => $provider, 'idempotency_claim_id' => absint( $claim['id'] ) ) );\n\t\t\t} else {\n\t\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\t}\n\t\t}\n\t\treturn $result;\n\t}\n\n\t/** @return string|WP_Error */\n\tpublic static function appointment_ics"
+          if new in s:
+              print('R9 correction already present')
+          elif old in s:
+              p.write_text(s.replace(old, new, 1))
+              print('Applied R9 correction')
+          else:
+              raise SystemExit('Expected R9 payment block not found')
+          PY
+      - name: Commit correction
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add includes/class-wca-service.php
+          git commit -m 'T23 R9: retain payment claim on uncertain transaction'
+          git push origin HEAD:review/file08-t21-ten-round-2026-09-09
