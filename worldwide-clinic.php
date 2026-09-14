@@ -46,6 +46,7 @@ $wca_files = array(
 	'includes/class-wca-continuity-guards.php',
 	'includes/class-wca-verification-reconciliation.php',
 	'includes/class-wca-privacy.php',
+	'includes/class-wca-retention-policy.php',
 	'includes/class-wca-rest.php',
 	'includes/class-wca-opaque-api.php',
 	'includes/class-wca-query-api.php',
@@ -108,6 +109,7 @@ function wca_start_plugin() {
 		return;
 	}
 	WCA_Plugin::boot();
+	WCA_Retention_Policy::boot();
 	WCA_Central_Governance::boot();
 	WCA_Continuity::boot();
 	WCA_Continuity_Guards::boot();
