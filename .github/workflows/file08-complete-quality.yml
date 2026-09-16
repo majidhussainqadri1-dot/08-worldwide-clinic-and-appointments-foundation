@@ -15,93 +15,50 @@ jobs:
           fetch-depth: 12
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none, extensions: zip}
-      - name: Apply frozen-ledger correction, restore canonical workflow, verify, push
+      - name: Apply T24 R9 correction, restore canonical workflow, verify, push
         shell: bash
         run: |
           set -euo pipefail
           test -f docs/T24-R9-FROZEN-LEDGER.md
           python3 - <<'PY'
           from pathlib import Path
-
-          changelog = Path('CHANGELOG.md')
-          c = changelog.read_text()
-          c = c.replace(
-            "- **T22 closure cycle is the current repository review sequence.** Through R9: R1 clean; R2 defect-bearing/corrected; R3–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected and exact-head green at `c3b46247b69bd87534e5fab4133ebf423a1da893` / canonical run `34838735323`. R10 is the final T22 closure review and does not inherit prior exact-head QA after any correction changes HEAD.",
-            "- **T24 closure cycle is the current repository review sequence.** Current ten-round continuation: T23 R10 clean; T24 R1 defect-bearing/corrected; T24 R2–R8 clean; T24 R9 defect-bearing/corrected. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.",
-            1
-          )
-          c = c.replace(
-            "- T22 material hardening in the same 1.2.15 candidate includes **audit-actor provenance** alignment, **File26** whole-clinic eligibility/delegation invalidation reconciliation, and **localization/timezone** plus translation-safe Continuity presentation corrections.",
-            "- T24 material hardening in the same 1.2.15 candidate includes uncertain-transaction idempotency retention for verified **CF02** complaint-status projection, verified **CF03** payment-status projection and generic **Future24** mutations, plus release-currentness documentation/regression correction.\n- **Historical T22 R1–R10 is closed.** Its former exact heads/runs remain provenance only after later commits.",
-            1
-          )
-          if '**T24 closure cycle is the current repository review sequence.**' not in c:
-              raise SystemExit('T24 changelog currentness missing')
-          if '**T22 closure cycle is the current repository review sequence.**' in c:
-              raise SystemExit('stale T22 changelog currentness remains')
+          changelog=Path('CHANGELOG.md'); c=changelog.read_text()
+          c=c.replace("- **T22 closure cycle is the current repository review sequence.** Through R9: R1 clean; R2 defect-bearing/corrected; R3–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected and exact-head green at `c3b46247b69bd87534e5fab4133ebf423a1da893` / canonical run `34838735323`. R10 is the final T22 closure review and does not inherit prior exact-head QA after any correction changes HEAD.","- **T24 closure cycle is the current repository review sequence.** Current ten-round continuation: T23 R10 clean; T24 R1 defect-bearing/corrected; T24 R2–R8 clean; T24 R9 defect-bearing/corrected. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.",1)
+          c=c.replace("- T22 material hardening in the same 1.2.15 candidate includes **audit-actor provenance** alignment, **File26** whole-clinic eligibility/delegation invalidation reconciliation, and **localization/timezone** plus translation-safe Continuity presentation corrections.","- T24 material hardening in the same 1.2.15 candidate includes uncertain-transaction idempotency retention for verified **CF02** complaint-status projection, verified **CF03** payment-status projection and generic **Future24** mutations, plus release-currentness documentation/regression correction.\n- **Historical T22 R1–R10 is closed.** Its former exact heads/runs remain provenance only after later commits.",1)
+          if '**T24 closure cycle is the current repository review sequence.**' not in c or '**T22 closure cycle is the current repository review sequence.**' in c: raise SystemExit('changelog currentness correction failed')
           changelog.write_text(c)
 
+          t19=Path('tests/t19-r20-closure-hygiene-regressions.php'); x=t19.read_text()
+          old="        && false !== strpos( $release, 'historical evidence' )"
+          new="        && ( false !== strpos( $release, 'historical evidence' ) || false !== strpos( $release, 'historical provenance' ) )"
+          if old in x: x=x.replace(old,new,1)
+          if new not in x: raise SystemExit('T19 historical wording compatibility correction missing')
+          t19.write_text(x)
+
           Path('tests/t22-r10-release-currentness-regressions.php').write_text(r'''<?php
-          $root = dirname( __DIR__ );
-          $readme = file_get_contents( $root . '/README.md' );
-          $status = file_get_contents( $root . '/STATUS.md' );
-          $release = file_get_contents( $root . '/docs/RELEASE-STATUS-1.0.0.md' );
-          $change = file_get_contents( $root . '/CHANGELOG.md' );
-          $ledger = file_get_contents( $root . '/docs/T22-R10-FROZEN-LEDGER.md' );
-          foreach ( array( $readme, $status, $release, $change, $ledger ) as $source ) { if ( ! is_string( $source ) ) { fwrite( STDERR, "T22 R10 source read failed\n" ); exit( 1 ); } }
-          $checks = array(
-            'README keeps T22 historical' => false !== strpos( $readme, 'Historical T22:' ),
-            'STATUS keeps T22 historical' => false !== strpos( $status, '## Historical T22 result' ),
-            'release status keeps T22 historical' => false !== strpos( $release, 'Historical T22 and T21' ),
-            'changelog keeps T22 historical' => false !== strpos( $change, 'Historical T22 R1–R10 is closed' ),
-            'T22 frozen ledger remains preserved' => false !== strpos( $ledger, 'read-only closure/release-truth review' ) && false !== strpos( $ledger, 'No R10 correction was applied while the review was open' ),
-            'repository truth remains separate from live truth' => false !== strpos( $status, 'Live-Deployed | **Unverified / not claimed.**' ) && false !== strpos( $release, 'Production release/deployment: **NO / UNVERIFIED**' ),
-          );
-          $failures = array(); foreach ( $checks as $name => $ok ) { if ( ! $ok ) { $failures[] = $name; } }
-          if ( $failures ) { fwrite( STDERR, "T22 R10 historical-currentness regressions failed:\n- " . implode( "\n- ", $failures ) . "\n" ); exit( 1 ); }
-          echo 'T22 R10 historical-currentness regressions: PASS ' . count( $checks ) . '/' . count( $checks ) . "\n";
+          $root=dirname(__DIR__); $readme=file_get_contents($root.'/README.md'); $status=file_get_contents($root.'/STATUS.md'); $release=file_get_contents($root.'/docs/RELEASE-STATUS-1.0.0.md'); $change=file_get_contents($root.'/CHANGELOG.md'); $ledger=file_get_contents($root.'/docs/T22-R10-FROZEN-LEDGER.md');
+          foreach(array($readme,$status,$release,$change,$ledger) as $source){if(!is_string($source)){fwrite(STDERR,"T22 R10 source read failed\n");exit(1);}}
+          $checks=array('README keeps T22 historical'=>false!==strpos($readme,'Historical T22:'),'STATUS keeps T22 historical'=>false!==strpos($status,'## Historical T22 result'),'release keeps T22 historical'=>false!==strpos($release,'Historical T22 and T21'),'changelog keeps T22 historical'=>false!==strpos($change,'Historical T22 R1–R10 is closed'),'T22 ledger preserved'=>false!==strpos($ledger,'read-only closure/release-truth review')&&false!==strpos($ledger,'No R10 correction was applied while the review was open'),'live truth separate'=>false!==strpos($status,'Live-Deployed | **Unverified / not claimed.**')&&false!==strpos($release,'Production release/deployment: **NO / UNVERIFIED**'));
+          $bad=array();foreach($checks as $n=>$ok){if(!$ok)$bad[]=$n;}if($bad){fwrite(STDERR,"T22 R10 historical-currentness regressions failed:\n- ".implode("\n- ",$bad)."\n");exit(1);}echo 'T22 R10 historical-currentness regressions: PASS '.count($checks).'/'.count($checks)."\n";
           ''')
-
           Path('tests/t24-r9-release-currentness-regressions.php').write_text(r'''<?php
-          $root = dirname( __DIR__ );
-          $readme = file_get_contents( $root . '/README.md' );
-          $status = file_get_contents( $root . '/STATUS.md' );
-          $release = file_get_contents( $root . '/docs/RELEASE-STATUS-1.0.0.md' );
-          $change = file_get_contents( $root . '/CHANGELOG.md' );
-          $ledger = file_get_contents( $root . '/docs/T24-R9-FROZEN-LEDGER.md' );
-          foreach ( array( $readme, $status, $release, $change, $ledger ) as $source ) { if ( ! is_string( $source ) ) { fwrite( STDERR, "T24 R9 source read failed\n" ); exit( 1 ); } }
-          $checks = array(
-            'README identifies T24 current cycle' => false !== strpos( $readme, 'Current review cycle: **T24 closure cycle' ),
-            'STATUS identifies T24 current discipline' => false !== strpos( $status, 'Current review discipline: **T24 closure cycle' ),
-            'release status identifies T24 current cycle' => false !== strpos( $release, 'Current review cycle: **T24 closure cycle**' ),
-            'changelog identifies T24 current cycle' => false !== strpos( $change, '**T24 closure cycle is the current repository review sequence.**' ),
-            'old T22 current-cycle assertion retired' => false === strpos( $change, '**T22 closure cycle is the current repository review sequence.**' ),
-            'old T22 exact-head run retired from current docs' => false === strpos( $readme, '34838735323' ) && false === strpos( $status, '34838735323' ) && false === strpos( $release, '34838735323' ) && false === strpos( $change, '34838735323' ),
-            'static docs avoid future CI success claim' => false !== strpos( $status, 'Exact-head CI/package status is determined from the canonical workflow on the exact HEAD' ) && false !== strpos( $release, 'does not hard-code a future CI success' ),
-            'live truth remains unclaimed' => false !== strpos( $status, 'Live-Deployed | **Unverified / not claimed.**' ) && false !== strpos( $release, 'Production release/deployment: **NO / UNVERIFIED**' ),
-            'R9 ledger proves review before correction' => false !== strpos( $ledger, 'No R9 correction was applied while the review remained open' ) && false !== strpos( $ledger, 'R9-D1' ),
-          );
-          $failures = array(); foreach ( $checks as $name => $ok ) { if ( ! $ok ) { $failures[] = $name; } }
-          if ( $failures ) { fwrite( STDERR, "T24 R9 release-currentness regressions failed:\n- " . implode( "\n- ", $failures ) . "\n" ); exit( 1 ); }
-          echo 'T24 R9 release-currentness regressions: PASS ' . count( $checks ) . '/' . count( $checks ) . "\n";
+          $root=dirname(__DIR__); $readme=file_get_contents($root.'/README.md'); $status=file_get_contents($root.'/STATUS.md'); $release=file_get_contents($root.'/docs/RELEASE-STATUS-1.0.0.md'); $change=file_get_contents($root.'/CHANGELOG.md'); $ledger=file_get_contents($root.'/docs/T24-R9-FROZEN-LEDGER.md');
+          foreach(array($readme,$status,$release,$change,$ledger) as $source){if(!is_string($source)){fwrite(STDERR,"T24 R9 source read failed\n");exit(1);}}
+          $checks=array('README T24 current'=>false!==strpos($readme,'Current review cycle: **T24 closure cycle'),'STATUS T24 current'=>false!==strpos($status,'Current review discipline: **T24 closure cycle'),'release T24 current'=>false!==strpos($release,'Current review cycle: **T24 closure cycle**'),'changelog T24 current'=>false!==strpos($change,'**T24 closure cycle is the current repository review sequence.**'),'old T22 current retired'=>false===strpos($change,'**T22 closure cycle is the current repository review sequence.**'),'old T22 run retired'=>false===strpos($readme,'34838735323')&&false===strpos($status,'34838735323')&&false===strpos($release,'34838735323')&&false===strpos($change,'34838735323'),'static docs avoid future CI claim'=>false!==strpos($status,'Exact-head CI/package status is determined from the canonical workflow on the exact HEAD')&&false!==strpos($release,'does not hard-code a future CI success'),'live truth unclaimed'=>false!==strpos($status,'Live-Deployed | **Unverified / not claimed.**')&&false!==strpos($release,'Production release/deployment: **NO / UNVERIFIED**'),'R9 ledger frozen before correction'=>false!==strpos($ledger,'No R9 correction was applied while the review remained open')&&false!==strpos($ledger,'R9-D1'));
+          $bad=array();foreach($checks as $n=>$ok){if(!$ok)$bad[]=$n;}if($bad){fwrite(STDERR,"T24 R9 release-currentness regressions failed:\n- ".implode("\n- ",$bad)."\n");exit(1);}echo 'T24 R9 release-currentness regressions: PASS '.count($checks).'/'.count($checks)."\n";
           ''')
-
-          runner = Path('tests/run-all.php')
-          r = runner.read_text()
+          runner=Path('tests/run-all.php'); r=runner.read_text()
           if 't24-r9-release-currentness-regressions.php' not in r:
-              needle = "'t24-r1-idempotency-uncertainty-regressions.php' );"
-              repl = "'t24-r1-idempotency-uncertainty-regressions.php', 't24-r9-release-currentness-regressions.php' );"
-              if needle not in r: raise SystemExit('T24 R9 aggregate insertion target missing')
-              runner.write_text(r.replace(needle, repl, 1))
+              needle="'t24-r1-idempotency-uncertainty-regressions.php' );"; repl="'t24-r1-idempotency-uncertainty-regressions.php', 't24-r9-release-currentness-regressions.php' );"
+              if needle not in r: raise SystemExit('aggregate insertion target missing')
+              runner.write_text(r.replace(needle,repl,1))
           PY
           git show db6d09fb53a9b7e946624431e4410f379687fa80:.github/workflows/file08-complete-quality.yml > .github/workflows/file08-complete-quality.yml
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
           php tests/run-all.php
-          node --check assets/js/clinic.js
-          node --check assets/js/continuity.js
-          node --check assets/js/future24.js
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add CHANGELOG.md tests/t22-r10-release-currentness-regressions.php tests/t24-r9-release-currentness-regressions.php tests/run-all.php .github/workflows/file08-complete-quality.yml
+          git add CHANGELOG.md tests/t19-r20-closure-hygiene-regressions.php tests/t22-r10-release-currentness-regressions.php tests/t24-r9-release-currentness-regressions.php tests/run-all.php .github/workflows/file08-complete-quality.yml
           git commit -m 'T24 R9: close release-currentness correction'
           git push origin HEAD:'${{ github.event.pull_request.head.ref }}'
