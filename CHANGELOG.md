@@ -2,8 +2,9 @@
 
 ## 1.2.15 — current repository candidate
 
-- **T22 closure cycle is the current repository review sequence.** Through R9: R1 clean; R2 defect-bearing/corrected; R3–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected and exact-head green at `c3b46247b69bd87534e5fab4133ebf423a1da893` / canonical run `34838735323`. R10 is the final T22 closure review and does not inherit prior exact-head QA after any correction changes HEAD.
-- T22 material hardening in the same 1.2.15 candidate includes **audit-actor provenance** alignment, **File26** whole-clinic eligibility/delegation invalidation reconciliation, and **localization/timezone** plus translation-safe Continuity presentation corrections.
+- **T24 closure cycle is the current repository review sequence.** Current ten-round continuation: T23 R10 clean; T24 R1 defect-bearing/corrected; T24 R2–R8 clean; T24 R9 defect-bearing/corrected. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.
+- T24 material hardening in the same 1.2.15 candidate includes uncertain-transaction idempotency retention for verified **CF02** complaint-status projection, verified **CF03** payment-status projection and generic **Future24** mutations, plus release-currentness documentation/regression correction.
+- **Historical T22 R1–R10 is closed.** Its former exact heads/runs remain provenance only after later commits.
 - **Historical T21 R1–R10 is closed.** Defect-bearing rounds were R1–R6, R9 and R10; clean rounds were R7 and R8. T21 remains provenance only and is not the current review cycle.
 - **T20 R1–R20 completed.** R1–R2 were clean; R3–R10 were defect/gap-bearing with R10 evidence-only; R11 was clean; R12 was defect-bearing; R13–R19 were clean; R20 was evidence-only defect-bearing. The latest T20 ten rounds were 8/10 clean (80%).
 - T20 materially hardened the same 1.2.15 runtime candidate with appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization-boundary hardening, availability-projection correction, payment-currency persistence parity, calendar-provider practitioner/source-order/idempotency hardening, and release-evidence alignment.
