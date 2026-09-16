@@ -9,7 +9,7 @@ $required = array(
     "add_action( 'added_user_meta', array( __CLASS__, 'delegation_meta_changed' ), 20, 4 )",
     "add_action( 'updated_user_meta', array( __CLASS__, 'delegation_meta_changed' ), 20, 4 )",
     "add_action( 'deleted_user_meta', array( __CLASS__, 'delegation_meta_changed' ), 20, 4 )",
-    "self::run_or_retry( \$user_id, \$eligible, 'delegation_changed', 'File08' )",
+    "self::run_or_retry( \$user_id, \$eligible, 'delegation_changed', 'File08', 0 )",
     's.doctor_user_id=%d',
     'a.doctor_user_id=%d',
     'WCA_Service::public_clinic_projection( $clinic_ref )',
