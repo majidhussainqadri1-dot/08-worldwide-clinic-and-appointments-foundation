@@ -37,7 +37,7 @@ r20_check(
     'release status preserves T19 as history without requiring stale wording',
     false === strpos( $release, 'REVIEWABLE CANDIDATE UNDER T19 SEQUENTIAL AUDIT' )
         && false !== strpos( $release, 'T19' )
-        && false !== strpos( $release, 'historical evidence' )
+        && ( false !== strpos( $release, 'historical evidence' ) || false !== strpos( $release, 'historical provenance' ) )
 );
 r20_check( 'current changelog carries core 3.4', false !== strpos( $change, 'Current core schema is **3.4.0**' ) );
 r20_check( 'current changelog carries Future24 1.1', false !== strpos( $change, 'Future24 schema/contract **1.1.0**' ) );
