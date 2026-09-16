@@ -352,7 +352,14 @@ final class WCA_Future24 {
 		}
 		$result = call_user_func_array( array( __CLASS__, $method ), (array) $args );
 		if ( is_wp_error( $result ) ) {
-			WCA_Repository::release_idempotency( $claim['id'] );
+			$error_data = $result->get_error_data();
+			$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );
+			if ( $state_uncertain ) {
+				WCA_Observability::metric( 'future24_idempotency_state_uncertain_total', 1, array( 'scope' => sanitize_key( $scope ) ) );
+				WCA_Observability::log( 'critical', 'future24_idempotency_state_uncertain', array( 'scope' => sanitize_key( $scope ), 'claim_id' => absint( $claim['id'] ) ) );
+			} else {
+				WCA_Repository::release_idempotency( $claim['id'] );
+			}
 			return $result;
 		}
 		$completed = WCA_Repository::complete_idempotency( $claim['id'], $status, $result );

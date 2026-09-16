@@ -1084,7 +1084,7 @@ final class WCA_Service {
 		if(!is_array($event)||true!==($event['verified']??false)||'CF02'!==(string)($event['source']??'')){return new WP_Error('wca_cf02_case_unverified',__('Only a verified CF02 case fact may update File 08 complaint state.','worldwide-clinic-appointments'),array('status'=>403));}
 		$event_id=sanitize_text_field($event['event_id']??''); $ref=strtolower(sanitize_text_field($event['complaint_ref']??'')); $next=sanitize_key($event['status']??''); $expected=self::strict_id($event['expected_version']??null); if(!preg_match('/^[A-Za-z0-9._:-]{8,191}$/',$event_id)||!preg_match('/^[0-9a-f-]{36}$/',$ref)||!isset(WCA_Contracts::complaint_transition_matrix()[$next])||null===$expected){return new WP_Error('wca_cf02_case_event_invalid',__('Verified CF02 complaint event is malformed.','worldwide-clinic-appointments'),array('status'=>400));}
 		$claim=WCA_Repository::claim_idempotency('cf02_complaint_status',$event_id,0,array('complaint_ref'=>$ref,'status'=>$next,'expected_version'=>$expected)); if(is_wp_error($claim)){return $claim;} if('completed'===(string)($claim['status']??'')){return $claim['response'];} if(empty($claim['claimed_new'])){return new WP_Error('wca_cf02_case_event_in_progress',__('This complaint case fact is already being reconciled.','worldwide-clinic-appointments'),array('status'=>409));}
-		$result=WCA_Repository::transaction(function() use($event,$ref,$next,$expected,$claim,$event_id){$updated=WCA_Repository::transition_complaint($ref,$next,$expected,absint($event['assigned_user_id']??0),(array)($event['outcome']??array())); if(is_wp_error($updated)){return $updated;} $trace=WCA_Observability::trace_id(); $audit=WCA_Repository::append_event('ComplaintCaseStatusProjected.v1','complaint',$ref,array('event_id'=>WCA_Repository::uuid(),'source_event_id'=>$event_id,'complaint_ref'=>$ref,'status'=>$next,'trace_id'=>$trace),0,$trace); if(is_wp_error($audit)){return $audit;} $response=array('public_ref'=>$ref,'status'=>$next,'version'=>absint($updated['version']),'updated_at'=>(string)$updated['updated_at']); if(!WCA_Repository::complete_idempotency($claim['id'],200,$response)){return new WP_Error('wca_cf02_case_finalize',__('Complaint case projection could not be finalized safely.','worldwide-clinic-appointments'),array('status'=>500));} return $response;},'wca_cf02_complaint_projection_transaction'); if(is_wp_error($result)){WCA_Repository::release_idempotency($claim['id']);} return $result;
+		$result=WCA_Repository::transaction(function() use($event,$ref,$next,$expected,$claim,$event_id){$updated=WCA_Repository::transition_complaint($ref,$next,$expected,absint($event['assigned_user_id']??0),(array)($event['outcome']??array())); if(is_wp_error($updated)){return $updated;} $trace=WCA_Observability::trace_id(); $audit=WCA_Repository::append_event('ComplaintCaseStatusProjected.v1','complaint',$ref,array('event_id'=>WCA_Repository::uuid(),'source_event_id'=>$event_id,'complaint_ref'=>$ref,'status'=>$next,'trace_id'=>$trace),0,$trace); if(is_wp_error($audit)){return $audit;} $response=array('public_ref'=>$ref,'status'=>$next,'version'=>absint($updated['version']),'updated_at'=>(string)$updated['updated_at']); if(!WCA_Repository::complete_idempotency($claim['id'],200,$response)){return new WP_Error('wca_cf02_case_finalize',__('Complaint case projection could not be finalized safely.','worldwide-clinic-appointments'),array('status'=>500));} return $response;},'wca_cf02_complaint_projection_transaction'); if(is_wp_error($result)){ $error_data=$result->get_error_data(); $state_uncertain=is_array($error_data)&&!empty($error_data['state_uncertain']); if($state_uncertain){ WCA_Observability::metric('cf02_complaint_status_state_uncertain_total',1); WCA_Observability::log('critical','cf02_complaint_status_state_uncertain',array('complaint_ref'=>$ref,'idempotency_claim_id'=>absint($claim['id']))); } else { WCA_Repository::release_idempotency($claim['id']); } } return $result;
 	}
 
 	private static function approved_payment_provider( $provider ) {
@@ -1346,7 +1346,16 @@ final class WCA_Service {
 			if ( ! WCA_Repository::complete_idempotency( $claim['id'], 200, $response ) ) { return new WP_Error( 'wca_payment_status_idempotency_complete', __( 'Payment status reconciliation could not be finalized safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 			return $response;
 		}, 'wca_payment_status_projection_transaction' );
-		if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); }
+		if ( is_wp_error( $result ) ) {
+			$error_data = $result->get_error_data();
+			$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );
+			if ( $state_uncertain ) {
+				WCA_Observability::metric( 'payment_status_projection_state_uncertain_total', 1 );
+				WCA_Observability::log( 'critical', 'payment_status_projection_state_uncertain', array( 'payment_intent_ref' => $payment_ref, 'idempotency_claim_id' => absint( $claim['id'] ) ) );
+			} else {
+				WCA_Repository::release_idempotency( $claim['id'] );
+			}
+		}
 		return $result;
 	}
 
