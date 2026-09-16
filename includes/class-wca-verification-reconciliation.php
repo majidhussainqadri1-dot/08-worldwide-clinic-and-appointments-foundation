@@ -9,33 +9,35 @@
  *
  * @package Worldwide_Clinic_Appointments
  */
-
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Verification_Reconciliation {
 	const CONTRACT_VERSION = '1.1.0';
 	const DELEGATION_META_KEY = '_wca_clinic_delegations';
+	const MAX_ATTEMPTS = 8;
+	const DEAD_LETTER_OPTION = 'wca_verification_reconciliation_dead_letters';
+	const MAX_DEAD_LETTERS = 100;
 
 	public static function boot() {
 		add_action( 'wca_doctor_suspended', array( __CLASS__, 'doctor_ineligible' ), 20, 2 );
 		add_action( 'wca_doctor_revoked', array( __CLASS__, 'doctor_ineligible' ), 20, 2 );
 		add_action( 'wca_doctor_verified', array( __CLASS__, 'doctor_reverified' ), 20, 1 );
-		add_action( 'wca_retry_doctor_eligibility_reconciliation', array( __CLASS__, 'retry' ), 20, 4 );
+		add_action( 'wca_retry_doctor_eligibility_reconciliation', array( __CLASS__, 'retry' ), 20, 5 );
 		add_action( 'added_user_meta', array( __CLASS__, 'delegation_meta_changed' ), 20, 4 );
 		add_action( 'updated_user_meta', array( __CLASS__, 'delegation_meta_changed' ), 20, 4 );
 		add_action( 'deleted_user_meta', array( __CLASS__, 'delegation_meta_changed' ), 20, 4 );
 	}
 
 	public static function doctor_ineligible( $doctor_user_id, $reason = '' ) {
-		return self::run_or_retry( absint( $doctor_user_id ), false, sanitize_text_field( $reason ), 'File09' );
+		return self::run_or_retry( absint( $doctor_user_id ), false, sanitize_text_field( $reason ), 'File09', 0 );
 	}
 
 	public static function doctor_reverified( $doctor_user_id ) {
-		return self::run_or_retry( absint( $doctor_user_id ), true, 'verification_restored', 'File09' );
+		return self::run_or_retry( absint( $doctor_user_id ), true, 'verification_restored', 'File09', 0 );
 	}
 
-	public static function retry( $doctor_user_id, $eligible, $reason, $source_owner = 'File09' ) {
-		return self::run_or_retry( absint( $doctor_user_id ), (bool) $eligible, sanitize_text_field( $reason ), self::source_owner( $source_owner ) );
+	public static function retry( $doctor_user_id, $eligible, $reason, $source_owner = 'File09', $attempt = 1 ) {
+		return self::run_or_retry( absint( $doctor_user_id ), (bool) $eligible, sanitize_text_field( $reason ), self::source_owner( $source_owner ), absint( $attempt ) );
 	}
 
 	/** Observe only the File 08 delegation authority meta; unrelated user-meta changes are ignored. */
@@ -45,23 +47,85 @@ final class WCA_Verification_Reconciliation {
 		$user_id = absint( $user_id );
 		if ( ! $user_id ) { return; }
 		$eligible = class_exists( 'SWC_Doctor_Authority' ) && SWC_Doctor_Authority::is_eligible( $user_id );
-		self::run_or_retry( $user_id, $eligible, 'delegation_changed', 'File08' );
+		self::run_or_retry( $user_id, $eligible, 'delegation_changed', 'File08', 0 );
 	}
 
 	private static function source_owner( $source_owner ) {
 		return 'File08' === (string) $source_owner ? 'File08' : 'File09';
 	}
 
-	private static function run_or_retry( $doctor_user_id, $practitioner_eligible, $reason, $source_owner ) {
+	private static function run_or_retry( $doctor_user_id, $practitioner_eligible, $reason, $source_owner, $attempt = 0 ) {
 		$source_owner = self::source_owner( $source_owner );
+		$attempt = max( 0, absint( $attempt ) );
 		$result = self::publish_clinic_eligibility( $doctor_user_id, $practitioner_eligible, $reason, $source_owner );
-		if ( ! is_wp_error( $result ) ) { return true; }
-		WCA_Observability::log( 'error', 'verification_reconciliation_failed', array( 'doctor_user_id' => $doctor_user_id, 'eligible' => $practitioner_eligible ? 'yes' : 'no', 'source_owner' => $source_owner, 'error_code' => $result->get_error_code() ) );
-		$args = array( $doctor_user_id, $practitioner_eligible ? 1 : 0, $reason, $source_owner );
+		if ( ! is_wp_error( $result ) ) {
+			$cleared = self::clear_dead_letter( $doctor_user_id, $practitioner_eligible, $reason, $source_owner );
+			if ( is_wp_error( $cleared ) ) {
+				WCA_Observability::log( 'critical', 'verification_reconciliation_dead_letter_clear_failed', array( 'doctor_user_id' => $doctor_user_id, 'source_owner' => $source_owner, 'error_code' => $cleared->get_error_code() ) );
+				return $cleared;
+			}
+			return true;
+		}
+
+		WCA_Observability::log( 'error', 'verification_reconciliation_failed', array( 'doctor_user_id' => $doctor_user_id, 'eligible' => $practitioner_eligible ? 'yes' : 'no', 'source_owner' => $source_owner, 'attempt' => $attempt + 1, 'error_code' => $result->get_error_code() ) );
+		$next_attempt = $attempt + 1;
+		if ( $next_attempt >= self::MAX_ATTEMPTS ) {
+			$dead = self::persist_dead_letter( $doctor_user_id, $practitioner_eligible, $reason, $source_owner, $next_attempt, $result->get_error_code() );
+			if ( is_wp_error( $dead ) ) { return $dead; }
+			WCA_Observability::metric( 'verification_reconciliation_dead_letter_total', 1, array( 'source_owner' => $source_owner ) );
+			WCA_Observability::log( 'critical', 'verification_reconciliation_dead_lettered', array( 'doctor_user_id' => $doctor_user_id, 'eligible' => $practitioner_eligible ? 'yes' : 'no', 'source_owner' => $source_owner, 'attempts' => $next_attempt, 'error_code' => $result->get_error_code() ) );
+			return $result;
+		}
+
+		$delay = min( HOUR_IN_SECONDS, MINUTE_IN_SECONDS * (int) pow( 2, min( 6, $attempt ) ) );
+		$args = array( $doctor_user_id, $practitioner_eligible ? 1 : 0, $reason, $source_owner, $next_attempt );
 		if ( ! wp_next_scheduled( 'wca_retry_doctor_eligibility_reconciliation', $args ) ) {
-			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, 'wca_retry_doctor_eligibility_reconciliation', $args );
+			$scheduled = wp_schedule_single_event( time() + $delay, 'wca_retry_doctor_eligibility_reconciliation', $args, true );
+			if ( is_wp_error( $scheduled ) || false === $scheduled ) {
+				$code = is_wp_error( $scheduled ) ? $scheduled->get_error_code() : 'schedule_failed';
+				$dead = self::persist_dead_letter( $doctor_user_id, $practitioner_eligible, $reason, $source_owner, $next_attempt, $code );
+				if ( is_wp_error( $dead ) ) { return $dead; }
+				WCA_Observability::metric( 'verification_reconciliation_schedule_failure_total', 1, array( 'source_owner' => $source_owner ) );
+				WCA_Observability::log( 'critical', 'verification_reconciliation_retry_schedule_failed', array( 'doctor_user_id' => $doctor_user_id, 'source_owner' => $source_owner, 'attempts' => $next_attempt, 'error_code' => $code ) );
+			}
 		}
 		return $result;
+	}
+
+	private static function dead_letter_key( $doctor_user_id, $practitioner_eligible, $reason, $source_owner ) {
+		return hash( 'sha256', absint( $doctor_user_id ) . '|' . ( $practitioner_eligible ? '1' : '0' ) . '|' . sanitize_text_field( $reason ) . '|' . self::source_owner( $source_owner ) );
+	}
+
+	/** @return true|WP_Error */
+	private static function persist_dead_letter( $doctor_user_id, $practitioner_eligible, $reason, $source_owner, $attempts, $error_code ) {
+		$all = (array) get_option( self::DEAD_LETTER_OPTION, array() );
+		$key = self::dead_letter_key( $doctor_user_id, $practitioner_eligible, $reason, $source_owner );
+		$all[ $key ] = array(
+			'doctor_user_id' => absint( $doctor_user_id ),
+			'eligible'       => (bool) $practitioner_eligible,
+			'reason'         => substr( sanitize_text_field( $reason ), 0, 191 ),
+			'source_owner'   => self::source_owner( $source_owner ),
+			'attempts'       => absint( $attempts ),
+			'error_code'     => sanitize_key( $error_code ),
+			'failed_at'      => WCA_Repository::now(),
+		);
+		while ( count( $all ) > self::MAX_DEAD_LETTERS ) { array_shift( $all ); }
+		$written = SWC_Helpers::update_option_strict( self::DEAD_LETTER_OPTION, $all, 'wca_verification_reconciliation_dead_letter_write' );
+		return is_wp_error( $written ) ? $written : true;
+	}
+
+	/** @return true|WP_Error */
+	private static function clear_dead_letter( $doctor_user_id, $practitioner_eligible, $reason, $source_owner ) {
+		$all = (array) get_option( self::DEAD_LETTER_OPTION, array() );
+		$key = self::dead_letter_key( $doctor_user_id, $practitioner_eligible, $reason, $source_owner );
+		if ( ! isset( $all[ $key ] ) ) { return true; }
+		unset( $all[ $key ] );
+		$written = SWC_Helpers::update_option_strict( self::DEAD_LETTER_OPTION, $all, 'wca_verification_reconciliation_dead_letter_clear' );
+		return is_wp_error( $written ) ? $written : true;
+	}
+
+	public static function dead_letter_count() {
+		return count( (array) get_option( self::DEAD_LETTER_OPTION, array() ) );
 	}
 
 	private static function publish_clinic_eligibility( $doctor_user_id, $practitioner_eligible, $reason, $source_owner ) {
