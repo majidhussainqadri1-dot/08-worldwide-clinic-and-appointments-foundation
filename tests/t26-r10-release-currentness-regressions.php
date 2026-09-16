@@ -26,7 +26,7 @@ $checks = array(
     'release carries T26 round truth' => false !== strpos( $release, $round_truth ),
     'T25 is historical rather than current' => false !== strpos( $status, '## Historical T25 result' ) && false !== strpos( $change, 'Historical T25 R1–R10 is closed' ) && false === strpos( $package, 'current repository review sequence is **T25**' ),
     'runtime identity remains 1.2.15' => false !== strpos( $readme, 'Runtime candidate: **1.2.15**' ) && false !== strpos( $release, 'Runtime candidate: **1.2.15**' ),
-    'Public Clinic contract remains 1.1.0' => false !== strpos( $contracts, "PUBLIC_CLINIC_CONTRACT_VERSION = '1.1.0'" ) && false !== strpos( $release, 'Public Clinic Contract: **1.1.0**' ),
+    'Public Clinic contract remains 1.1.0' => 1 === preg_match( "/PUBLIC_CLINIC_CONTRACT_VERSION\\s*=\\s*'1\\.1\\.0'/", $contracts ) && false !== strpos( $release, 'Public Clinic Contract: **1.1.0**' ),
     'governing booking route remains canonical' => false !== strpos( $readme, '/appointments/book/{doctor_or_clinic}' ) && false !== strpos( $contracts, "'pattern' => '/appointments/book/{doctor_or_clinic}'" ),
     'old practitioner-only booking route is absent' => false === strpos( $readme, '/appointments/book/{opaque_practitioner_ref}' ),
     'canonical exact-head workflow remains' => false !== strpos( $workflow, "php: ['7.4', '8.3']" ) && false !== strpos( $workflow, 'Build twice' ) && false !== strpos( $workflow, 'Independent verification' ),
