@@ -4,7 +4,6 @@
  *
  * @package Worldwide_Clinic_Appointments
  */
-
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Observability {
@@ -90,12 +89,21 @@ final class WCA_Observability {
 		$runtime_failure = get_option( 'wca_runtime_migration_failure', false );
 		$queue = WCA_Repository::outbox_queue_status();
 		if ( is_wp_error( $queue ) ) { $queue = array( 'pending' => 0, 'retry' => 0, 'processing' => 0, 'dead_letter' => 0, 'due' => 0, 'oldest_due_at' => '', 'db_read_ok' => false, 'healthy' => false ); }
+		$legacy_status_complete = class_exists( 'WCA_Compatibility' ) && (bool) get_option( WCA_Compatibility::MIGRATION_OPTION, false );
+		$verification_dead_letters = class_exists( 'WCA_Verification_Reconciliation' ) ? WCA_Verification_Reconciliation::dead_letter_count() : 0;
 		$checks = array(
 			'runtime_version' => defined( 'WCA_VERSION' ) ? WCA_VERSION : '',
 			'schema'          => class_exists( 'WCA_Schema' ) ? WCA_Schema::health() : array( 'available' => false ),
 			'continuity'      => class_exists( 'WCA_Continuity' ) ? WCA_Continuity::health() : array( 'available' => false ),
 			'future24'        => class_exists( 'WCA_Future24' ) ? WCA_Future24::health() : array( 'available' => false ),
-			'migration'       => array( 'runtime_failure_absent' => false === $runtime_failure || empty( $runtime_failure ) ),
+			'migration'       => array(
+				'runtime_failure_absent'   => false === $runtime_failure || empty( $runtime_failure ),
+				'legacy_statuses_complete' => $legacy_status_complete,
+			),
+			'verification_reconciliation' => array(
+				'dead_letter_free' => 0 === $verification_dead_letters,
+				'dead_letter_count'=> absint( $verification_dead_letters ),
+			),
 			'dependencies'    => class_exists( 'SWC_Activator' ) ? SWC_Activator::dependencies_ready() : false,
 			'legacy_checks'   => class_exists( 'SWC_Activator' ) ? SWC_Activator::system_checks() : array(),
 			'cron'            => array(
@@ -108,7 +116,7 @@ final class WCA_Observability {
 			'generated_at_utc' => gmdate( 'c' ),
 		);
 		$continuity_ok = isset( $checks['continuity']['status'] ) && 'ok' === $checks['continuity']['status'] && ! empty( $checks['continuity']['schema_current'] );
-		$checks['ok'] = self::all_true( $checks['schema'] ) && $continuity_ok && self::all_true( $checks['future24'] ) && self::all_true( $checks['migration'] ) && (bool) $checks['dependencies'] && self::all_true( $checks['legacy_checks'] ) && self::all_true( $checks['cron'] ) && self::all_true( $checks['outbox_queue'] );
+		$checks['ok'] = self::all_true( $checks['schema'] ) && $continuity_ok && self::all_true( $checks['future24'] ) && self::all_true( $checks['migration'] ) && self::all_true( $checks['verification_reconciliation'] ) && (bool) $checks['dependencies'] && self::all_true( $checks['legacy_checks'] ) && self::all_true( $checks['cron'] ) && self::all_true( $checks['outbox_queue'] );
 		return $checks;
 	}
 
