@@ -1,63 +1,84 @@
-name: File 08 T24 R9 Final Correction Runner
+name: File 08 Complete Master Plan Quality
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches: [main]
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: file08-complete-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  correct:
+  quality:
+    name: PHP ${{ matrix.php }} and source contracts
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.3']
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: '${{ github.event.pull_request.head.ref }}'
-          fetch-depth: 12
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
-        with: {php-version: '8.3', coverage: none, extensions: zip}
-      - name: Apply T24 R9 source corrections and push without workflow mutation
+        with: {php-version: '${{ matrix.php }}', coverage: none, extensions: zip}
+      - name: PHP syntax
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Master-plan, security and state tests
+        run: php tests/run-all.php
+      - name: JavaScript syntax
+        run: |
+          node --check assets/js/clinic.js
+          node --check assets/js/continuity.js
+          node --check assets/js/future24.js
+      - name: Repository hygiene
         shell: bash
         run: |
           set -euo pipefail
-          test -f docs/T24-R9-FROZEN-LEDGER.md
-          python3 - <<'PY'
-          from pathlib import Path
-          changelog=Path('CHANGELOG.md'); c=changelog.read_text()
-          c=c.replace("- **T22 closure cycle is the current repository review sequence.** Through R9: R1 clean; R2 defect-bearing/corrected; R3–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected and exact-head green at `c3b46247b69bd87534e5fab4133ebf423a1da893` / canonical run `34838735323`. R10 is the final T22 closure review and does not inherit prior exact-head QA after any correction changes HEAD.","- **T24 closure cycle is the current repository review sequence.** Current ten-round continuation: T23 R10 clean; T24 R1 defect-bearing/corrected; T24 R2–R8 clean; T24 R9 defect-bearing/corrected. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.",1)
-          c=c.replace("- T22 material hardening in the same 1.2.15 candidate includes **audit-actor provenance** alignment, **File26** whole-clinic eligibility/delegation invalidation reconciliation, and **localization/timezone** plus translation-safe Continuity presentation corrections.","- T24 material hardening in the same 1.2.15 candidate includes uncertain-transaction idempotency retention for verified **CF02** complaint-status projection, verified **CF03** payment-status projection and generic **Future24** mutations, plus release-currentness documentation/regression correction.\n- **Historical T22 R1–R10 is closed.** Its former exact heads/runs remain provenance only after later commits.",1)
-          if '**T24 closure cycle is the current repository review sequence.**' not in c or '**T22 closure cycle is the current repository review sequence.**' in c: raise SystemExit('changelog currentness correction failed')
-          changelog.write_text(c)
-          t19=Path('tests/t19-r20-closure-hygiene-regressions.php'); x=t19.read_text()
-          old="        && false !== strpos( $release, 'historical evidence' )"; new="        && ( false !== strpos( $release, 'historical evidence' ) || false !== strpos( $release, 'historical provenance' ) )"
-          if old in x: x=x.replace(old,new,1)
-          if new not in x: raise SystemExit('T19 historical wording compatibility correction missing')
-          t19.write_text(x)
-          Path('tests/t22-r10-release-currentness-regressions.php').write_text(r'''<?php
-$root=dirname(__DIR__); $readme=file_get_contents($root.'/README.md'); $status=file_get_contents($root.'/STATUS.md'); $release=file_get_contents($root.'/docs/RELEASE-STATUS-1.0.0.md'); $change=file_get_contents($root.'/CHANGELOG.md'); $ledger=file_get_contents($root.'/docs/T22-R10-FROZEN-LEDGER.md');
-foreach(array($readme,$status,$release,$change,$ledger) as $source){if(!is_string($source)){fwrite(STDERR,"T22 R10 source read failed\n");exit(1);}}
-$checks=array('README keeps T22 historical'=>false!==strpos($readme,'Historical T22:'),'STATUS keeps T22 historical'=>false!==strpos($status,'## Historical T22 result'),'release keeps T22 historical'=>false!==strpos($release,'Historical T22 and T21'),'changelog keeps T22 historical'=>false!==strpos($change,'Historical T22 R1–R10 is closed'),'T22 ledger preserved'=>false!==strpos($ledger,'read-only closure/release-truth review')&&false!==strpos($ledger,'No R10 correction was applied while the review was open'),'live truth separate'=>false!==strpos($status,'Live-Deployed | **Unverified / not claimed.**')&&false!==strpos($release,'Production release/deployment: **NO / UNVERIFIED**'));
-$bad=array();foreach($checks as $n=>$ok){if(!$ok)$bad[]=$n;}if($bad){fwrite(STDERR,"T22 R10 historical-currentness regressions failed:\n- ".implode("\n- ",$bad)."\n");exit(1);}echo 'T22 R10 historical-currentness regressions: PASS '.count($checks).'/'.count($checks)."\n";
-''')
-          Path('tests/t24-r9-release-currentness-regressions.php').write_text(r'''<?php
-$root=dirname(__DIR__); $readme=file_get_contents($root.'/README.md'); $status=file_get_contents($root.'/STATUS.md'); $release=file_get_contents($root.'/docs/RELEASE-STATUS-1.0.0.md'); $change=file_get_contents($root.'/CHANGELOG.md'); $ledger=file_get_contents($root.'/docs/T24-R9-FROZEN-LEDGER.md');
-foreach(array($readme,$status,$release,$change,$ledger) as $source){if(!is_string($source)){fwrite(STDERR,"T24 R9 source read failed\n");exit(1);}}
-$checks=array('README T24 current'=>false!==strpos($readme,'Current review cycle: **T24 closure cycle'),'STATUS T24 current'=>false!==strpos($status,'Current review discipline: **T24 closure cycle'),'release T24 current'=>false!==strpos($release,'Current review cycle: **T24 closure cycle**'),'changelog T24 current'=>false!==strpos($change,'**T24 closure cycle is the current repository review sequence.**'),'old T22 current retired'=>false===strpos($change,'**T22 closure cycle is the current repository review sequence.**'),'old T22 run retired'=>false===strpos($readme,'34838735323')&&false===strpos($status,'34838735323')&&false===strpos($release,'34838735323')&&false===strpos($change,'34838735323'),'static docs avoid future CI claim'=>false!==strpos($status,'Exact-head CI/package status is determined from the canonical workflow on the exact HEAD')&&false!==strpos($release,'does not hard-code a future CI success'),'live truth unclaimed'=>false!==strpos($status,'Live-Deployed | **Unverified / not claimed.**')&&false!==strpos($release,'Production release/deployment: **NO / UNVERIFIED**'),'R9 ledger frozen before correction'=>false!==strpos($ledger,'No R9 correction was applied while the review remained open')&&false!==strpos($ledger,'R9-D1'));
-$bad=array();foreach($checks as $n=>$ok){if(!$ok)$bad[]=$n;}if($bad){fwrite(STDERR,"T24 R9 release-currentness regressions failed:\n- ".implode("\n- ",$bad)."\n");exit(1);}echo 'T24 R9 release-currentness regressions: PASS '.count($checks).'/'.count($checks)."\n";
-''')
-          runner=Path('tests/run-all.php'); r=runner.read_text()
-          if 't24-r9-release-currentness-regressions.php' not in r:
-              needle="'t24-r1-idempotency-uncertainty-regressions.php' );"; repl="'t24-r1-idempotency-uncertainty-regressions.php', 't24-r9-release-currentness-regressions.php' );"
-              if needle not in r: raise SystemExit('aggregate insertion target missing')
-              runner.write_text(r.replace(needle,repl,1))
-          PY
-          git show db6d09fb53a9b7e946624431e4410f379687fa80:.github/workflows/file08-complete-quality.yml > /tmp/canonical-workflow.yml
-          cp /tmp/canonical-workflow.yml .github/workflows/file08-complete-quality.yml
-          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
-          php tests/run-all.php
-          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
-          git checkout -- .github/workflows/file08-complete-quality.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add CHANGELOG.md tests/t19-r20-closure-hygiene-regressions.php tests/t22-r10-release-currentness-regressions.php tests/t24-r9-release-currentness-regressions.php tests/run-all.php
-          git commit -m 'T24 R9: close release-currentness source correction'
-          git push origin HEAD:'${{ github.event.pull_request.head.ref }}'
+          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
+          test -z "$(find . -type l -print -quit)"
+          test ! -e .gitmodules
+          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
+          test "$(find .github/workflows -maxdepth 1 -type f -name '*.yml' | wc -l | tr -d ' ')" = "1"
+          test "$(find .github/scripts -maxdepth 1 -type f -name 't*-correct*.py' 2>/dev/null | wc -l | tr -d ' ')" = "0"
+          test "$(find tools -maxdepth 1 -type f -name 't*-correct*.py' 2>/dev/null | wc -l | tr -d ' ')" = "0"
+          test ! -e tools/build-development-candidate.php
+          test ! -e tools/verify-development-candidate.php
+          test ! -e CHECKSUMS.sha256
+          test ! -e CORRECTIVE-CHECKSUMS.sha256
+  candidate:
+    name: Reproducible candidate package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: quality
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(php -r '$source=file_get_contents("worldwide-clinic.php"); if(!is_string($source)||preg_match("/^\\s*\\* Version:\\s*([^\\s]+)/m",$source,$m)!==1){exit(1);} echo $m[1];')
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build twice
+        run: |
+          php tools/build-candidate.php --output-dir=build/a --commit='${{ steps.source.outputs.sha }}' --source-date-epoch='${{ steps.source.outputs.epoch }}'
+          php tools/build-candidate.php --output-dir=build/b --commit='${{ steps.source.outputs.sha }}' --source-date-epoch='${{ steps.source.outputs.epoch }}'
+          cmp build/a/*-candidate.zip build/b/*-candidate.zip
+          cmp build/a/*-candidate-manifest.json build/b/*-candidate-manifest.json
+          cmp build/a/*-candidate.sha256 build/b/*-candidate.sha256
+      - name: Independent verification
+        run: |
+          php tools/verify-candidate.php --artifact=build/a --commit='${{ steps.source.outputs.sha }}'
+          cat build/a/*-candidate.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: file-08-${{ steps.source.outputs.version }}-candidate-${{ steps.source.outputs.sha }}
+          path: build/a/
+          if-no-files-found: error
+          retention-days: 30
