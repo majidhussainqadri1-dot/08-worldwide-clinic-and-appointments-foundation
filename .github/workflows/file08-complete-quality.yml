@@ -4,75 +4,61 @@ on:
     branches: [main]
 permissions:
   contents: write
-concurrency:
-  group: file08-t24-r1-correction-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   correct:
-    name: Apply and verify T24 R1 frozen-ledger corrections
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: '${{ github.event.pull_request.head.ref }}'
-          fetch-depth: 6
+          fetch-depth: 8
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none, extensions: zip}
-      - name: Correct only after complete frozen review
+      - name: Apply, verify, and push source-only correction batch
         shell: bash
         run: |
           set -euo pipefail
           test -f docs/T24-R1-FROZEN-LEDGER.md
           python3 - <<'PY'
           from pathlib import Path
-          service = Path('includes/class-wca-service.php')
-          s = service.read_text()
-          def replace_in_function(text, start_marker, end_marker, old, new):
-              start = text.index(start_marker); end = text.index(end_marker, start); block = text[start:end]
-              if old not in block: raise SystemExit(f'Expected target missing in {start_marker}')
-              return text[:start] + block.replace(old, new, 1) + text[end:]
+          service=Path('includes/class-wca-service.php'); s=service.read_text()
+          def rif(text,start_marker,end_marker,old,new):
+              start=text.index(start_marker); end=text.index(end_marker,start); block=text[start:end]
+              if old not in block: raise SystemExit('Expected target missing: '+start_marker)
+              return text[:start]+block.replace(old,new,1)+text[end:]
           if 'cf02_complaint_status_state_uncertain_total' not in s:
-              s = replace_in_function(s, 'public static function consume_cf02_case_status_event', 'private static function approved_payment_provider', "if(is_wp_error($result)){WCA_Repository::release_idempotency($claim['id']);} return $result;", "if(is_wp_error($result)){ $error_data=$result->get_error_data(); $state_uncertain=is_array($error_data)&&!empty($error_data['state_uncertain']); if($state_uncertain){ WCA_Observability::metric('cf02_complaint_status_state_uncertain_total',1); WCA_Observability::log('critical','cf02_complaint_status_state_uncertain',array('complaint_ref'=>$ref,'idempotency_claim_id'=>absint($claim['id']))); } else { WCA_Repository::release_idempotency($claim['id']); } } return $result;")
+              s=rif(s,'public static function consume_cf02_case_status_event','private static function approved_payment_provider',"if(is_wp_error($result)){WCA_Repository::release_idempotency($claim['id']);} return $result;","if(is_wp_error($result)){ $error_data=$result->get_error_data(); $state_uncertain=is_array($error_data)&&!empty($error_data['state_uncertain']); if($state_uncertain){ WCA_Observability::metric('cf02_complaint_status_state_uncertain_total',1); WCA_Observability::log('critical','cf02_complaint_status_state_uncertain',array('complaint_ref'=>$ref,'idempotency_claim_id'=>absint($claim['id']))); } else { WCA_Repository::release_idempotency($claim['id']); } } return $result;")
           if 'payment_status_projection_state_uncertain_total' not in s:
-              old = "if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); }\n\t\treturn $result;"
-              new = "if ( is_wp_error( $result ) ) {\n\t\t\t$error_data = $result->get_error_data();\n\t\t\t$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );\n\t\t\tif ( $state_uncertain ) {\n\t\t\t\tWCA_Observability::metric( 'payment_status_projection_state_uncertain_total', 1 );\n\t\t\t\tWCA_Observability::log( 'critical', 'payment_status_projection_state_uncertain', array( 'payment_intent_ref' => $payment_ref, 'idempotency_claim_id' => absint( $claim['id'] ) ) );\n\t\t\t} else {\n\t\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\t}\n\t\t}\n\t\treturn $result;"
-              s = replace_in_function(s, 'public static function consume_payment_status_event', '\n}\n', old, new)
+              old="if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); }\n\t\treturn $result;"
+              new="if ( is_wp_error( $result ) ) {\n\t\t\t$error_data = $result->get_error_data();\n\t\t\t$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );\n\t\t\tif ( $state_uncertain ) {\n\t\t\t\tWCA_Observability::metric( 'payment_status_projection_state_uncertain_total', 1 );\n\t\t\t\tWCA_Observability::log( 'critical', 'payment_status_projection_state_uncertain', array( 'payment_intent_ref' => $payment_ref, 'idempotency_claim_id' => absint( $claim['id'] ) ) );\n\t\t\t} else {\n\t\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\t}\n\t\t}\n\t\treturn $result;"
+              s=rif(s,'public static function consume_payment_status_event','\n}\n',old,new)
           service.write_text(s)
-          future = Path('includes/class-wca-future24.php'); f = future.read_text()
+          future=Path('includes/class-wca-future24.php'); f=future.read_text()
           if 'future24_idempotency_state_uncertain_total' not in f:
-              old = "\t\tif ( is_wp_error( $result ) ) {\n\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\treturn $result;\n\t\t}"
-              new = "\t\tif ( is_wp_error( $result ) ) {\n\t\t\t$error_data = $result->get_error_data();\n\t\t\t$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );\n\t\t\tif ( $state_uncertain ) {\n\t\t\t\tWCA_Observability::metric( 'future24_idempotency_state_uncertain_total', 1, array( 'scope' => sanitize_key( $scope ) ) );\n\t\t\t\tWCA_Observability::log( 'critical', 'future24_idempotency_state_uncertain', array( 'scope' => sanitize_key( $scope ), 'claim_id' => absint( $claim['id'] ) ) );\n\t\t\t} else {\n\t\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\t}\n\t\t\treturn $result;\n\t\t}"
+              old="\t\tif ( is_wp_error( $result ) ) {\n\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\treturn $result;\n\t\t}"
+              new="\t\tif ( is_wp_error( $result ) ) {\n\t\t\t$error_data = $result->get_error_data();\n\t\t\t$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );\n\t\t\tif ( $state_uncertain ) {\n\t\t\t\tWCA_Observability::metric( 'future24_idempotency_state_uncertain_total', 1, array( 'scope' => sanitize_key( $scope ) ) );\n\t\t\t\tWCA_Observability::log( 'critical', 'future24_idempotency_state_uncertain', array( 'scope' => sanitize_key( $scope ), 'claim_id' => absint( $claim['id'] ) ) );\n\t\t\t} else {\n\t\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\t}\n\t\t\treturn $result;\n\t\t}"
               if old not in f: raise SystemExit('Expected Future24 target missing')
-              f = f.replace(old, new, 1)
+              f=f.replace(old,new,1)
           future.write_text(f)
           Path('tests/t24-r1-idempotency-uncertainty-regressions.php').write_text(r'''<?php
-          $root = dirname( __DIR__ );
-          $service = file_get_contents( $root . '/includes/class-wca-service.php' ); $future = file_get_contents( $root . '/includes/class-wca-future24.php' ); $runner = file_get_contents( __DIR__ . '/run-all.php' );
-          if ( ! is_string( $service ) || ! is_string( $future ) || ! is_string( $runner ) ) { fwrite( STDERR, "T24 R1 source read failed\n" ); exit( 1 ); }
-          $checks = array(
-            'CF02 uncertain branch' => false !== strpos( $service, 'cf02_complaint_status_state_uncertain_total' ),
-            'CF03 uncertain branch' => false !== strpos( $service, 'payment_status_projection_state_uncertain_total' ),
-            'Future24 uncertain branch' => false !== strpos( $future, 'future24_idempotency_state_uncertain_total' ),
-            'safe releases remain' => false !== strpos( $service, 'release_idempotency' ) && false !== strpos( $future, 'release_idempotency' ),
-            'aggregate binding' => false !== strpos( $runner, 't24-r1-idempotency-uncertainty-regressions.php' ),
-          );
-          $failures=array(); foreach($checks as $name=>$ok){if(!$ok){$failures[]=$name;}} if($failures){fwrite(STDERR,"T24 R1 idempotency uncertainty regressions failed:\n- ".implode("\n- ",$failures)."\n");exit(1);} echo 'T24 R1 idempotency uncertainty regressions: PASS '.count($checks).'/'.count($checks)."\n";
+          $root=dirname(__DIR__); $service=file_get_contents($root.'/includes/class-wca-service.php'); $future=file_get_contents($root.'/includes/class-wca-future24.php'); $runner=file_get_contents(__DIR__.'/run-all.php');
+          $checks=array('cf02'=>false!==strpos($service,'cf02_complaint_status_state_uncertain_total'),'cf03'=>false!==strpos($service,'payment_status_projection_state_uncertain_total'),'future24'=>false!==strpos($future,'future24_idempotency_state_uncertain_total'),'release'=>false!==strpos($service,'release_idempotency')&&false!==strpos($future,'release_idempotency'),'bound'=>false!==strpos($runner,'t24-r1-idempotency-uncertainty-regressions.php')); $bad=array(); foreach($checks as $n=>$ok){if(!$ok)$bad[]=$n;} if($bad){fwrite(STDERR,'T24 R1 failed: '.implode(',',$bad)."\n");exit(1);} echo "T24 R1 idempotency uncertainty regressions: PASS 5/5\n";
           ''')
-          runner = Path('tests/run-all.php'); r=runner.read_text()
+          runner=Path('tests/run-all.php'); r=runner.read_text()
           if 't24-r1-idempotency-uncertainty-regressions.php' not in r:
               needle="'t23-r9-payment-idempotency-uncertainty-regressions.php' );"; repl="'t23-r9-payment-idempotency-uncertainty-regressions.php', 't24-r1-idempotency-uncertainty-regressions.php' );"
               if needle not in r: raise SystemExit('Aggregate insertion target missing')
               runner.write_text(r.replace(needle,repl,1))
           PY
+          cp .github/workflows/file08-complete-quality.yml /tmp/t24-temp-workflow.yml
           git show ad25900f105ed29018a587ae05749b18335fd061:.github/workflows/file08-complete-quality.yml > .github/workflows/file08-complete-quality.yml
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l >/dev/null
           php tests/run-all.php
-          node --check assets/js/clinic.js
-          node --check assets/js/continuity.js
-          node --check assets/js/future24.js
+          node --check assets/js/clinic.js && node --check assets/js/continuity.js && node --check assets/js/future24.js
+          cp /tmp/t24-temp-workflow.yml .github/workflows/file08-complete-quality.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add includes/class-wca-service.php includes/class-wca-future24.php tests/run-all.php tests/t24-r1-idempotency-uncertainty-regressions.php .github/workflows/file08-complete-quality.yml
+          git add includes/class-wca-service.php includes/class-wca-future24.php tests/run-all.php tests/t24-r1-idempotency-uncertainty-regressions.php
           git commit -m 'T24 R1: correct uncertain idempotency replay boundaries'
           git push origin HEAD:'${{ github.event.pull_request.head.ref }}'
