@@ -10,7 +10,7 @@ Canonical File 08 clinic and appointment runtime for the Sabri Social Homeopathy
 
 == Description ==
 
-Version 1.2.15 implements the File 08 Complete Master Plan and Future24 amendment. The current repository review identity is the resumed **T21** cycle on `review/file08-t21-ten-round-2026-09-09`, opened from exact verified T20 baseline `79f18b5cb3ad9270a52027df7c3a6b50465fdfa4`. T20 completed R1–R20 and its latest ten rounds were 8/10 clean; the user explicitly resumed further review after that prior stopping threshold. T19 and earlier cycles are historical provenance, not the current candidate identity. Current technical identity is core schema 3.4.0, continuity 1.1.0, Future24 1.1.0, Public Clinic 1.1.0 and CF-01 1.1.0. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
+Version 1.2.15 implements the File 08 Complete Master Plan and Future24 amendment. The current repository review sequence is **T25** on `review/file08-t21-ten-round-2026-09-09`, opened only after the corrected T24 R9 exact head `8e3945b8b79afdf5ba5feb2d8c3222da0d86c225` passed canonical run `35053963450` (PHP 7.4, PHP 8.3, source/JS/hygiene and reproducible independently verified candidate package). T21–T24 remain historical/current provenance as recorded in the frozen review ledgers; an older round label or CI run never substitutes for exact-head evidence after a later commit. Current technical identity is core schema 3.4.0, continuity 1.1.0, Future24 1.1.0, Public Clinic 1.1.0 and CF-01 1.1.0. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
 
 T20 materially hardened the 1.2.15 candidate after T19: appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization-boundary hardening, availability projection correction, payment-currency persistence parity, calendar-provider practitioner/source-order/idempotency hardening, and release-evidence alignment. Exact commit identity, not a historical round label alone, defines a candidate artifact.
 
@@ -42,7 +42,8 @@ The eighth fresh corrective audit removes residual total-page ceilings from doct
 == Changelog ==
 
 = 1.2.15 =
-* T21 review resumed on 2026-09-09 from exact verified T20 baseline `79f18b5cb3ad9270a52027df7c3a6b50465fdfa4`; every T21 round remains review-first and any corrected HEAD requires its own exact-head CI/package proof.
+* T25 is the current review sequence. It began only after T24 R9 exact head `8e3945b8b79afdf5ba5feb2d8c3222da0d86c225` passed canonical run `35053963450`; every T25 round remains review-first and any later corrected HEAD requires its own exact-head CI/package proof.
+* Historical T24 corrected uncertain-transaction idempotency replay boundaries and release-currentness drift; T21–T23 remain frozen provenance rather than current release identity.
 * T20 R1–R20 completed. Latest-ten clean result: R11 and R13–R19 clean = 8/10; R12 and R20 defect-bearing. Earlier T20 R3–R10 corrections included material runtime hardening, while R10/R20 included evidence-only corrections as documented in review evidence.
 * Current release identity: runtime 1.2.15; core schema 3.4.0; continuity schema/contract 1.1.0; Future24 schema/contract 1.1.0; Public Clinic and CF-01 contracts 1.1.0. Exact-head CI/package evidence remains distinct from staging/live evidence.
 * Historical T19 R1–R20 source review/correction sequence completed under review-first ledger discipline. Its defect rounds were R1–R9, R11, R18, R19 and R20; clean rounds were R10 and R12–R17.
@@ -73,7 +74,7 @@ The eighth fresh corrective audit removes residual total-page ceilings from doct
 * Branch and availability timezone/window inputs fail closed instead of silent normalization.
 * HTTP mutation replay finalization has authoritative status reconciliation.
 * Public clinic listing uses opaque cursor pagination and ETag conditional caching.
-* Runtime 1.2.10; core schema 3.2.0; continuity 1.1.0; Future24 1.0.0.
+* Runtime 1.2.10; core schema 3.2.0; continuity schema 1.1.0; Future24 schema 1.0.0.
 * Repository/CI/package evidence remains distinct from staging/live evidence.
 
 = 1.2.9 =
