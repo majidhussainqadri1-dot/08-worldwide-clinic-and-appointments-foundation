@@ -7,7 +7,6 @@
  *
  * @package Worldwide_Clinic_Appointments
  */
-
 defined( 'ABSPATH' ) || exit;
 
 final class WCA_Second_Ten_Review_Hardening {
@@ -16,6 +15,41 @@ final class WCA_Second_Ten_Review_Hardening {
 	public static function boot() {
 		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'pre_dispatch' ), 5, 3 );
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'post_dispatch' ), 80, 3 );
+
+		/* T25 R8: File 26 is a derived consumer projection, so the canonical owner
+		 * event remains the durable File 08 outbox fact. Replace the historical
+		 * observer with one that propagates a derived-enqueue failure into the
+		 * parent dispatcher; WCA_Outbox can then retry and dead-letter it rather
+		 * than acknowledging the parent while projection freshness was lost. */
+		remove_action( 'wca_outbox_event', array( 'WCA_Central_Governance', 'observe_outbox_event' ), 20 );
+		add_action( 'wca_outbox_event', array( __CLASS__, 'observe_search_projection_event' ), 20, 1 );
+	}
+
+	/**
+	 * Retry-safe File 26 projection invalidation consumer.
+	 *
+	 * @throws RuntimeException When the derived invalidation cannot be queued.
+	 */
+	public static function observe_search_projection_event( $envelope ) {
+		if ( ! is_array( $envelope ) ) { return; }
+		$topic = isset( $envelope['topic'] ) ? (string) $envelope['topic'] : '';
+		if ( ! in_array( $topic, array( 'ClinicActivated.v1', 'ClinicServiceChanged.v1', 'ClinicAvailabilityChanged.v1' ), true ) ) { return; }
+		$payload = isset( $envelope['payload'] ) && is_array( $envelope['payload'] ) ? $envelope['payload'] : array();
+		$clinic_ref = sanitize_text_field( isset( $payload['clinic_ref'] ) ? $payload['clinic_ref'] : ( isset( $envelope['aggregate_ref'] ) ? $envelope['aggregate_ref'] : '' ) );
+		if ( ! preg_match( '/^[0-9a-f-]{36}$/i', $clinic_ref ) ) { return; }
+		$trace = isset( $envelope['trace_id'] ) ? sanitize_text_field( $envelope['trace_id'] ) : WCA_Observability::trace_id();
+		$queued = WCA_Repository::enqueue( 'File26.SearchProjectionChanged.v1', $clinic_ref, array(
+			'contract'      => 'wca.file26-clinic-projection',
+			'version'       => WCA_Central_Governance::FILE26_PROJECTION_VERSION,
+			'object_type'   => 'clinic',
+			'public_ref'    => $clinic_ref,
+			'change_source' => sanitize_text_field( $topic ),
+			'owner'         => 'File08',
+		), $trace );
+		if ( is_wp_error( $queued ) ) {
+			throw new RuntimeException( $queued->get_error_message() );
+		}
+		return true;
 	}
 
 	/**
