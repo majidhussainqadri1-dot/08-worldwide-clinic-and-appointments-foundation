@@ -11,7 +11,7 @@ if ( ! is_string( $hardening ) || ! is_string( $cf01 ) || ! is_string( $runner )
 $checks = array(
 	'legacy File26 observer is removed after governance boot' => false !== strpos( $hardening, "remove_action( 'wca_outbox_event', array( 'WCA_Central_Governance', 'observe_outbox_event' ), 20 );" ),
 	'retry-safe File26 observer is registered' => false !== strpos( $hardening, "add_action( 'wca_outbox_event', array( __CLASS__, 'observe_search_projection_event' ), 20, 1 );" ),
-	'File26 invalidation is durably queued' => false !== strpos( $hardening, "$queued = WCA_Repository::enqueue( 'File26.SearchProjectionChanged.v1'" ),
+	'File26 invalidation is durably queued' => false !== strpos( $hardening, "\$queued = WCA_Repository::enqueue( 'File26.SearchProjectionChanged.v1'" ),
 	'File26 enqueue failure propagates to parent outbox retry' => false !== strpos( $hardening, 'if ( is_wp_error( $queued ) )' ) && false !== strpos( $hardening, 'throw new RuntimeException( $queued->get_error_message() );' ),
 	'checked-in context remains active scheduled state' => false !== strpos( $cf01, "array( 'confirmed', 'checked_in' )" ) && false !== strpos( $cf01, "return 'scheduled';" ),
 	'checked-in relationship remains scheduling-only contact' => substr_count( $cf01, "array( 'confirmed', 'checked_in' )" ) >= 2 && false !== strpos( $cf01, "return 'scheduled_contact';" ),
