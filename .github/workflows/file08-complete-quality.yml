@@ -7,7 +7,6 @@ permissions:
   contents: write
 jobs:
   correct:
-    if: github.event.head_commit.message != 'T26 R1: apply frozen corrections'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
