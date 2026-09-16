@@ -66,6 +66,11 @@ if ( ! hash_equals( $version, $contractVersions['runtime_contract_version'] ) ) 
 	fwrite( STDERR, "Plugin/runtime contract version mismatch.\n" );
 	exit( 2 );
 }
+$publicClinicProjectionVersion = wca_build_class_constant( $root, 'includes/class-swc-public-clinic.php', 'CONTRACT_VERSION' );
+if ( ! hash_equals( $contractVersions['public_clinic_contract_version'], $publicClinicProjectionVersion ) ) {
+	fwrite( STDERR, "Public Clinic runtime/canonical contract version mismatch.\n" );
+	exit( 2 );
+}
 foreach ( array( 'core_schema_version', 'continuity_schema_version', 'continuity_contract_version', 'future24_schema_version', 'future24_contract_version', 'public_clinic_contract_version', 'cf01_context_contract_version' ) as $key ) {
 	if ( ! preg_match( '/^\d+\.\d+\.\d+$/', $contractVersions[ $key ] ) ) {
 		fwrite( STDERR, "Invalid contract/schema version: {$key}\n" );

@@ -8,7 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 final class SWC_Public_Clinic {
-	const CONTRACT_VERSION = '1.0.0';
+	const CONTRACT_VERSION = '1.1.0';
 
 	/**
 	 * Return the bounded public clinic projection for an authoritative public

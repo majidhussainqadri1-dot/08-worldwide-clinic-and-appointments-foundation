@@ -1,4 +1,4 @@
-# File 08 Public Clinic Projection Contract 1.0.0
+# File 08 Public Clinic Projection Contract 1.1.0
 
 ## Governing boundary
 
@@ -15,7 +15,7 @@ swc_public_clinic_projection_contract(): array
 
 ```php
 array(
-    'contract_version' => '1.0.0',
+    'contract_version' => '1.1.0',
     'clinic' => array(
         'name'     => 'Example Clinic',
         'address'  => 'Public clinic address',
@@ -74,4 +74,4 @@ The projection is read-only. It creates no posts, options, user metadata, appoin
 
 ## Acceptance boundary
 
-Source tests and green CI establish code-level contract evidence only. Real Files 00/03/07/08/09/20/25 packages, public/private Doctor accounts, availability states, Urdu RTL, responsive layout, accessibility, cache behavior, upgrade, rollback, and Hostinger staging acceptance remain mandatory before production approval.
+Source tests and green CI establish code-level contract evidence only. Candidate build and independent verification must also prove that this runtime projection contract version equals the canonical `WCA_Contracts::PUBLIC_CLINIC_CONTRACT_VERSION` embedded in the same exact artifact. Real Files 00/03/07/08/09/20/25 packages, public/private Doctor accounts, availability states, Urdu RTL, responsive layout, accessibility, cache behavior, upgrade, rollback, and Hostinger staging acceptance remain mandatory before production approval.
