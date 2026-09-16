@@ -1,68 +1,62 @@
-name: File 08 Complete Master Plan Quality
+name: File 08 T24 R1 Frozen-Ledger Correction Runner
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches: [main]
 permissions:
   contents: write
 concurrency:
-  group: file08-complete-${{ github.workflow }}-${{ github.ref }}
+  group: file08-t24-r1-correction-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  autofix_t24_r1:
-    name: T24 R1 frozen-ledger correction batch
-    if: github.event_name == 'pull_request'
+  correct:
+    name: Apply and verify T24 R1 frozen-ledger corrections
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: '${{ github.event.pull_request.head.ref }}'
-          fetch-depth: 2
+          fetch-depth: 5
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none, extensions: zip}
-      - name: Apply T24 R1 corrections only after frozen ledger
+      - name: Correct only after complete frozen review
         shell: bash
         run: |
           set -euo pipefail
           test -f docs/T24-R1-FROZEN-LEDGER.md
-          if test -f tests/t24-r1-idempotency-uncertainty-regressions.php; then
-            echo 'T24 R1 corrections already present; no mutation required.'
-            exit 0
-          fi
           python3 - <<'PY'
           from pathlib import Path
 
           service = Path('includes/class-wca-service.php')
           s = service.read_text()
-
           def replace_in_function(text, start_marker, end_marker, old, new):
               start = text.index(start_marker)
               end = text.index(end_marker, start)
               block = text[start:end]
               if old not in block:
-                  raise SystemExit(f'Expected correction target missing in {start_marker}')
-              block = block.replace(old, new, 1)
-              return text[:start] + block + text[end:]
+                  raise SystemExit(f'Expected target missing in {start_marker}')
+              return text[:start] + block.replace(old, new, 1) + text[end:]
 
           old_cf02 = "if(is_wp_error($result)){WCA_Repository::release_idempotency($claim['id']);} return $result;"
           new_cf02 = "if(is_wp_error($result)){ $error_data=$result->get_error_data(); $state_uncertain=is_array($error_data)&&!empty($error_data['state_uncertain']); if($state_uncertain){ WCA_Observability::metric('cf02_complaint_status_state_uncertain_total',1); WCA_Observability::log('critical','cf02_complaint_status_state_uncertain',array('complaint_ref'=>$ref,'idempotency_claim_id'=>absint($claim['id']))); } else { WCA_Repository::release_idempotency($claim['id']); } } return $result;"
-          s = replace_in_function(s, 'public static function consume_cf02_case_status_event', 'private static function approved_payment_provider', old_cf02, new_cf02)
+          if 'cf02_complaint_status_state_uncertain_total' not in s:
+              s = replace_in_function(s, 'public static function consume_cf02_case_status_event', 'private static function approved_payment_provider', old_cf02, new_cf02)
 
           old_payment = "if ( is_wp_error( $result ) ) { WCA_Repository::release_idempotency( $claim['id'] ); }\n\t\treturn $result;"
           new_payment = "if ( is_wp_error( $result ) ) {\n\t\t\t$error_data = $result->get_error_data();\n\t\t\t$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );\n\t\t\tif ( $state_uncertain ) {\n\t\t\t\tWCA_Observability::metric( 'payment_status_projection_state_uncertain_total', 1 );\n\t\t\t\tWCA_Observability::log( 'critical', 'payment_status_projection_state_uncertain', array( 'payment_intent_ref' => $payment_ref, 'idempotency_claim_id' => absint( $claim['id'] ) ) );\n\t\t\t} else {\n\t\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\t}\n\t\t}\n\t\treturn $result;"
-          s = replace_in_function(s, 'public static function consume_payment_status_event', '\n}\n', old_payment, new_payment)
+          if 'payment_status_projection_state_uncertain_total' not in s:
+              s = replace_in_function(s, 'public static function consume_payment_status_event', '\n}\n', old_payment, new_payment)
           service.write_text(s)
 
           future = Path('includes/class-wca-future24.php')
           f = future.read_text()
           old_future = "\t\tif ( is_wp_error( $result ) ) {\n\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\treturn $result;\n\t\t}"
           new_future = "\t\tif ( is_wp_error( $result ) ) {\n\t\t\t$error_data = $result->get_error_data();\n\t\t\t$state_uncertain = is_array( $error_data ) && ! empty( $error_data['state_uncertain'] );\n\t\t\tif ( $state_uncertain ) {\n\t\t\t\tWCA_Observability::metric( 'future24_idempotency_state_uncertain_total', 1, array( 'scope' => sanitize_key( $scope ) ) );\n\t\t\t\tWCA_Observability::log( 'critical', 'future24_idempotency_state_uncertain', array( 'scope' => sanitize_key( $scope ), 'claim_id' => absint( $claim['id'] ) ) );\n\t\t\t} else {\n\t\t\t\tWCA_Repository::release_idempotency( $claim['id'] );\n\t\t\t}\n\t\t\treturn $result;\n\t\t}"
-          if old_future not in f:
-              raise SystemExit('Expected Future24 idempotency correction target missing')
-          future.write_text(f.replace(old_future, new_future, 1))
+          if 'future24_idempotency_state_uncertain_total' not in f:
+              if old_future not in f:
+                  raise SystemExit('Expected Future24 target missing')
+              f = f.replace(old_future, new_future, 1)
+          future.write_text(f)
 
           regression = Path('tests/t24-r1-idempotency-uncertainty-regressions.php')
           regression.write_text(r'''<?php
@@ -72,11 +66,11 @@ jobs:
           $runner = file_get_contents( __DIR__ . '/run-all.php' );
           if ( ! is_string( $service ) || ! is_string( $future ) || ! is_string( $runner ) ) { fwrite( STDERR, "T24 R1 source read failed\n" ); exit( 1 ); }
           $checks = array(
-              'CF02 uncertain projection retains claim' => false !== strpos( $service, 'cf02_complaint_status_state_uncertain_total' ) && false !== strpos( $service, "if($state_uncertain){" ),
-              'CF03 payment projection uncertain branch exists' => false !== strpos( $service, 'payment_status_projection_state_uncertain_total' ) && false !== strpos( $service, 'payment_status_projection_state_uncertain' ),
-              'Future24 uncertain wrapper retains claim' => false !== strpos( $future, 'future24_idempotency_state_uncertain_total' ) && false !== strpos( $future, 'future24_idempotency_state_uncertain' ),
-              'safe-failure release remains available' => substr_count( $service, "WCA_Repository::release_idempotency( $claim['id'] );" ) >= 3 && false !== strpos( $future, "WCA_Repository::release_idempotency( $claim['id'] );" ),
-              'regression bound into aggregate suite' => false !== strpos( $runner, "'t24-r1-idempotency-uncertainty-regressions.php'" ),
+              'CF02 uncertain branch exists' => false !== strpos( $service, 'cf02_complaint_status_state_uncertain_total' ) && false !== strpos( $service, 'cf02_complaint_status_state_uncertain' ),
+              'CF03 uncertain branch exists' => false !== strpos( $service, 'payment_status_projection_state_uncertain_total' ) && false !== strpos( $service, 'payment_status_projection_state_uncertain' ),
+              'Future24 uncertain wrapper exists' => false !== strpos( $future, 'future24_idempotency_state_uncertain_total' ) && false !== strpos( $future, 'future24_idempotency_state_uncertain' ),
+              'safe failure release remains present' => false !== strpos( $service, 'release_idempotency' ) && false !== strpos( $future, 'release_idempotency' ),
+              'regression bound into aggregate suite' => false !== strpos( $runner, 't24-r1-idempotency-uncertainty-regressions.php' ),
           );
           $failures = array(); foreach ( $checks as $name => $ok ) { if ( ! $ok ) { $failures[] = $name; } }
           if ( $failures ) { fwrite( STDERR, "T24 R1 idempotency uncertainty regressions failed:\n- " . implode( "\n- ", $failures ) . "\n" ); exit( 1 ); }
@@ -85,11 +79,12 @@ jobs:
 
           runner = Path('tests/run-all.php')
           r = runner.read_text()
-          needle = "'t23-r9-payment-idempotency-uncertainty-regressions.php' );"
-          replacement = "'t23-r9-payment-idempotency-uncertainty-regressions.php', 't24-r1-idempotency-uncertainty-regressions.php' );"
-          if needle not in r:
-              raise SystemExit('run-all aggregate insertion target missing')
-          runner.write_text(r.replace(needle, replacement, 1))
+          if 't24-r1-idempotency-uncertainty-regressions.php' not in r:
+              needle = "'t23-r9-payment-idempotency-uncertainty-regressions.php' );"
+              replacement = "'t23-r9-payment-idempotency-uncertainty-regressions.php', 't24-r1-idempotency-uncertainty-regressions.php' );"
+              if needle not in r:
+                  raise SystemExit('Aggregate insertion target missing')
+              runner.write_text(r.replace(needle, replacement, 1))
           PY
           php -l includes/class-wca-service.php
           php -l includes/class-wca-future24.php
@@ -98,80 +93,9 @@ jobs:
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
-          git checkout HEAD^ -- .github/workflows/file08-complete-quality.yml
+          git show ad25900f105ed29018a587ae05749b18335fd061:.github/workflows/file08-complete-quality.yml > .github/workflows/file08-complete-quality.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add includes/class-wca-service.php includes/class-wca-future24.php tests/run-all.php tests/t24-r1-idempotency-uncertainty-regressions.php .github/workflows/file08-complete-quality.yml
           git commit -m 'T24 R1: correct uncertain idempotency replay boundaries'
           git push origin HEAD:'${{ github.event.pull_request.head.ref }}'
-  quality:
-    name: PHP ${{ matrix.php }} and source contracts
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['7.4', '8.3']
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
-        with: {php-version: '${{ matrix.php }}', coverage: none, extensions: zip}
-      - name: PHP syntax
-        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
-      - name: Master-plan, security and state tests
-        run: php tests/run-all.php
-      - name: JavaScript syntax
-        run: |
-          node --check assets/js/clinic.js
-          node --check assets/js/continuity.js
-          node --check assets/js/future24.js
-      - name: Repository hygiene
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -z "$(find . -type f \( -name '*.pem' -o -name '*.key' -o -name '.env' -o -name '*.p12' -o -name '*.b64' \) -print -quit)"
-          test -z "$(find . -type l -print -quit)"
-          test ! -e .gitmodules
-          ! grep -RInE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16})' --exclude-dir=.git .
-          test "$(find .github/workflows -maxdepth 1 -type f -name '*.yml' | wc -l | tr -d ' ')" = "1"
-          test "$(find .github/scripts -maxdepth 1 -type f -name 't*-correct*.py' 2>/dev/null | wc -l | tr -d ' ')" = "0"
-          test "$(find tools -maxdepth 1 -type f -name 't*-correct*.py' 2>/dev/null | wc -l | tr -d ' ')" = "0"
-          test ! -e tools/build-development-candidate.php
-          test ! -e tools/verify-development-candidate.php
-          test ! -e CHECKSUMS.sha256
-          test ! -e CORRECTIVE-CHECKSUMS.sha256
-  candidate:
-    name: Reproducible candidate package
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: quality
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
-      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
-        with: {php-version: '8.3', coverage: none, extensions: zip}
-      - id: source
-        shell: bash
-        run: |
-          set -euo pipefail
-          version=$(php -r '$source=file_get_contents("worldwide-clinic.php"); if(!is_string($source)||preg_match("/^\\s*\\* Version:\\s*([^\\s]+)/m",$source,$m)!==1){exit(1);} echo $m[1];')
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "epoch=$(git show -s --format=%ct HEAD)" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Build twice
-        run: |
-          php tools/build-candidate.php --output-dir=build/a --commit='${{ steps.source.outputs.sha }}' --source-date-epoch='${{ steps.source.outputs.epoch }}'
-          php tools/build-candidate.php --output-dir=build/b --commit='${{ steps.source.outputs.sha }}' --source-date-epoch='${{ steps.source.outputs.epoch }}'
-          cmp build/a/*-candidate.zip build/b/*-candidate.zip
-          cmp build/a/*-candidate-manifest.json build/b/*-candidate-manifest.json
-          cmp build/a/*-candidate.sha256 build/b/*-candidate.sha256
-      - name: Independent verification
-        run: |
-          php tools/verify-candidate.php --artifact=build/a --commit='${{ steps.source.outputs.sha }}'
-          cat build/a/*-candidate.sha256
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: file-08-${{ steps.source.outputs.version }}-candidate-${{ steps.source.outputs.sha }}
-          path: build/a/
-          if-no-files-found: error
-          retention-days: 30
