@@ -4,7 +4,6 @@
  *
  * @package Worldwide_Clinic
  */
-
 defined( 'ABSPATH' ) || exit;
 
 final class SWC_CF01_Care_Context {
@@ -200,10 +199,10 @@ final class SWC_CF01_Care_Context {
 	}
 
 	private static function context_state( $status ) {
-		if ( in_array( $status, array( 'requested', 'requested', 'reschedule_pending' ), true ) ) {
+		if ( in_array( $status, array( 'requested', 'reschedule_pending' ), true ) ) {
 			return 'proposed';
 		}
-		if ( 'confirmed' === $status ) {
+		if ( in_array( $status, array( 'confirmed', 'checked_in' ), true ) ) {
 			return 'scheduled';
 		}
 		if ( 'completed' === $status ) {
@@ -213,7 +212,7 @@ final class SWC_CF01_Care_Context {
 	}
 
 	private static function relationship_state( $status ) {
-		if ( 'confirmed' === $status ) {
+		if ( in_array( $status, array( 'confirmed', 'checked_in' ), true ) ) {
 			return 'scheduled_contact';
 		}
 		if ( 'completed' === $status ) {
@@ -226,7 +225,7 @@ final class SWC_CF01_Care_Context {
 	}
 
 	private static function scheduled_time( $appointment_id, $status ) {
-		if ( ! in_array( $status, array( 'confirmed', 'completed' ), true ) ) {
+		if ( ! in_array( $status, array( 'confirmed', 'checked_in', 'completed' ), true ) ) {
 			return '';
 		}
 		$value = (string) SWC_Helpers::meta( $appointment_id, 'preferred_at_utc' );
