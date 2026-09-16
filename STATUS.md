@@ -3,8 +3,8 @@
 ## Current repository candidate
 
 - Working review branch: `review/file08-t21-ten-round-2026-09-09`
-- Current review discipline: **T24 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
-- Current ten-round continuation: **T23 R10 clean; T24 R1 defect-bearing/corrected; T24 R2–R8 clean; T24 R9 defect-bearing/corrected at repository-documentation level.**
+- Current review discipline: **T25 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
+- Current T25 ten-round cycle: **R1 defect-bearing/corrected; R2–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected; R10 defect-bearing/corrected at repository-documentation level.**
 - Historical T22: **R1–R10 closed**; former T22 exact heads/runs are historical provenance only.
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
 - Runtime candidate: **1.2.15**
@@ -18,11 +18,11 @@
 
 Repository release identity is always the exact candidate HEAD together with its exact-head canonical GitHub Actions run, deterministic manifest, artifact digest and candidate SHA-256. The manifest must independently match the runtime, plan, core schema, continuity schema/contract, Future24 schema/contract, Public Clinic contract and CF-01 contract embedded in that same artifact.
 
-## Current T24 evidence law
+## Current T25 evidence law
 
-Numbered-round checkpoints are maintained in PR #10 and frozen ledgers because a static repository file cannot truthfully claim a future CI result that occurs only after its own commit. For every T24 round, the governing order remains: full review-only pass → frozen ledger → complete correction batch → permanent regression → exact-head canonical CI/package → next round. A round is not closed merely because correction source exists; the exact corrected HEAD itself must pass the canonical gates.
+Numbered-round checkpoints are maintained in PR #10 and frozen ledgers because a static repository file cannot truthfully claim a future CI result that occurs only after its own commit. For every T25 round, the governing order remains: full review-only pass → frozen ledger → complete correction batch → permanent regression → exact-head canonical CI/package → next round. A round is not closed merely because correction source exists; the exact corrected HEAD itself must pass the canonical gates.
 
-The present ten-round continuation begins with historical T23 R10 and continues through T24 R1–R9. T24 R1 corrected uncertain-transaction idempotency replay boundaries in CF02 complaint-status projection, CF03 payment-status projection and Future24 generic idempotent mutations. T24 R2–R8 were clean. T24 R9 identified and corrected release-document currentness drift. Exact-head CI/package status is determined from the canonical workflow on the exact HEAD and is not hard-coded here as a future result.
+T25 R1 corrected governing brand/release drift; R2–R7 were clean; R8 corrected atomic File26 search-projection invalidation and checked-in CF-01 scheduling projection; R9 corrected bounded verification reconciliation, complete CLI legacy migration and migration-aware health; R10 corrected current-cycle/release documentation and canonical booking-route documentation. Exact-head CI/package status is determined from the canonical workflow on the exact HEAD and is not hard-coded here as a future result.
 
 ## Historical T22 result
 
@@ -46,14 +46,14 @@ The final T19 R20 correction was release/repository hygiene and documentation tr
 
 The candidate implements `F08-FR-001…018`, `F08-NFR-001…010`, and `F08-FUT-01…24` while preserving File 08 ownership boundaries. Current source includes clinic identity/branches/services/fees, timezone/DST-aware availability and slots, atomic holds, appointment lifecycle, patient/guardian/doctor/delegated-staff authorization, consent, secure continuity, review eligibility, calendar/payment/complaint adapters, privacy/audit/outbox/observability, migration/rollback and recovery, accessibility/localization, and Future24 scheduling/interoperability.
 
-T20 materially hardened that source after T19. T21 and T22 added further governance, reconciliation and presentation hardening. T23/T24 re-reviewed the same source across financial, migration, authorization, scheduling, privacy, discovery, provider/outbox, frontend/accessibility/localization and release-truth boundaries without changing the runtime candidate identity.
+T20 materially hardened that source after T19. T21 and T22 added further governance, reconciliation and presentation hardening. T23/T24 added further financial, migration, authorization, scheduling, privacy, discovery, provider/outbox, frontend/accessibility/localization and release-truth hardening. T25 then re-reviewed brand/release truth, APIs/authorization, appointment concurrency, finance, calendar/outbox, privacy, schema/migration, cross-file reliability, operability and final release currentness without changing the runtime candidate identity.
 
 ## Evidence-state classification
 
 | State | Repository evidence rule |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Complete candidate** — current T24 review/correction sequence operates on the implemented 1.2.15 candidate. |
+| Coded | **Complete candidate** — current T25 review/correction sequence operates on the implemented 1.2.15 candidate. |
 | Packaged | **Exact-head only** — valid only for a HEAD whose canonical reproducible-candidate job succeeds; consult PR #10/current workflow evidence. |
 | Automated-QA Green | **Exact-head only** — valid only for a HEAD whose PHP 7.4/PHP 8.3/source/JS/hygiene gates are green; consult PR #10/current workflow evidence. |
 | Staging-Accepted | **Pending / not claimed.** |
@@ -72,4 +72,4 @@ This repository does not prove the current staging or live installation. Exact d
 
 ## Historical evidence note
 
-T13–T23 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T24 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+T13–T23 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T25 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.

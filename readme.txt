@@ -42,7 +42,7 @@ The eighth fresh corrective audit removes residual total-page ceilings from doct
 == Changelog ==
 
 = 1.2.15 =
-* T25 is the current review sequence. It began only after T24 R9 exact head `8e3945b8b79afdf5ba5feb2d8c3222da0d86c225` passed canonical run `35053963450`; every T25 round remains review-first and any later corrected HEAD requires its own exact-head CI/package proof.
+* T25 is the current review sequence. It began only after T24 R9 exact head `8e3945b8b79afdf5ba5feb2d8c3222da0d86c225` passed canonical run `35053963450`; T25 R1, R8, R9 and R10 were defect-bearing and corrected only after their frozen ledgers, while R2–R7 were clean. Any corrected HEAD requires its own exact-head CI/package proof.
 * Historical T24 corrected uncertain-transaction idempotency replay boundaries and release-currentness drift; T21–T23 remain frozen provenance rather than current release identity.
 * T20 R1–R20 completed. Latest-ten clean result: R11 and R13–R19 clean = 8/10; R12 and R20 defect-bearing. Earlier T20 R3–R10 corrections included material runtime hardening, while R10/R20 included evidence-only corrections as documented in review evidence.
 * Current release identity: runtime 1.2.15; core schema 3.4.0; continuity schema/contract 1.1.0; Future24 schema/contract 1.1.0; Public Clinic and CF-01 contracts 1.1.0. Exact-head CI/package evidence remains distinct from staging/live evidence.

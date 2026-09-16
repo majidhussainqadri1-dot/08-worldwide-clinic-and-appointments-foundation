@@ -2,8 +2,8 @@
 
 ## 1.2.15 — current repository candidate
 
-- **T24 closure cycle is the current repository review sequence.** Current ten-round continuation: T23 R10 clean; T24 R1 defect-bearing/corrected; T24 R2–R8 clean; T24 R9 defect-bearing/corrected. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.
-- T24 material hardening in the same 1.2.15 candidate includes uncertain-transaction idempotency retention for verified **CF02** complaint-status projection, verified **CF03** payment-status projection and generic **Future24** mutations, plus release-currentness documentation/regression correction.
+- **T25 closure cycle is the current repository review sequence.** R1 was defect-bearing/corrected; R2–R7 were clean; R8 and R9 were defect-bearing/corrected; R10 was defect-bearing/corrected at release-documentation level. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.
+- T25 hardening in the same 1.2.15 candidate includes governing brand/release alignment; atomic File26 search-projection invalidation; corrected checked-in CF-01 scheduling projection; bounded/dead-lettered verification reconciliation; complete CLI legacy-status migration; migration-aware health; and final release-currentness/canonical-route documentation. Historical T24 hardening remains provenance.
 - **Historical T22 R1–R10 is closed.** Its former exact heads/runs remain provenance only after later commits.
 - **Historical T21 R1–R10 is closed.** Defect-bearing rounds were R1–R6, R9 and R10; clean rounds were R7 and R8. T21 remains provenance only and is not the current review cycle.
 - **T20 R1–R20 completed.** R1–R2 were clean; R3–R10 were defect/gap-bearing with R10 evidence-only; R11 was clean; R12 was defect-bearing; R13–R19 were clean; R20 was evidence-only defect-bearing. The latest T20 ten rounds were 8/10 clean (80%).

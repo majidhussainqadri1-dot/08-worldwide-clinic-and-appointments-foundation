@@ -5,8 +5,8 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 ## Canonical repository identity
 
 - Repository review branch: `review/file08-t21-ten-round-2026-09-09`
-- Current review cycle: **T24 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
-- Current ten-round continuation: **T23 R10 clean; T24 R1 defect-bearing/corrected; T24 R2–R8 clean; T24 R9 defect-bearing/corrected at repository-documentation level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
+- Current review cycle: **T25 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
+- Current T25 ten-round cycle: **R1 defect-bearing/corrected; R2–R7 clean; R8 defect-bearing/corrected; R9 defect-bearing/corrected; R10 defect-bearing/corrected at repository-documentation level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T22: **R1–R10 closed**; its former exact heads/runs are historical provenance only.
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
 - Package folder: `08-worldwide-clinic-and-appointments`
@@ -40,7 +40,7 @@ T20 materially hardened the same 1.2.15 candidate after T19. T21 and T22 added f
 ## Canonical routes
 
 - `/clinic/{clinic_slug}`
-- `/appointments/book/{opaque_practitioner_ref}`
+- `/appointments/book/{doctor_or_clinic}`
 - `/appointments`
 - `/clinic/dashboard`
 - `/appointment/{public_ref}`
@@ -63,6 +63,6 @@ The canonical GitHub Actions quality workflow repeats PHP 7.4/8.3 syntax and sou
 
 A repository candidate may be called **Coded**, **Packaged**, or **Automated-QA Green** only when the respective evidence applies to the exact same HEAD. It is not `Staging-Accepted`, `Live-Deployed`, or `Operational` from repository evidence alone.
 
-T24 is the current closure cycle. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status. Static documentation deliberately does not hard-code a future CI result; consult the canonical workflow on the exact HEAD being evaluated.
+T25 is the current closure cycle. R1 corrected governing brand/release drift; R2–R7 were clean; R8 corrected cross-file projection/CF-01 checked-in context defects; R9 corrected bounded reconciliation/migration-health defects; R10 corrected release-currentness and canonical booking-route documentation. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status. Static documentation deliberately does not hard-code a future CI result; consult the canonical workflow on the exact HEAD being evaluated.
 
 Before production, run `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, recording actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback and Founder acceptance. After an explicitly authorized production deployment, freeze the exact deployed artifact/version/schema/migration state and perform live parity re-test before any live resolution claim.
