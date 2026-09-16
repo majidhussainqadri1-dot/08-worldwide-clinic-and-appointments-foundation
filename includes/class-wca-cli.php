@@ -28,15 +28,32 @@ final class WCA_CLI {
 			WCA_Continuity::install_schema();
 			WCA_Future24::install_schema();
 			$migrated = SWC_Activator::migrate_existing_records();
-			$legacy = WCA_Compatibility::migrate_legacy_statuses( 5000 );
-			if ( is_wp_error( $legacy ) ) { WP_CLI::error( $legacy->get_error_message() ); return; }
+
+			$legacy = 0;
+			$batches = 0;
+			while ( ! get_option( WCA_Compatibility::MIGRATION_OPTION ) ) {
+				$batch = WCA_Compatibility::migrate_legacy_statuses( 5000 );
+				if ( is_wp_error( $batch ) ) { WP_CLI::error( $batch->get_error_message() ); return; }
+				$legacy += absint( $batch );
+				$batches++;
+				if ( get_option( WCA_Compatibility::MIGRATION_OPTION ) ) { break; }
+				if ( 0 === absint( $batch ) ) {
+					WP_CLI::error( 'Legacy appointment status reconciliation made no progress and did not record completion.' );
+					return;
+				}
+				if ( $batches >= 1000 ) {
+					WP_CLI::error( 'Legacy appointment status reconciliation exceeded the bounded repair budget. Re-run after investigating remaining records.' );
+					return;
+				}
+			}
+
 			foreach ( array( 'swc_db_version' => SWC_Activator::DB_VERSION, 'swc_version' => SWC_VERSION ) as $option => $value ) {
 				$written = SWC_Helpers::update_option_strict( $option, $value, 'wca_cli_migration_marker_write' );
 				if ( is_wp_error( $written ) ) { WP_CLI::error( $written->get_error_message() ); return; }
 			}
 			$failure_cleared = SWC_Helpers::delete_option_strict( 'wca_runtime_migration_failure', 'wca_cli_migration_failure_clear' );
 			if ( is_wp_error( $failure_cleared ) ) { WP_CLI::error( $failure_cleared->get_error_message() ); return; }
-			WP_CLI::success( sprintf( 'All File 08 schema layers verified; %d appointment records and %d legacy statuses reconciled.', absint( $migrated ), absint( $legacy ) ) );
+			WP_CLI::success( sprintf( 'All File 08 schema layers verified; %d appointment records and %d legacy statuses reconciled across %d bounded batch(es).', absint( $migrated ), absint( $legacy ), absint( $batches ) ) );
 		} catch ( Throwable $error ) {
 			WP_CLI::error( 'File 08 migration/repair failed: ' . $error->getMessage() );
 		}
