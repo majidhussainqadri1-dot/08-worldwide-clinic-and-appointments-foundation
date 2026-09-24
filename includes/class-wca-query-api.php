@@ -174,7 +174,7 @@ final class WCA_Query_API {
 		$items = array();
 		foreach ( $page_rows as $row ) {
 			$id = absint( $row['ID'] ?? 0 );
-			if ( ! $owner_scope && ! $appointment_scope ) {
+			if ( ! $owner_scope && ! $appointment_scope && ! $profile_delegate_scope ) {
 				$access = WCA_Authorization::can_view_appointment( $id, $actor_user_id, $purpose );
 				if ( is_wp_error( $access ) ) { return $access; }
 			}
