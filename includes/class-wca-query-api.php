@@ -149,10 +149,11 @@ final class WCA_Query_API {
 		$clinic_id = absint( $clinic['id'] ?? 0 );
 		$owner_scope = $clinic_id && absint( $clinic['owner_user_id'] ?? 0 ) === $actor_user_id && ( ! empty( $claims['doctor'] ) || ! empty( $claims['founder'] ) );
 		$appointment_scope = $clinic_id && in_array( $clinic_id, WCA_Authorization::delegated_clinic_ids( $actor_user_id, 'appointments' ), true );
+		$profile_delegate_scope = $clinic_id && class_exists( 'WCA_File03_Adapter' ) && WCA_File03_Adapter::delegate_can_schedule( absint( $clinic['owner_user_id'] ?? 0 ), $actor_user_id );
 		$admin_scope = user_can( $actor_user_id, 'manage_worldwide_clinic' ) || user_can( $actor_user_id, 'manage_wca_operations' );
 		$purpose = sanitize_key( (string) ( $args['purpose'] ?? '' ) );
 		$allowed_admin_purposes = array( 'operations', 'complaint', 'privacy_request', 'incident', 'support_case' );
-		if ( ! $owner_scope && ! $appointment_scope ) {
+		if ( ! $owner_scope && ! $appointment_scope && ! $profile_delegate_scope ) {
 			if ( ! $admin_scope || ! in_array( $purpose, $allowed_admin_purposes, true ) ) {
 				return new WP_Error( 'wca_clinic_schedule_forbidden', __( 'You cannot view this clinic schedule.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 			}
@@ -173,7 +174,7 @@ final class WCA_Query_API {
 		$items = array();
 		foreach ( $page_rows as $row ) {
 			$id = absint( $row['ID'] ?? 0 );
-			if ( ! $owner_scope && ! $appointment_scope ) {
+			if ( ! $owner_scope && ! $appointment_scope && ! $profile_delegate_scope ) {
 				$access = WCA_Authorization::can_view_appointment( $id, $actor_user_id, $purpose );
 				if ( is_wp_error( $access ) ) { return $access; }
 			}
