@@ -41,6 +41,7 @@ $wca_files = array(
 	'includes/class-wca-service.php',
 	'includes/class-wca-appointment-command.php',
 	'includes/class-wca-compatibility.php',
+	'includes/class-wca-file03-adapter.php',
 	'includes/class-wca-outbox.php',
 	'includes/class-wca-continuity-secure.php',
 	'includes/class-wca-continuity-guards.php',
@@ -126,6 +127,7 @@ function wca_start_plugin() {
 	WCA_Ten_Review_Hardening::boot();
 	WCA_Second_Ten_Review_Hardening::boot();
 }
+WCA_File03_Adapter::register_hooks();
 add_action( 'plugins_loaded', 'wca_start_plugin', 30 );
 
 /** Canonical public contract helpers for cross-file consumers. */
