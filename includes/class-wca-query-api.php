@@ -164,7 +164,7 @@ final class WCA_Query_API {
 		}
 
 		$per_page = self::page_size( $args['per_page'] ?? 20 );
-		$filter_hash = hash( 'sha256', wp_json_encode( array( 'actor' => $actor_user_id, 'clinic_ref' => strtolower( (string) $clinic['public_ref'] ), 'per_page' => $per_page, 'purpose' => $admin_scope && ! $owner_scope && ! $appointment_scope && ! $profile_delegate_scope ? $purpose : '' ) ) );
+		$filter_hash = hash( 'sha256', wp_json_encode( array( 'actor' => $actor_user_id, 'clinic_ref' => strtolower( (string) $clinic['public_ref'] ), 'per_page' => $per_page, 'purpose' => $admin_scope && ! $owner_scope && ! $appointment_scope ? $purpose : '' ) ) );
 		$cursor = self::decode_cursor( (string) ( $args['cursor'] ?? '' ), 'clinic_schedule', $actor_user_id, $filter_hash );
 		if ( is_wp_error( $cursor ) ) { return $cursor; }
 		$rows = self::query_candidate_appointments( $actor_user_id, $clinic_id, array(), $cursor, $per_page + 1 );
