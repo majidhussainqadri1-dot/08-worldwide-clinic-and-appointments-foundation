@@ -19,11 +19,26 @@ final class WCA_Plugin {
 		WCA_Admin::hooks();
 		WCA_Privacy::hooks();
 		WCA_Outbox::hooks();
+		self::register_file19_producer();
 		WCA_CLI::register();
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'admin_assets' ) );
 		add_action( 'init', array( __CLASS__, 'register_assets_only_on_routes' ), 100 );
 		add_action( 'send_headers', array( 'WCA_Observability', 'trace_header' ) );
+	}
+
+	/** Register File 08 as a bounded factual-event producer for canonical File 19 notifications. */
+	public static function register_file19_producer() {
+		if ( ! function_exists( 'sun_register_notification_producer' ) ) { return false; }
+		return sun_register_notification_producer(
+			'file08-clinic',
+			array(
+				'owner' => 'File 08',
+				'event_types' => array( 'Clinic.*' ),
+				'schema_versions' => array( '1.0' ),
+				'allowed_data_fields' => array( 'action_name', 'summary', 'status', 'label' ),
+			)
+		);
 	}
 
 	public static function register_assets_only_on_routes() {
