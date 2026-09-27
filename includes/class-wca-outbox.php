@@ -139,7 +139,7 @@ final class WCA_Outbox {
 		do_action( 'wca_outbox_event_' . sanitize_key( str_replace( '.', '_', $topic ) ), $envelope );
 
 		if ( 'File19.NotificationRequested.v1' === $topic ) {
-			return self::dispatch_notification( $payload, $trace_id );
+			return self::dispatch_notification( $payload, $trace_id, $message_id, $aggregate_ref );
 		}
 		if ( 0 === strpos( $topic, 'CF03.' ) ) {
 			return apply_filters( 'wca_cf03_dispatch_result', true, $envelope );
@@ -150,41 +150,64 @@ final class WCA_Outbox {
 		return apply_filters( 'wca_outbox_dispatch_result', true, $envelope );
 	}
 
-	private static function dispatch_notification( $payload, $trace_id ) {
-		$provider = function_exists( 'sn_notify_users' ) ? 'file19' : 'fallback_mail';
-		if ( WCA_Observability::circuit_open( $provider ) ) {
-			return new WP_Error( 'wca_provider_circuit_open', 'Notification provider circuit is temporarily open.', array( 'retry_after' => 60 ) );
+	private static function dispatch_notification( $payload, $trace_id, $message_id, $aggregate_ref ) {
+		if ( ! function_exists( 'sun_ingest_domain_event' ) || ! function_exists( 'sun_register_notification_producer' ) ) {
+			return new WP_Error( 'wca_file19_unavailable', __( 'The canonical File 19 notification service is unavailable.', 'worldwide-clinic-appointments' ), array( 'status'=>503, 'retry_after'=>60 ) );
 		}
-		if ( 'file19' === $provider ) {
-			$result = sn_notify_users( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ), sanitize_key( $payload['event'] ?? 'clinic_update' ), array(
-				'appointment_ref' => sanitize_text_field( $payload['appointment_ref'] ?? '' ),
-				'trace_id'        => $trace_id,
-			) );
-			if ( is_wp_error( $result ) || false === $result ) {
-				$message = is_wp_error( $result ) ? $result->get_error_message() : 'File 19 rejected the notification.';
-				WCA_Observability::circuit_failure( $provider, $message );
-				return new WP_Error( 'wca_file19_delivery', $message );
-			}
-			WCA_Observability::circuit_success( $provider );
-			return true;
+		WCA_Plugin::register_file19_producer();
+		$recipients = array_values( array_unique( array_filter( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ) ) ) );
+		if ( empty( $recipients ) ) { return true; }
+		$event_key = sanitize_key( (string) ( $payload['event'] ?? 'clinic_update' ) );
+		$event_type = self::file19_event_type( $event_key );
+		$appointment_ref = sanitize_text_field( (string) ( $payload['appointment_ref'] ?? $aggregate_ref ) );
+		$event = array(
+			'producer' => 'file08-clinic',
+			'owner' => 'File 08',
+			'event_id' => 'wca-notification:' . substr( preg_replace( '/[^A-Za-z0-9._:\-]/', '', (string) $message_id ), 0, 160 ),
+			'event_type' => $event_type,
+			'schema_version' => '1.0',
+			'occurred_at' => gmdate( DATE_ATOM ),
+			'recipients' => array_map( static function ( $user_id ) { return array( 'user_id'=>(int)$user_id ); }, $recipients ),
+			'trace_id' => substr( preg_replace( '/[^A-Za-z0-9._:\-]/', '', (string) $trace_id ), 0, 100 ),
+			'category' => 'clinic',
+			'priority' => self::file19_priority( $event_key ),
+			'sensitivity' => 'sensitive',
+			'subject' => array( 'type'=>'appointment', 'public_id'=>$appointment_ref ),
+			'data' => array(
+				'action_name' => __( 'Clinic appointment update', 'worldwide-clinic-appointments' ),
+				'summary' => __( 'There is an update to your clinic appointment. Sign in to review it securely.', 'worldwide-clinic-appointments' ),
+				'status' => $event_key,
+			),
+		);
+		$result = sun_ingest_domain_event( $event );
+		if ( is_wp_error( $result ) ) {
+			WCA_Observability::circuit_failure( 'file19', $result->get_error_code() );
+			return new WP_Error( 'wca_file19_delivery', __( 'File 19 rejected or could not persist the clinic notification event.', 'worldwide-clinic-appointments' ), array( 'status'=>503, 'source_error'=>$result->get_error_code() ) );
 		}
-
-		// Privacy-minimal fallback: no clinical reason, note, phone, or appointment time.
-		$subject = __( 'Clinic appointment update', 'worldwide-clinic-appointments' );
-		$message = __( 'There is an update to your clinic appointment. Sign in to the platform to view it securely.', 'worldwide-clinic-appointments' );
-		$recipients = array_unique( array_filter( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ) ) );
-		if ( empty( $recipients ) ) { WCA_Observability::circuit_success( $provider ); return true; }
-		$all_sent = true;
-		foreach ( $recipients as $user_id ) {
-			$user = get_userdata( $user_id );
-			if ( ! $user || ! is_email( $user->user_email ) || ! wp_mail( $user->user_email, $subject, $message ) ) { $all_sent = false; }
-		}
-		if ( ! $all_sent ) {
-			WCA_Observability::circuit_failure( $provider, 'Notification fallback did not deliver to every intended recipient.' );
-			return new WP_Error( 'wca_mail_delivery', 'Notification fallback did not deliver to every intended recipient.' );
-		}
-		WCA_Observability::circuit_success( $provider );
+		WCA_Observability::circuit_success( 'file19' );
 		return true;
+	}
+
+	private static function file19_event_type( $event_key ) {
+		$map = array(
+			'appointment_requested' => 'Clinic.AppointmentRequested',
+			'appointmentconfirmed_v1' => 'Clinic.AppointmentConfirmed',
+			'appointmentdeclined_v1' => 'Clinic.AppointmentDeclined',
+			'appointmentrescheduleproposed_v1' => 'Clinic.AppointmentRescheduleProposed',
+			'appointmentcheckedin_v1' => 'Clinic.AppointmentCheckedIn',
+			'appointmentcompleted_v1' => 'Clinic.AppointmentCompleted',
+			'appointmentcancelled_v1' => 'Clinic.AppointmentCancelled',
+			'appointmentnoshow_v1' => 'Clinic.AppointmentNoShow',
+			'appointmentchanged_v1' => 'Clinic.AppointmentChanged',
+			'complaint_submitted' => 'Clinic.AppointmentComplaintSubmitted',
+			'doctor_authority_hold' => 'Clinic.DoctorAuthorityHoldApplied',
+		);
+		return $map[ sanitize_key( (string) $event_key ) ] ?? 'Clinic.AppointmentChanged';
+	}
+
+	private static function file19_priority( $event_key ) {
+		$event_key = sanitize_key( (string) $event_key );
+		return in_array( $event_key, array( 'appointmentcancelled_v1','appointmentdeclined_v1','doctor_authority_hold' ), true ) ? 'high' : 'normal';
 	}
 
 	public static function maintenance() {
