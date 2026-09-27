@@ -729,52 +729,42 @@ final class SWC_Helpers {
 	 * Unified File 19 notification first, checked email fallback second.
 	 */
 	public static function notify_user( $user_id, $event, $title, $body, $appointment_id, $link = '', $priority = 'normal' ) {
+		unset( $link );
 		$user_id = absint( $user_id );
-		$user    = get_userdata( $user_id );
-		if ( ! $user ) {
+		if ( $user_id < 1 || ! get_userdata( $user_id ) ) { return false; }
+		if ( ! function_exists( 'sun_ingest_domain_event' ) || ! function_exists( 'sun_register_notification_producer' ) ) {
+			self::audit( $appointment_id, 'notification-failed', array( 'source'=>'file19', 'reason'=>'canonical File 19 unavailable' ) );
 			return false;
 		}
+		WCA_Plugin::register_file19_producer();
 		$appointment_ref = self::appointment_public_ref( $appointment_id );
-		$args = array(
-			'user_id'       => $user_id,
-			'actor_user_id' => get_current_user_id(),
-			'category'      => 'appointments',
-			'type'          => sanitize_key( $event ),
-			'priority'      => sanitize_key( $priority ),
-			'title'         => sanitize_text_field( $title ),
-			'body'          => sanitize_textarea_field( $body ),
-			'link'          => esc_url_raw( $link ),
-			'entity_type'   => 'appointment',
-			'entity_ref'    => $appointment_ref,
-			'source'        => 'file08',
-			'source_ref'    => $appointment_ref,
-			'dedupe_key'    => 'file08|' . sanitize_key( $event ) . '|' . $appointment_ref . '|' . self::record_version( $appointment_id ),
-			'context'       => array( 'appointment_ref' => $appointment_ref ),
-		);
-		if ( class_exists( 'SUN_Core' ) ) {
-			return (bool) SUN_Core::create( $args );
-		}
-		if ( has_action( 'sabri_notify' ) ) {
-			do_action( 'sabri_notify', $args );
-			return true;
-		}
-		$subject = __( 'Worldwide Clinic Appointment Update', 'worldwide-clinic-appointments' );
-		$message = sanitize_textarea_field( $body ) . "\n\n" . ( $appointment_ref ? sprintf( __( 'Appointment reference: %s', 'worldwide-clinic-appointments' ), $appointment_ref ) . "\n" : '' ) . __( 'Do not send sensitive medical information by email.', 'worldwide-clinic-appointments' );
-		$sent    = is_email( $user->user_email ) && wp_mail( $user->user_email, $subject, $message );
-		if ( ! $sent ) {
-			update_option(
-				'swc_last_delivery_error',
-				array(
-					'user_id'        => $user_id,
-					'appointment_id' => absint( $appointment_id ),
-					'event'          => sanitize_key( $event ),
-					'time'           => current_time( 'mysql', true ),
+		$dedupe = 'file08|' . sanitize_key( $event ) . '|' . $appointment_ref . '|' . self::record_version( $appointment_id ) . '|u:' . $user_id;
+		$result = sun_ingest_domain_event(
+			array(
+				'producer' => 'file08-clinic',
+				'owner' => 'File 08',
+				'event_id' => 'legacy-notification:' . hash( 'sha256', $dedupe ),
+				'event_type' => 'Clinic.AppointmentChanged',
+				'schema_version' => '1.0',
+				'occurred_at' => gmdate( DATE_ATOM ),
+				'recipients' => array( array( 'user_id'=>$user_id ) ),
+				'trace_id' => 'wca-legacy:' . substr( hash( 'sha256', $dedupe ), 0, 48 ),
+				'category' => 'clinic',
+				'priority' => in_array( sanitize_key( $priority ), array( 'low','normal','high','critical' ), true ) ? sanitize_key( $priority ) : 'normal',
+				'sensitivity' => 'sensitive',
+				'subject' => array( 'type'=>'appointment', 'public_id'=>$appointment_ref ),
+				'data' => array(
+					'action_name' => sanitize_text_field( $title ),
+					'summary' => sanitize_textarea_field( $body ),
+					'status' => sanitize_key( $event ),
 				),
-				false
-			);
-			self::audit( $appointment_id, 'notification-failed', array( 'source' => 'email-fallback', 'reason' => 'wp_mail returned false' ) );
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			self::audit( $appointment_id, 'notification-failed', array( 'source'=>'file19', 'reason'=>$result->get_error_code() ) );
+			return false;
 		}
-		return $sent;
+		return true;
 	}
 
 	/**
