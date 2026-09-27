@@ -160,6 +160,8 @@ final class WCA_Outbox {
 		$event_key = sanitize_key( (string) ( $payload['event'] ?? 'clinic_update' ) );
 		$event_type = self::file19_event_type( $event_key );
 		$appointment_ref = sanitize_text_field( (string) ( $payload['appointment_ref'] ?? $aggregate_ref ) );
+		$trace = substr( preg_replace( '/[^A-Za-z0-9._:\\-]/', '', (string) $trace_id ), 0, 100 );
+		if ( '' === $trace ) { $trace = 'wca:' . substr( hash( 'sha256', (string) $message_id ), 0, 48 ); }
 		$event = array(
 			'producer' => 'file08-clinic',
 			'owner' => 'File 08',
