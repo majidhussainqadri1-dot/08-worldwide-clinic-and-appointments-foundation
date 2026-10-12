@@ -34,7 +34,7 @@ $checks = array(
     'underlying source subject assertion required' => strpos($source, 'SMC_CF01_Contract::membership_assertion') !== false,
     'private narrative never read' => strpos($source, "SWC_Helpers::meta( \$appointment_id, 'reason'") === false && strpos($source, "SWC_Helpers::meta( \$appointment_id, 'doctor_private_note'") === false,
     'known source inventory retained' => strpos($inventory, 'appointment-processing consent/acknowledgement only') !== false,
-    'current deterministic builder used' => strpos($data['builder'], 'class-swc-cf01-care-context.php') !== false,
+    'current deterministic builder used' => strpos($data['builder'], "'assets','includes','languages','templates'") !== false,
     'current independently verified package' => strpos($data['verifier'], 'CF-01') !== false || strpos($data['verifier'], 'cf01') !== false,
     'canonical aggregate includes this test' => strpos($data['runner'], "'cf01-care-context-contract.php'") !== false,
 );
