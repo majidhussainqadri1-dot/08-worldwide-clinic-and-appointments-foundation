@@ -71,6 +71,11 @@ if ( ! hash_equals( $contractVersions['public_clinic_contract_version'], $public
 	fwrite( STDERR, "Public Clinic runtime/canonical contract version mismatch.\n" );
 	exit( 2 );
 }
+$cf01CareContextVersion = wca_build_class_constant( $root, 'includes/class-swc-cf01-care-context.php', 'CONTRACT_VERSION' );
+if ( ! hash_equals( $contractVersions['cf01_context_contract_version'], $cf01CareContextVersion ) ) {
+	fwrite( STDERR, "CF-01 care-context runtime/canonical contract version mismatch.\n" );
+	exit( 2 );
+}
 foreach ( array( 'core_schema_version', 'continuity_schema_version', 'continuity_contract_version', 'future24_schema_version', 'future24_contract_version', 'public_clinic_contract_version', 'cf01_context_contract_version' ) as $key ) {
 	if ( ! preg_match( '/^\d+\.\d+\.\d+$/', $contractVersions[ $key ] ) ) {
 		fwrite( STDERR, "Invalid contract/schema version: {$key}\n" );

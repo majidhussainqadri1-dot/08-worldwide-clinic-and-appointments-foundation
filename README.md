@@ -4,7 +4,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t21-ten-round-2026-09-09`
+- Repository review branch: `review/file08-t30-20-check-query-input-boundary-2026-10-12`
 - Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.
@@ -67,3 +67,11 @@ A repository candidate may be called **Coded**, **Packaged**, or **Automated-QA 
 T26 is the current closure cycle. R1 corrected Public Clinic canonical/runtime contract parity and the package-verifier blind spot; R2–R9 were clean; R10 corrected release-currentness and historical-regression drift. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status. Static documentation deliberately does not hard-code a future CI result; consult the canonical workflow on the exact HEAD being evaluated.
 
 Before production, run `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, recording actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback and Founder acceptance. After an explicitly authorized production deployment, freeze the exact deployed artifact/version/schema/migration state and perform live parity re-test before any live resolution claim.
+
+
+## T29 — unified current-plan source candidate (12 October 2026)
+Latest File08 PR#12/T28 Source `0dbfddc789f295b30b9aa1b71cb7ec4fda443bff` retains current File00 1.2.3, File09 eligible verification, CF01 1.1.0, all original + revived runtime tests, package parity and File17/19 fixes. T29 candidate additionally integrates proven PR#14 strict File08 patient/clinic signed cursor decoder, RAW UTC cursor encoder validation and no-partial-pagination degraded responses. **20 bounded File08/central/companion source reviews** were frozen before modification at `docs/T29-20-FROZEN-REVIEWS-2026-10-12.md`; 20 complete real E2E reviews have NOT been performed. Tests include `tests/t27-r1-query-cursor-integrity-regressions.php`, `tests/t27-r2-cursor-producer-consumer-regressions.php` and the T28 no-orphan suite. Software 1.2.15; source core schema 3.4.0, Future24/Continuity 1.1.0 unchanged. Hostinger/physical DB/migrations/staging/live verification not performed; PR is a draft and no deployment authorized.
+
+
+## T30 exact-source review candidate — 12 October 2026
+Twenty bounded plan/central/companion owner inspections against T29 SHA `03a376e3aab37e191eeb32fbf50910e644095f30` frozen before edits in `docs/T30-20-FROZEN-REVIEWS-2026-10-12.md`. T30-D01: malformed signed pagination cursor arrays, whitespace, HTML and dashboard query parameters could be cast, trimmed or sanitized before proof of canonical identity. T30-D02: malformed/nested `per_page` silently defaulted to 20. Current source `WCA_Query_API` now rejects wrong types without DB reads or private projection, preserves an exact signed opaque cursor and a canonical bounded positive page size, with a new real method regression in `tests/t30-private-query-input-integrity-regressions.php`. This is one source-only draft; prior T29 File00/09/CF01, File17/19 and all T28 test coverage are retained. Software candidate 1.2.15, source core schema 3.4.0 and Future24/Continuity 1.1.0 unchanged. Hostinger deployed code, DB/migrations, two staged reviews, Founder acceptance, deployment and live retest remain unverified.
