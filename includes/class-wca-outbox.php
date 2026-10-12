@@ -94,8 +94,8 @@ final class WCA_Outbox {
 						throw new RuntimeException( 'Invalid outbox payload.' );
 					}
 					$result = self::dispatch( (string) $item['message_id'], (string) $item['topic'], (string) $item['aggregate_ref'], $payload, (string) $item['trace_id'] );
-					if ( is_wp_error( $result ) ) {
-						throw new RuntimeException( $result->get_error_message() );
+					if ( is_wp_error( $result ) || true !== $result ) {
+						throw new RuntimeException( is_wp_error( $result ) ? $result->get_error_message() : 'Outbox consumer did not positively acknowledge the event.' );
 					}
 					if ( ! WCA_Repository::complete_outbox( absint( $item['id'] ), $worker ) ) {
 						throw new RuntimeException( 'Outbox delivery completed externally but durable worker-fenced finalization failed.' );
@@ -141,13 +141,34 @@ final class WCA_Outbox {
 		if ( 'File19.NotificationRequested.v1' === $topic ) {
 			return self::dispatch_notification( $payload, $trace_id, $message_id );
 		}
+		if ( 0 === strpos( $topic, 'File17.' ) ) {
+			return self::require_owner_receipt( 'file17', 'wca_file17_dispatch_result', $envelope );
+		}
+		if ( 0 === strpos( $topic, 'File26.' ) ) {
+			return self::require_owner_receipt( 'file26', 'wca_file26_dispatch_result', $envelope );
+		}
 		if ( 0 === strpos( $topic, 'CF03.' ) ) {
-			return apply_filters( 'wca_cf03_dispatch_result', true, $envelope );
+			return self::require_owner_receipt( 'cf03', 'wca_cf03_dispatch_result', $envelope );
 		}
 		if ( 0 === strpos( $topic, 'CF02.' ) ) {
-			return apply_filters( 'wca_cf02_dispatch_result', true, $envelope );
+			return self::require_owner_receipt( 'cf02', 'wca_cf02_dispatch_result', $envelope );
 		}
 		return apply_filters( 'wca_outbox_dispatch_result', true, $envelope );
+	}
+
+	/**
+	 * External canonical owners must durably acknowledge consumption. No handler,
+	 * false, null or malformed receipt keeps the outbox item retryable rather
+	 * than silently marking File17/File26/CF02/CF03 work delivered.
+	 *
+	 * Consumers return literal true only after durable, idempotent acceptance
+	 * of envelope.message_id. File 08 never writes another owner's tables.
+	 */
+	private static function require_owner_receipt( $owner, $hook, $envelope ) {
+		$result = apply_filters( $hook, false, $envelope );
+		if ( true === $result ) { return true; }
+		if ( is_wp_error( $result ) ) { return $result; }
+		return new WP_Error( 'wca_outbox_owner_not_acknowledged', __( 'The external owner has not confirmed durable event acceptance; delivery will be retried.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'owner' => sanitize_key( $owner ) ) );
 	}
 
 	/**
