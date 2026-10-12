@@ -31,7 +31,7 @@ $filter = hash( 'sha256', 'File08|patient|77|20' );
 $when = '2026-10-12 14:25:39';
 $valid = array( 'v' => 1, 's' => $scope, 'a' => $actor, 'f' => $filter, 't' => $when, 'i' => 285 );
 $trusted_signed = static function( $payload ) {
-	$hex = bin2hex( json_encode( $payload ) );
+	$hex = bin2hex( json_encode( $payload, JSON_PRESERVE_ZERO_FRACTION ) );
 	return $hex . '.' . hash_hmac( 'sha256', $hex, wp_salt( 'nonce' ) );
 };
 $generated = $encode->invoke( null, $scope, $actor, $filter, array( 't' => $when, 'i' => 285 ) );
