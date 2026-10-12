@@ -18,7 +18,8 @@ class SN_Context_Adapters { public static function attach_context( $request ) { 
 function sun_register_notification_producer( $key, $args ) { return true; }
 function sun_ingest_domain_event( $event ) { return array( 'status' => 'processed' ); }
 function gdo_user_is_verified( $id ) { return true; }
-function has_filter( $name ) { return false; }
+$GLOBALS['t30_owner_receipts'] = array( 'wca_file17_dispatch_result' => true, 'wca_file26_dispatch_result' => true );
+function has_filter( $name ) { return ! empty( $GLOBALS['t30_owner_receipts'][ $name ] ); }
 
 require_once dirname( __DIR__ ) . '/includes/class-wca-authorization.php';
 require_once dirname( __DIR__ ) . '/includes/class-wca-compatibility.php';
@@ -38,6 +39,11 @@ foreach ( array( 'file00','file03','file07','file09','file17','file19' ) as $own
     wca_test_assert( true === $health[ $owner ]['ready'], 'Current owner contract is detected: ' . $owner );
 }
 wca_test_assert( false === $health['file24']['ready'], 'Own outbox observers do not fabricate File 24 readiness.' );
+wca_test_assert( true === $health['file26']['ready'], 'File 26 owner receipt hook appears as ready only while registered.' );
+$GLOBALS['t30_owner_receipts'] = array();
+$degraded = WCA_Compatibility::dependency_health();
+wca_test_assert( false === $degraded['file17']['ready'] && false === $degraded['file26']['ready'], 'Missing companion durable-ack filters explicitly degrade File 17 and File 26 readiness.' );
+$GLOBALS['t30_owner_receipts'] = array( 'wca_file17_dispatch_result' => true, 'wca_file26_dispatch_result' => true );
 wca_test_assert( false === $health['cf02']['ready'] && false === $health['cf03']['ready'], 'Absent cross-file case/finance owner filters do not fabricate readiness.' );
 
 $auth = file_get_contents( dirname(__DIR__) . '/includes/class-wca-authorization.php' );
