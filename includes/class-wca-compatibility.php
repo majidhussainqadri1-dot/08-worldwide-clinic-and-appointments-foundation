@@ -77,13 +77,13 @@ final class WCA_Compatibility {
 	/** @return array<string,mixed> */
 	public static function dependency_health() {
 		return array(
-			'file00' => array( 'ready' => function_exists( 'smc_get_membership_assertion' ) || function_exists( 'sabri_membership_get_assertion' ), 'required' => true ),
+			'file00' => array( 'ready' => class_exists( 'SMC_Contracts' ) && method_exists( 'SMC_Contracts', 'assertions' ) && class_exists( 'SMC_CF01_Contract' ) && method_exists( 'SMC_CF01_Contract', 'ensure_subject_uuid' ), 'required' => true ),
 			'file03' => array( 'ready' => function_exists( 'spp_get_profile_projection' ) || function_exists( 'sp_get_profile_projection' ), 'required' => false ),
 			'file07' => array( 'ready' => function_exists( 'gdd_get_doctor_projection' ) || function_exists( 'gdo_get_doctor_projection' ), 'required' => false ),
 			'file09' => array( 'ready' => function_exists( 'gdo_user_is_verified' ), 'required' => true ),
-			'file17' => array( 'ready' => has_action( 'wca_outbox_event' ) || function_exists( 'sn_create_appointment_context' ), 'required' => false ),
-			'file19' => array( 'ready' => function_exists( 'sn_notify_users' ), 'required' => false ),
-			'file24' => array( 'ready' => has_action( 'wca_outbox_event' ) || function_exists( 'sabri_assurance_record_evidence' ), 'required' => false ),
+			'file17' => array( 'ready' => function_exists( 'sn_create_appointment_context' ), 'required' => false ),
+			'file19' => array( 'ready' => function_exists( 'sun_register_notification_producer' ) && function_exists( 'sun_ingest_domain_event' ), 'required' => false ),
+			'file24' => array( 'ready' => function_exists( 'sabri_assurance_record_evidence' ), 'required' => false ),
 			'cf01'   => array( 'ready' => function_exists( 'cf01_accept_scheduling_context' ), 'required' => false ),
 			'cf02'   => array( 'ready' => has_filter( 'wca_cf02_dispatch_result' ), 'required' => false ),
 			'cf03'   => array( 'ready' => has_filter( 'wca_cf03_dispatch_result' ), 'required' => false ),
