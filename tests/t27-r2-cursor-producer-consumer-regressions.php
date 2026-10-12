@@ -100,8 +100,11 @@ $good = WCA_Query_API::list_patient_appointments( 77, array( 'per_page' => 1 ) )
 $check( is_array( $good ) && count( $good['items'] ) === 1 &&
     is_string( $good['next_cursor'] ) && '' !== $good['next_cursor'],
     'patient list with valid historical state yields consumable next cursor' );
-$check( ! is_wp_error( $decode->invoke( null, $good['next_cursor'], 'appointment_list', 77,
-    hash( 'sha256', wp_json_encode( array( 'actor' => 77, 'scope' => 'own_appointments', 'per_page' => 1 ) ) ) ),
+$patient_filter = hash( 'sha256', wp_json_encode( array(
+    'actor' => 77, 'scope' => 'own_appointments', 'per_page' => 1,
+) ) );
+$roundtrip = $decode->invoke( null, $good['next_cursor'], 'appointment_list', 77, $patient_filter );
+$check( is_array( $roundtrip ) && $roundtrip['i'] === 51,
     'actual patient list next cursor was rejected by shared decoder' );
 $db->rows[0]['sort_time'] = 'historical-non-calendar';
 $bad = WCA_Query_API::list_patient_appointments( 77, array( 'per_page' => 1 ) );
