@@ -2,7 +2,7 @@
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t21-ten-round-2026-09-09`
+- Working review branch: `review/file08-t29-20-check-merged-t28-cursor-2026-10-12`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
@@ -78,3 +78,7 @@ This repository does not prove the current staging or live installation. Exact d
 ## Historical evidence note
 
 T13–T25 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T26 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+
+
+## T29 — unified current-plan source candidate (12 October 2026)
+Latest File08 PR#12/T28 Source `0dbfddc789f295b30b9aa1b71cb7ec4fda443bff` retains current File00 1.2.3, File09 eligible verification, CF01 1.1.0, all original + revived runtime tests, package parity and File17/19 fixes. T29 candidate additionally integrates proven PR#14 strict File08 patient/clinic signed cursor decoder, RAW UTC cursor encoder validation and no-partial-pagination degraded responses. **20 bounded File08/central/companion source reviews** were frozen before modification at `docs/T29-20-FROZEN-REVIEWS-2026-10-12.md`; 20 complete real E2E reviews have NOT been performed. Tests include `tests/t27-r1-query-cursor-integrity-regressions.php`, `tests/t27-r2-cursor-producer-consumer-regressions.php` and the T28 no-orphan suite. Software 1.2.15; source core schema 3.4.0, Future24/Continuity 1.1.0 unchanged. Hostinger/physical DB/migrations/staging/live verification not performed; PR is a draft and no deployment authorized.
