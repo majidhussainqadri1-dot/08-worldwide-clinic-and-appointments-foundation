@@ -281,7 +281,11 @@ final class WCA_Query_API {
 	}
 
 	private static function encode_cursor( $scope, $actor_user_id, $filter_hash, $state ) {
-		$payload = array( 'v' => 1, 's' => sanitize_key( $scope ), 'a' => absint( $actor_user_id ), 'f' => (string) $filter_hash, 't' => sanitize_text_field( $state['t'] ?? '' ), 'i' => absint( $state['i'] ?? 0 ) );
+		// Validate the original persisted row BEFORE sanitization: HTML stripping
+		// must never silently turn a malformed source into a trusted cursor.
+		$source_time = $state['t'] ?? null;
+		if ( ! self::cursor_time_valid( $source_time ) ) { return ''; }
+		$payload = array( 'v' => 1, 's' => sanitize_key( $scope ), 'a' => absint( $actor_user_id ), 'f' => (string) $filter_hash, 't' => $source_time, 'i' => absint( $state['i'] ?? 0 ) );
 		$json = wp_json_encode( $payload );
 		// Producer and decoder must accept the identical canonical UTC keyset.
 		// Never sign a malformed historic SQL sort-time into an unusable next link.
