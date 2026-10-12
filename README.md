@@ -4,7 +4,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t21-ten-round-2026-09-09`
+- Repository review branch: `review/file08-t27-r2-combined-cursor-notifications-2026-10-12`
 - Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.
@@ -67,3 +67,7 @@ A repository candidate may be called **Coded**, **Packaged**, or **Automated-QA 
 T26 is the current closure cycle. R1 corrected Public Clinic canonical/runtime contract parity and the package-verifier blind spot; R2–R9 were clean; R10 corrected release-currentness and historical-regression drift. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status. Static documentation deliberately does not hard-code a future CI result; consult the canonical workflow on the exact HEAD being evaluated.
 
 Before production, run `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, recording actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback and Founder acceptance. After an explicitly authorized production deployment, freeze the exact deployed artifact/version/schema/migration state and perform live parity re-test before any live resolution claim.
+
+
+## T27-R2 combined candidate (12 October 2026)
+A new **unmerged T27-R2 integrated source candidate** combines previous draft PR#12 File17 opaque-reference and File19 current delivery owner corrections with previous PR#13 signed HMAC patient/clinic cursor correction. The T27-R2 frozen **20 bounded plan/source checks** (not 20 exhaustive live audits) are in `docs/T27-R2-TWENTY-REVIEW-FROZEN-LEDGER.md`. The new cursor producer also refuses to sign malformed historical UTC sort positions and both private lists return a safe 503 rather than a partial/unconsumable next page. Tests `t27-r1-query-cursor-integrity-regressions.php` (48) and `t27-r2-cursor-producer-consumer-regressions.php` run with existing File17/File19 tests. Source software 1.2.15, core schema 3.4.0 and Future24/Continuity 1.1.0 remain unchanged. Exact branch CI and staging/live are separate.
