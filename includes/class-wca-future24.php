@@ -643,7 +643,19 @@ final class WCA_Future24 {
 	private static function public_record( $row ) {
 		if ( is_wp_error( $row ) ) { return $row; }
 		if ( ! is_array( $row ) ) { return new WP_Error( 'wca_future24_record_unavailable', __( 'The Future24 record could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-		$payload = json_decode( isset( $row['payload_json'] ) ? (string) $row['payload_json'] : '{}', true );
+		// Historical Future24 storage must be an operational JSON object,
+		// not a scalar, malformed state or nonempty positional list.
+		$raw_payload = isset( $row['payload_json'] ) ? (string) $row['payload_json'] : '{}';
+		$native_payload = json_decode( $raw_payload );
+		$payload = json_decode( $raw_payload, true );
+		$root_valid = is_object( $native_payload ) || ( is_array( $native_payload ) && 0 === count( $native_payload ) );
+		if ( ! $root_valid || ! is_array( $payload ) ) {
+			WCA_Observability::log( 'error', 'future24_persisted_payload_corrupt', array(
+				'feature_id' => sanitize_key( (string) ( $row['feature_id'] ?? '' ) ),
+				'record_id' => absint( $row['id'] ?? 0 ),
+			) );
+			return new WP_Error( 'wca_future24_payload_corrupt', __( 'Stored Future24 operational state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		return array(
 			'public_ref' => (string) $row['public_ref'],
 			'feature_id' => (string) $row['feature_id'],
@@ -974,6 +986,11 @@ self::release_semantic_lock( $lock );
 		if ( is_wp_error( $claims ) ) { return $claims; }
 		$context = self::patient_context( is_array( $data ) ? $data : array(), $actor );
 		if ( is_wp_error( $context ) ) { return $context; }
+		// Only File00 may issue the patient's canonical group identity.
+		$member_ref = WCA_Authorization::subject_uuid( $context['patient_user_id'] );
+		if ( ! is_string( $member_ref ) || ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $member_ref ) ) {
+			return new WP_Error( 'wca_group_subject_unavailable', __( 'Canonical File00 patient identity is unavailable; group membership was not created.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		$session = self::get_record( $session_ref, 'F08-FUT-05' );
 		if ( is_wp_error( $session ) ) { return $session; }
 		if ( ! $session || 'group_open' !== $session['status'] || ( ! empty( $session['expires_at'] ) && strtotime( $session['expires_at'] . ' UTC' ) <= time() ) ) {
@@ -1002,7 +1019,7 @@ self::release_semantic_lock( $lock );
 				'parent_ref' => strtolower( $session_ref ),
 				'status' => 'group_member',
 				'expires_at' => $session['expires_at'],
-				'payload' => array( 'member_ref' => WCA_Authorization::subject_uuid( $context['patient_user_id'] ), 'guardian_user_id' => $context['guardian_user_id'], 'peer_identity_visible' => false ),
+				'payload' => array( 'member_ref' => $member_ref, 'guardian_user_id' => $context['guardian_user_id'], 'peer_identity_visible' => false ),
 			), $context['actor_user_id'] );
 		} finally {
 self::release_semantic_lock( $lock );

@@ -6,9 +6,9 @@
 declare(strict_types=1);
 
 define( 'ABSPATH', __DIR__ . '/' );
-define( 'SWC_VERSION', '0.2.2' );
-define( 'SMC_VERSION', '1.2.7' );
-define( 'SMC_CF01_CONTRACT_VERSION', '1.0.0' );
+define( 'SWC_VERSION', '1.2.15' );
+define( 'SMC_VERSION', '1.2.44' );
+define( 'SMC_CF01_CONTRACT_VERSION', '1.1.0' );
 
 $GLOBALS['swc_test_current_user'] = 10;
 $GLOBALS['swc_test_post_type']    = array( 100 => 'swc_appointment', 101 => 'swc_appointment' );
@@ -16,7 +16,7 @@ $GLOBALS['swc_test_meta']         = array(
 	100 => array(
 		'patient_user_id'     => 10,
 		'doctor_id'           => 20,
-		'status'              => 'accepted',
+		'status'              => 'confirmed',
 		'record_version'      => 7,
 		'consultation_type'   => 'online',
 		'preferred_at_utc'    => '2026-08-05 10:00:00',
@@ -48,6 +48,8 @@ function get_post_field( $field, $id ) { unset( $field ); return $GLOBALS['swc_t
 function get_current_user_id() { return (int) $GLOBALS['swc_test_current_user']; }
 function user_can( $user_id, $capability ) { return 30 === (int) $user_id && 'manage_worldwide_clinic' === $capability; }
 function wp_salt( $scheme = 'auth' ) { return hash( 'sha256', 'file08-cf01-test|' . $scheme ); }
+function is_wp_error( $value ) { return $value instanceof WP_Error; }
+class WP_Error { public $code; public function __construct( $code = '' ) { $this->code = $code; } }
 
 final class SWC_Helpers {
 	const TYPE = 'swc_appointment';
@@ -56,6 +58,15 @@ final class SWC_Helpers {
 	public static function status( $id ) { return (string) self::meta( $id, 'status', 'requested' ); }
 	public static function can_patient_manage( $id, $user_id = 0 ) { return (int) self::meta( $id, 'patient_user_id', 0 ) === (int) $user_id; }
 	public static function can_doctor_manage( $id, $user_id = 0 ) { return (int) self::meta( $id, 'doctor_id', 0 ) === (int) $user_id; }
+}
+
+final class WCA_Authorization {
+	public static function can_view_appointment( $appointment_id, $user_id, $purpose = '' ) {
+		unset( $purpose );
+		return SWC_Helpers::can_patient_manage( $appointment_id, $user_id )
+			|| SWC_Helpers::can_doctor_manage( $appointment_id, $user_id )
+			|| user_can( $user_id, 'manage_worldwide_clinic' );
+	}
 }
 
 final class SMC_CF01_Contract {
@@ -70,7 +81,7 @@ final class SMC_CF01_Contract {
 			: '22222222-2222-4222-8222-222222222222';
 		return array(
 			'contract'         => 'smc.cf01.membership-assurance',
-			'contract_version' => '1.0.0',
+			'contract_version' => '1.1.0',
 			'result'           => in_array( (int) $user_id, $GLOBALS['swc_test_denied_users'], true ) ? 'deny' : 'allow',
 			'reason_code'      => 'capability_allowed',
 			'subject'          => array( 'platform_uuid' => $uuid ),
@@ -90,7 +101,7 @@ function swc_expect( $condition, $message ) {
 $context = SWC_CF01_Care_Context::assertion( 100, 10, 'appointment_context_read', 7 );
 swc_expect( 'allow' === $context['result'], 'Patient must receive authorized scheduling context.' );
 swc_expect( 'scheduling_context_available' === $context['reason_code'], 'Scheduling allow reason is incorrect.' );
-swc_expect( false === $context['relationship']['treating_relationship_asserted'], 'Accepted appointment must not assert a treating relationship.' );
+swc_expect( false === $context['relationship']['treating_relationship_asserted'], 'Confirmed appointment must not assert a treating relationship.' );
 swc_expect( false === $context['relationship']['sufficient_for_clinical_read'], 'Appointment must not grant clinical read.' );
 swc_expect( false === $context['relationship']['sufficient_for_prescription'], 'Appointment must not grant prescription authority.' );
 swc_expect( false === $context['consent']['clinical_treatment_consent'], 'Appointment consent must not become clinical consent.' );

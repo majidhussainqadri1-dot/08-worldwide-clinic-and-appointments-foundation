@@ -110,7 +110,8 @@ $contracts = $zip->getFromName( $prefix . 'includes/class-wca-contracts.php' );
 $continuity = $zip->getFromName( $prefix . 'includes/class-wca-continuity-secure.php' );
 $future24 = $zip->getFromName( $prefix . 'includes/class-wca-future24.php' );
 $publicClinic = $zip->getFromName( $prefix . 'includes/class-swc-public-clinic.php' );
-if ( ! is_string( $plugin ) || ! is_string( $contracts ) || ! is_string( $continuity ) || ! is_string( $future24 ) || ! is_string( $publicClinic ) ) { fwrite( STDERR, "Runtime contract payload is missing.\n" ); exit( 11 ); }
+$cf01Provider = $zip->getFromName( $prefix . 'includes/class-swc-cf01-care-context.php' );
+if ( ! is_string( $plugin ) || ! is_string( $contracts ) || ! is_string( $continuity ) || ! is_string( $future24 ) || ! is_string( $publicClinic ) || ! is_string( $cf01Provider ) ) { fwrite( STDERR, "Runtime contract payload is missing.\n" ); exit( 11 ); }
 $header = '';
 $constant = '';
 if ( preg_match( '/^\s*\*\s*Version:\s*([^\s]+)/m', $plugin, $match ) ) { $header = trim( $match[1] ); }
@@ -142,6 +143,11 @@ foreach ( $sourceParity as $key => $value ) {
 $publicClinicVersion = wca_verify_constant( $publicClinic, 'CONTRACT_VERSION' );
 if ( '' === $publicClinicVersion || ! hash_equals( (string) ( $manifest['public_clinic_contract_version'] ?? '' ), $publicClinicVersion ) ) {
 	fwrite( STDERR, "Manifest/Public Clinic runtime contract parity failed.\n" );
+	exit( 14 );
+}
+$cf01Version = wca_verify_constant( $cf01Provider, 'CONTRACT_VERSION' );
+if ( '' === $cf01Version || ! hash_equals( (string) ( $manifest['cf01_context_contract_version'] ?? '' ), $cf01Version ) ) {
+	fwrite( STDERR, "Manifest/CF-01 care-context runtime contract parity failed.\n" );
 	exit( 14 );
 }
 $zip->close();
