@@ -2,7 +2,7 @@
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t30-20-check-query-input-boundary-2026-10-12`
+- Working review branch: `review/file08-t31-future24-identity-and-stored-record-integrity-2026-10-13`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
@@ -86,3 +86,7 @@ Latest File08 PR#12/T28 Source `0dbfddc789f295b30b9aa1b71cb7ec4fda443bff` retain
 
 ## T30 exact-source review candidate — 12 October 2026
 Twenty bounded plan/central/companion owner inspections against T29 SHA `03a376e3aab37e191eeb32fbf50910e644095f30` frozen before edits in `docs/T30-20-FROZEN-REVIEWS-2026-10-12.md`. T30-D01: malformed signed pagination cursor arrays, whitespace, HTML and dashboard query parameters could be cast, trimmed or sanitized before proof of canonical identity. T30-D02: malformed/nested `per_page` silently defaulted to 20. Current source `WCA_Query_API` now rejects wrong types without DB reads or private projection, preserves an exact signed opaque cursor and a canonical bounded positive page size, with a new real method regression in `tests/t30-private-query-input-integrity-regressions.php`. This is one source-only draft; prior T29 File00/09/CF01, File17/19 and all T28 test coverage are retained. Software candidate 1.2.15, source core schema 3.4.0 and Future24/Continuity 1.1.0 unchanged. Hostinger deployed code, DB/migrations, two staged reviews, Founder acceptance, deployment and live retest remain unverified.
+
+
+## T31 original-plan Future24 integrity source candidate — 13 October 2026
+The 20 **bounded** File08/central/companion source reviews were frozen *before code changes* in `docs/T31-20-FROZEN-SOURCE-REVIEWS-2026-10-13.md`. T31-D01: canonical File00 subject UUID not available, yet prior Group Session join could persist an empty member_ref; new `WCA_Future24::join_group_session` validates the exact owner-issued UUID before any group session lookup or write. T31-D02: malformed historical Future24 payload_json could masquerade as empty operational state; `public_record` now rejects nonobject/nonempty positional JSON with structured privacy-safe logs and a 503, preserving valid {} and legacy [] empty. Native regression `tests/t31-future24-group-identity-and-record-integrity.php` registered in the canonical full no-orphan runner. All code-level corrections are source-only: unchanged software 1.2.15, Core schema 3.4.0 and Continuity/Future24 1.1.0. No installed Hostinger plugin, physical DB/schema/wp_options, migration, dependency/staging/live checks verified.
