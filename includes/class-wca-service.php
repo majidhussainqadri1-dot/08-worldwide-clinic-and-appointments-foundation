@@ -759,10 +759,12 @@ final class WCA_Service {
 			);
 			$event = WCA_Repository::append_event( 'AppointmentRequested.v1', 'appointment', $public_ref, $payload, $actor_user_id, $trace );
 			if ( is_wp_error( $event ) ) { return $event; }
+			$file17_context = self::file17_context_payload( $appointment_id );
+			if ( is_wp_error( $file17_context ) ) { return $file17_context; }
 			foreach ( array(
 				array( 'AppointmentRequested.v1', $payload ),
 				array( 'File19.NotificationRequested.v1', array( 'event' => 'appointment_requested', 'appointment_ref' => $public_ref, 'recipients' => array( $patient_user_id, absint( $hold['doctor_user_id'] ) ) ) ),
-				array( 'File17.AppointmentContextChanged.v1', self::file17_context_payload( $appointment_id ) ),
+				array( 'File17.AppointmentContextChanged.v1', $file17_context ),
 			) as $outbox ) {
 				$queued = WCA_Repository::enqueue( $outbox[0], $public_ref, $outbox[1], $trace );
 				if ( is_wp_error( $queued ) ) { return $queued; }
@@ -899,7 +901,8 @@ final class WCA_Service {
 			$version_write = SWC_Helpers::bump_version_strict( $appointment_id );
 			if ( is_wp_error( $version_write ) ) { return $version_write; }
 			$trace = WCA_Observability::trace_id();
-			$public_ref = (string) SWC_Helpers::meta( $appointment_id, 'public_ref', 'appointment-' . $appointment_id );
+			$public_ref = self::required_public_appointment_ref( $appointment_id );
+			if ( is_wp_error( $public_ref ) ) { return $public_ref; }
 			$event_type = self::event_for_transition( $next );
 			$payload = array( 'event_id' => WCA_Repository::uuid(), 'occurred_at' => gmdate( 'c' ), 'appointment_ref' => $public_ref, 'old_status' => $current, 'new_status' => $next, 'scheduled_at_utc' => SWC_Helpers::meta( $appointment_id, 'preferred_at_utc' ), 'completed_at_utc' => SWC_Helpers::meta( $appointment_id, 'completed_at_utc' ), 'trace_id' => $trace );
 			$event_record = WCA_Repository::append_event( $event_type, 'appointment', $public_ref, $payload, $actor_user_id, $trace );
@@ -908,7 +911,9 @@ final class WCA_Service {
 			if ( is_wp_error( $outbox_event ) ) { return $outbox_event; }
 			$notification = WCA_Repository::enqueue( 'File19.NotificationRequested.v1', $public_ref, array( 'event' => strtolower( str_replace( '.', '_', $event_type ) ), 'appointment_ref' => $public_ref, 'recipients' => array( absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ), absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) ) ), $trace );
 			if ( is_wp_error( $notification ) ) { return $notification; }
-			$communication = WCA_Repository::enqueue( 'File17.AppointmentContextChanged.v1', $public_ref, self::file17_context_payload( $appointment_id ), $trace );
+			$file17_context = self::file17_context_payload( $appointment_id );
+			if ( is_wp_error( $file17_context ) ) { return $file17_context; }
+			$communication = WCA_Repository::enqueue( 'File17.AppointmentContextChanged.v1', $public_ref, $file17_context, $trace );
 			if ( is_wp_error( $communication ) ) { return $communication; }
 			if ( in_array( $next, array( 'declined','cancelled','no_show' ), true ) ) {
 				$fee_snapshot = self::appointment_fee_snapshot( $appointment_id );
@@ -1178,7 +1183,9 @@ final class WCA_Service {
 			$end_ts = $start_ts + max( 10, absint( SWC_Helpers::meta( $appointment_id, 'appointment_duration', 30 ) ) ) * 60;
 		}
 		if ( $end_ts <= $start_ts ) { return new WP_Error( 'wca_calendar_time_invalid', __( 'Stored appointment end time must be after the start time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		$uid = (string) SWC_Helpers::meta( $appointment_id, 'public_ref', 'appointment-' . $appointment_id ) . '@sabrihomeopathy.com';
+		$public_ref = self::required_public_appointment_ref( $appointment_id );
+		if ( is_wp_error( $public_ref ) ) { return $public_ref; }
+		$uid = $public_ref . '@sabrihomeopathy.com';
 		$summary = 'Clinic Appointment';
 		$lines = array(
 			'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Sabri Social Homeopathy Platform//File 08//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',
@@ -1209,12 +1216,23 @@ final class WCA_Service {
 		return str_replace( array( '\\', ';', ',', "\r\n", "\n", "\r" ), array( '\\\\', '\\;', '\\,', '\\n', '\\n', '\\n' ), (string) $value );
 	}
 
-	/** @return array<string,mixed> */
+	/** Canonical public references must never be substituted with native appointment IDs. @return string|WP_Error */
+	private static function required_public_appointment_ref( $appointment_id ) {
+		$ref = strtolower( trim( (string) SWC_Helpers::meta( $appointment_id, 'public_ref', '' ) ) );
+		if ( ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $ref ) ) {
+			return new WP_Error( 'wca_public_appointment_ref_unavailable', __( 'The appointment public reference is unavailable; reconcile the record before continuing.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+		return $ref;
+	}
+
+	/** @return array<string,mixed>|WP_Error */
 	public static function file17_context_payload( $appointment_id ) {
+		$public_ref = self::required_public_appointment_ref( $appointment_id );
+		if ( is_wp_error( $public_ref ) ) { return $public_ref; }
 		return array(
 			'contract'          => 'wca.file17.appointment-context',
 			'version'           => WCA_Contracts::FILE17_CONTEXT_CONTRACT_VERSION,
-			'appointment_ref'   => (string) SWC_Helpers::meta( $appointment_id, 'public_ref', 'appointment-' . $appointment_id ),
+			'appointment_ref'   => $public_ref,
 			'status'            => SWC_Helpers::status( $appointment_id ),
 			'patient_subject_uuid'=> WCA_Authorization::subject_uuid( absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) ) ),
 			'doctor_subject_uuid' => WCA_Authorization::subject_uuid( absint( SWC_Helpers::meta( $appointment_id, 'doctor_id' ) ) ),
