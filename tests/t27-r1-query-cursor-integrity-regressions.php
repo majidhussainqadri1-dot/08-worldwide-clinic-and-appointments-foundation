@@ -3,6 +3,18 @@
  * T27-R1: real source-method regression for signed File08 appointment-list
  * and delegated clinic-schedule cursors. Isolated PHP, not site E2E.
  */
+// Define a PHP7.4-compatible, diagnostic-free WP_Error fixture before the
+// shared test bootstrap (whose historical fallback used dynamic properties).
+class WP_Error {
+	public $code;
+	public $message;
+	public $data;
+	public function __construct( $code = '', $message = '', $data = null ) {
+		$this->code = $code;
+		$this->message = $message;
+		$this->data = $data;
+	}
+}
 require __DIR__ . '/bootstrap.php';
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $value ) { return json_encode( $value ); }
