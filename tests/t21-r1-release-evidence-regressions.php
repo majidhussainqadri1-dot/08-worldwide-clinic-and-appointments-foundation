@@ -12,7 +12,12 @@ function t21r1_check( $label, $ok ) { global $failures, $checks; $checks++; if (
 foreach ( array( $readme, $status, $release, $change, $plugin_readme, $historical ) as $source ) {
     t21r1_check( 'required release-evidence source is readable', is_string( $source ) );
 }
-$branch = 'review/file08-t21-ten-round-2026-09-09';
+// T21 is historical. Validate the active source-review branch dynamically,
+ // rather than permanently binding the current release to a 2026-09-09 branch.
+$matches = array();
+$matched = preg_match( '/Repository review branch:\\s*`([^`]+)`/', $readme, $matches );
+$branch = 1 === $matched && isset( $matches[1] ) ? $matches[1] : '';
+t21r1_check( 'active review branch is a canonical File08 review branch', 1 === preg_match( '/^review\\/file08-t[0-9]+-/', $branch ) );
 t21r1_check( 'README preserves review branch identity', false !== strpos( $readme, 'Repository review branch: `' . $branch . '`' ) );
 t21r1_check( 'STATUS preserves review branch identity', false !== strpos( $status, 'Working review branch: `' . $branch . '`' ) );
 t21r1_check( 'release status preserves review branch identity', false !== strpos( $release, 'Current review branch: `' . $branch . '`' ) );

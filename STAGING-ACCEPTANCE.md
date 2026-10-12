@@ -107,3 +107,7 @@ This checklist must be completed against the **exact final File 08 candidate com
 - [ ] Live deployment explicitly authorized.
 - [ ] After deployment, exact deployed version/files/checksum, DB/schema/migration state and active configuration are frozen and compared to the approved candidate.
 - [ ] Live real-role re-test and parity confirmation pass before the release is marked Operational/Resolved.
+
+
+## T27-R1 mandatory exact installed patient/clinic pagination acceptance
+On the frozen installed staging File08+File00/09/17/19/20/24/25/26 versions, test real signed patient and delegated-clinic schedule cursors with valid UTC dates, legitimate keyset resume, strict JSON v/a/i types, forged/tampered HMAC, signed-but-malformed historical negative/string/float/boolean cursor fields, non-calendar/markup/out-of-range time, cross-user, cross-clinic and cross-purpose replay. Ensure fail closed before query, no unauthorized patient reason or appointment existence leaks, private/no-store/noindex headers, File00 current guardian/delegation checks. Repeat on timezone/DST boundary and RTL/mobile browser, verify backups/restore and DB migrations, two fresh independent review/retest cycles and Founder approval before live deploy or 'Resolved'.

@@ -282,19 +282,38 @@ final class WCA_Query_API {
 		return $encoded . '.' . hash_hmac( 'sha256', $encoded, wp_salt( 'nonce' ) );
 	}
 
+	/** A sort cursor must preserve the exact canonical UTC calendar time. */
+	private static function cursor_time_valid( $value ) {
+		if ( ! is_string( $value ) || 1 !== preg_match( '/^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$/D', $value ) ) { return false; }
+		$date = DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $value, new DateTimeZone( 'UTC' ) );
+		return $date instanceof DateTimeImmutable && $date->format( 'Y-m-d H:i:s' ) === $value;
+	}
+
 	/** @return array<string,mixed>|WP_Error|null */
 	private static function decode_cursor( $cursor, $scope, $actor_user_id, $filter_hash ) {
 		$cursor = trim( (string) $cursor );
 		if ( '' === $cursor ) { return null; }
-		if ( ! preg_match( '/^([0-9a-f]+)\.([0-9a-f]{64})$/i', $cursor, $matches ) ) { return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-		$expected = hash_hmac( 'sha256', strtolower( $matches[1] ), wp_salt( 'nonce' ) );
-		if ( ! hash_equals( $expected, strtolower( $matches[2] ) ) ) { return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor signature is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		// Generated opaque cursors use lowercase hex JSON followed by an HMAC.
+		if ( strlen( $cursor ) > 2048 || ! preg_match( '/^([0-9a-f]+)\\.([0-9a-f]{64})$/D', $cursor, $matches ) ) {
+			return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$expected = hash_hmac( 'sha256', $matches[1], wp_salt( 'nonce' ) );
+		if ( ! hash_equals( $expected, $matches[2] ) ) {
+			return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor signature is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		$json = hex2bin( $matches[1] );
-		$state = is_string( $json ) ? json_decode( $json, true ) : null;
-		if ( ! is_array( $state ) || 1 !== absint( $state['v'] ?? 0 ) || sanitize_key( $scope ) !== (string) ( $state['s'] ?? '' ) || absint( $actor_user_id ) !== absint( $state['a'] ?? 0 ) || ! hash_equals( (string) $filter_hash, (string) ( $state['f'] ?? '' ) ) || empty( $state['t'] ) || empty( $state['i'] ) ) {
+		$state = is_string( $json ) ? json_decode( $json ) : null;
+		if ( ! is_object( $state ) || 6 !== count( get_object_vars( $state ) )
+			|| ! isset( $state->v, $state->s, $state->a, $state->f, $state->t, $state->i )
+			|| ! is_int( $state->v ) || 1 !== $state->v
+			|| ! is_string( $state->s ) || sanitize_key( $scope ) !== $state->s
+			|| ! is_int( $state->a ) || $state->a < 1 || absint( $actor_user_id ) !== $state->a
+			|| ! is_string( $state->f ) || ! hash_equals( (string) $filter_hash, $state->f )
+			|| ! self::cursor_time_valid( $state->t )
+			|| ! is_int( $state->i ) || $state->i < 1 ) {
 			return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor does not match this query.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
-		return array( 't' => sanitize_text_field( $state['t'] ), 'i' => absint( $state['i'] ) );
+		return array( 't' => $state->t, 'i' => $state->i );
 	}
 
 	public static function render_dashboard() {

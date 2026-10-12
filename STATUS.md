@@ -2,7 +2,7 @@
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t21-ten-round-2026-09-09`
+- Working review branch: `review/file08-t27-r1-20-scope-query-cursor-2026-10-12`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
@@ -78,3 +78,12 @@ This repository does not prove the current staging or live installation. Exact d
 ## Historical evidence note
 
 T13–T25 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T26 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+
+
+## T27-R1 additional unmerged source candidate — 12 October 2026
+- Frozen baseline `main` `70541974ce0ffb16aebef557c3016eb7447662f4`; 20 **bounded** scope checks recorded in `docs/T27-R1-TWENTY-REVIEW-FROZEN-LEDGER.md`, not 20 independent exhaustive E2E audits.
+- Two real query-signed-cursor source issues T27-D01/D02 (typed `v/a/i` and canonical UTC `t`) collected before a bounded post-ledger correction. See `docs/T27-R1-CORRECTION-EVIDENCE.md` and actual `tests/t27-r1-query-cursor-integrity-regressions.php` in canonical `tests/run-all.php`.
+- T26 is the last fully closed `main` cycle; T27 candidate exact-head CI and package must be verified independently. The software header/source contracts remain 1.2.15 / Core 3.4.0 / Continuity + Future24 1.1.0. No local physical migrations or WordPress deployment performed.
+- Actual Hostinger active deployed source checksum/version, DB/wp_options schema/versions/migrations, installed File00/03/07/09/17/19/20/24/25/26/CF01, backup/restore, two fresh staging reviews, Founder approval, deploy and live re-test remain UNVERIFIED.
+
+**Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
