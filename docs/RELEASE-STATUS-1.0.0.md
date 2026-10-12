@@ -11,7 +11,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
-- Current review branch: `review/file08-t21-ten-round-2026-09-09`
+- Current review branch: `review/file08-t27-r2-combined-cursor-notifications-2026-10-12`
 - Current review cycle: **T26 closure cycle**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25, T22 and T21: closed; their recorded exact heads/runs are provenance only after later commits.
@@ -42,3 +42,7 @@ A correction changes HEAD and makes prior CI/package evidence historical for fin
 T19, T20, T21, T22, T23, T24 and T25 remain historical provenance; T26 frozen ledgers are the current ten-round review record. Historical T22 and T21 remain closed historical evidence and never override current T26 release identity. Historical exact heads, runs and package hashes must never be presented as the current branch or current release status after later commits.
 
 Environment-dependent acceptance cannot be manufactured in source. Execute `STAGING-ACCEPTANCE-1.0.0.md`/`STAGING-ACCEPTANCE.md` on canonical Hostinger staging with the exact verified artifact, including the two required fresh post-final-runtime-code verification sweeps; then, only after explicit production authorization, freeze deployed artifact/version/schema/migration state and perform live parity re-test.
+
+
+## T27-R2 combined candidate (12 October 2026)
+T27-R2 is an **unmerged source-only cross-branch integration review candidate**. This is not a new production or staging release. File17/File19 contract source from PR#12 and signed private pagination cursor from PR#13 integrated on the T27-R2 branch, and producer/consumer UTC source validity is now constrained. All evidence is in `docs/T27-R2-TWENTY-REVIEW-FROZEN-LEDGER.md`, `tests/t27-r1-query-cursor-integrity-regressions.php`, `tests/t27-r2-cursor-producer-consumer-regressions.php`, the CI run on exact final SHA and Draft PR. Software 1.2.15 and physical schema source unchanged. Hostinger installed/deployed/DB/migration state and staging live acceptance unverified.
