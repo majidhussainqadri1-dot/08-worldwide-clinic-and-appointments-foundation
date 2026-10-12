@@ -4,6 +4,9 @@
  * methods. Isolated WordPress/DB fixture; not Hostinger/live parity.
  */
 require __DIR__ . '/bootstrap.php';
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( $value ) { return trim( strip_tags( (string) $value ) ); }
+}
 if ( ! function_exists( 'get_current_user_id' ) ) {
 	function get_current_user_id() { return 77; }
 }
