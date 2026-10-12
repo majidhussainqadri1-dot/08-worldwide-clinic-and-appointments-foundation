@@ -32,6 +32,7 @@ $checks = array(
     'no inferred appointment treating relationship' => strpos($source, 'appointment_is_not_treating_relationship') !== false,
     'stale optimistic version denied' => strpos($source, 'stale_record_version') !== false,
     'underlying source subject assertion required' => strpos($source, 'SMC_CF01_Contract::membership_assertion') !== false,
+    'current File 00 CF01 version 1.1.0' => strpos($source, \"const FILE_00_CONTRACT    = '1.1.0'\") !== false,
     'private narrative never read' => strpos($source, "SWC_Helpers::meta( \$appointment_id, 'reason'") === false && strpos($source, "SWC_Helpers::meta( \$appointment_id, 'doctor_private_note'") === false,
     'known source inventory retained' => strpos($inventory, 'appointment-processing consent/acknowledgement only') !== false,
     'current deterministic builder used' => strpos($data['builder'], "'assets','includes','languages','templates'") !== false,
