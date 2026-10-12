@@ -32,7 +32,7 @@ $checks = array(
     'no inferred appointment treating relationship' => strpos($source, 'appointment_is_not_treating_relationship') !== false,
     'stale optimistic version denied' => strpos($source, 'stale_record_version') !== false,
     'underlying source subject assertion required' => strpos($source, 'SMC_CF01_Contract::membership_assertion') !== false,
-    'current File 00 CF01 version 1.1.0' => strpos($source, \"const FILE_00_CONTRACT    = '1.1.0'\") !== false,
+    'current File 00 CF01 version 1.1.0' => strpos($source, "const FILE_00_CONTRACT    = '1.1.0'") !== false,
     'public CF01 owner version matches canonical 1.1.0' => strpos($source, "const CONTRACT_VERSION    = '1.1.0'") !== false,
     'build rejects CF01 runtime drift' => strpos($data['builder'], 'CF-01 care-context runtime/canonical contract version mismatch.') !== false,
     'verifier checks packaged CF01 provider' => strpos($data['verifier'], 'Manifest/CF-01 care-context runtime contract parity failed.') !== false,
