@@ -278,7 +278,7 @@ final class WCA_Query_API {
 	/** Preserve a private opaque cursor byte-for-byte, or deny a malformed input. */
 	private static function cursor_input( $raw ) {
 		if ( null === $raw || '' === $raw ) { return ''; }
-		if ( ! is_string( $raw ) || strlen( $raw ) > 2048 || trim( $raw ) !== $raw ) {
+		if ( ! is_string( $raw ) || strlen( $raw ) > 2048 || trim( $raw ) !== $raw || ! preg_match( '/^[0-9a-f]+\\.[0-9a-f]{64}$/D', $raw ) ) {
 			return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor must be an unchanged canonical string.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
 		return $raw;
