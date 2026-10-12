@@ -107,3 +107,11 @@ This checklist must be completed against the **exact final File 08 candidate com
 - [ ] Live deployment explicitly authorized.
 - [ ] After deployment, exact deployed version/files/checksum, DB/schema/migration state and active configuration are frozen and compared to the approved candidate.
 - [ ] Live real-role re-test and parity confirmation pass before the release is marked Operational/Resolved.
+
+
+## T27-R2 — Source PR integration + File17/File19 + native cursor producer/consumer staging gate (12 Oct 2026)
+1. Freeze EXACT installed Hostinger File08/17/19 packages, plugin folders and checksums, PHP/WordPress version, runtime configuration and error logs; compare against PR12/PR13/T27-R2 source only AFTER independently proving parity. Do not infer Hostinger version from GitHub.
+2. Verify physical File08 DB core/continuity/Future24 schema versions, `wp_options`, migration checkpoints, orphan rows, encrypted state and backup+isolate restore. Source candidate 1.2.15/core 3.4.0/continuity+Future24 1.1.0 is not installed DB truth.
+3. With real File00 patient, guardian, doctor, suspended doctor, staff and delegated roles, test appointment list and clinic schedule next-cursor generation/resume on legitimate canonical UTC datetime. Attempt cross-user/cross-clinic/cross-purpose signed cursor, wrong HMAC, trusted-but-malformed legacy cursor types/negative IDs, invalid/expired SQL timestamp, and private/no-store/noindex. Inject corrupt source sort_time ONLY into disposable staging fixture; ensure explicit safe 503 and no partial or unconsumable next link.
+4. Confirm PR12's File17 opaque-only UUID appointment context + ICS export never leaks numeric internal ID, File19 actual installed producer registration/event ack/deduplication/preferences/recipient opt-out and fail-closed retry; verify File19 main GitHub version matches actual deployment before calling APIs compatible.
+5. Two independent fresh post-final-source staged adversarial review/fix/retest rounds; backup/restore, age/guardian consent, UTC DST/RTL mobile/low-bandwidth, concurrent booking/reschedule, migration rollback and Founder written approval before any controlled deploy/live parity retest.
