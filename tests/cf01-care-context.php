@@ -7,8 +7,8 @@ declare(strict_types=1);
 
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'SWC_VERSION', '1.2.15' );
-define( 'SMC_VERSION', '1.2.7' );
-define( 'SMC_CF01_CONTRACT_VERSION', '1.0.0' );
+define( 'SMC_VERSION', '1.2.44' );
+define( 'SMC_CF01_CONTRACT_VERSION', '1.1.0' );
 
 $GLOBALS['swc_test_current_user'] = 10;
 $GLOBALS['swc_test_post_type']    = array( 100 => 'swc_appointment', 101 => 'swc_appointment' );
@@ -81,7 +81,7 @@ final class SMC_CF01_Contract {
 			: '22222222-2222-4222-8222-222222222222';
 		return array(
 			'contract'         => 'smc.cf01.membership-assurance',
-			'contract_version' => '1.0.0',
+			'contract_version' => '1.1.0',
 			'result'           => in_array( (int) $user_id, $GLOBALS['swc_test_denied_users'], true ) ? 'deny' : 'allow',
 			'reason_code'      => 'capability_allowed',
 			'subject'          => array( 'platform_uuid' => $uuid ),
