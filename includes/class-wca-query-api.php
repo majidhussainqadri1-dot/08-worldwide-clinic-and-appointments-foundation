@@ -58,7 +58,7 @@ final class WCA_Query_API {
 		$rate = self::rate_limit( 'appointment_list', $actor );
 		if ( is_wp_error( $rate ) ) { return $rate; }
 		return self::response( self::list_patient_appointments( $actor, array(
-			'cursor'   => sanitize_text_field( (string) $request->get_param( 'cursor' ) ),
+			'cursor'   => $request->get_param( 'cursor' ),
 			'per_page' => $request->get_param( 'per_page' ),
 		) ) );
 	}
@@ -68,7 +68,7 @@ final class WCA_Query_API {
 		$rate = self::rate_limit( 'clinic_schedule', $actor );
 		if ( is_wp_error( $rate ) ) { return $rate; }
 		return self::response( self::list_clinic_schedule( sanitize_text_field( $request['ref'] ), $actor, array(
-			'cursor'   => sanitize_text_field( (string) $request->get_param( 'cursor' ) ),
+			'cursor'   => $request->get_param( 'cursor' ),
 			'per_page' => $request->get_param( 'per_page' ),
 			'purpose'  => sanitize_key( (string) $request->get_header( 'X-WCA-Access-Purpose' ) ),
 		) ) );
@@ -87,8 +87,11 @@ final class WCA_Query_API {
 		$claims = WCA_Authorization::claims( $actor_user_id );
 		if ( is_wp_error( $claims ) ) { return $claims; }
 		$per_page = self::page_size( $args['per_page'] ?? 20 );
+		if ( is_wp_error( $per_page ) ) { return $per_page; }
 		$filter_hash = hash( 'sha256', wp_json_encode( array( 'actor' => $actor_user_id, 'scope' => 'own_appointments', 'per_page' => $per_page ) ) );
-		$cursor = self::decode_cursor( (string) ( $args['cursor'] ?? '' ), 'appointment_list', $actor_user_id, $filter_hash );
+		$cursor_input = self::cursor_input( $args['cursor'] ?? '' );
+		if ( is_wp_error( $cursor_input ) ) { return $cursor_input; }
+		$cursor = self::decode_cursor( $cursor_input, 'appointment_list', $actor_user_id, $filter_hash );
 		if ( is_wp_error( $cursor ) ) { return $cursor; }
 		$rows = self::query_candidate_appointments( $actor_user_id, 0, array(), $cursor, $per_page + 1 );
 		if ( is_wp_error( $rows ) ) { return $rows; }
@@ -167,8 +170,11 @@ final class WCA_Query_API {
 		}
 
 		$per_page = self::page_size( $args['per_page'] ?? 20 );
+		if ( is_wp_error( $per_page ) ) { return $per_page; }
 		$filter_hash = hash( 'sha256', wp_json_encode( array( 'actor' => $actor_user_id, 'clinic_ref' => strtolower( (string) $clinic['public_ref'] ), 'per_page' => $per_page, 'purpose' => $admin_scope && ! $owner_scope && ! $appointment_scope ? $purpose : '' ) ) );
-		$cursor = self::decode_cursor( (string) ( $args['cursor'] ?? '' ), 'clinic_schedule', $actor_user_id, $filter_hash );
+		$cursor_input = self::cursor_input( $args['cursor'] ?? '' );
+		if ( is_wp_error( $cursor_input ) ) { return $cursor_input; }
+		$cursor = self::decode_cursor( $cursor_input, 'clinic_schedule', $actor_user_id, $filter_hash );
 		if ( is_wp_error( $cursor ) ) { return $cursor; }
 		$rows = self::query_candidate_appointments( $actor_user_id, $clinic_id, array(), $cursor, $per_page + 1 );
 		if ( is_wp_error( $rows ) ) { return $rows; }
@@ -269,9 +275,29 @@ final class WCA_Query_API {
 		return $projection;
 	}
 
+	/** Preserve a private opaque cursor byte-for-byte, or deny a malformed input. */
+	private static function cursor_input( $raw ) {
+		if ( null === $raw || '' === $raw ) { return ''; }
+		if ( ! is_string( $raw ) || strlen( $raw ) > 2048 || trim( $raw ) !== $raw ) {
+			return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor must be an unchanged canonical string.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		return $raw;
+	}
+
+	/** @return int|WP_Error */
 	private static function page_size( $value ) {
-		$raw = filter_var( $value, FILTER_VALIDATE_INT );
-		return false === $raw ? 20 : min( self::MAX_PAGE_SIZE, max( 1, (int) $raw ) );
+		if ( null === $value || '' === $value ) { return 20; }
+		if ( ! is_int( $value ) && ! is_string( $value ) ) {
+			return new WP_Error( 'wca_query_page_size_invalid', __( 'Page size must be a positive whole number.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		if ( is_int( $value ) ) {
+			if ( $value < 1 ) { return new WP_Error( 'wca_query_page_size_invalid', __( 'Page size must be a positive whole number.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+			return min( self::MAX_PAGE_SIZE, $value );
+		}
+		if ( strlen( $value ) > 10 || ! preg_match( '/^[1-9][0-9]*$/D', $value ) ) {
+			return new WP_Error( 'wca_query_page_size_invalid', __( 'Page size must be a canonical positive whole number.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		return min( self::MAX_PAGE_SIZE, (int) $value );
 	}
 
 	private static function error_status( $error ) {
@@ -303,7 +329,9 @@ final class WCA_Query_API {
 
 	/** @return array<string,mixed>|WP_Error|null */
 	private static function decode_cursor( $cursor, $scope, $actor_user_id, $filter_hash ) {
-		$cursor = trim( (string) $cursor );
+		if ( ! is_string( $cursor ) || strlen( $cursor ) > 2048 || trim( $cursor ) !== $cursor ) {
+			return new WP_Error( 'wca_cursor_invalid', __( 'The pagination cursor is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		if ( '' === $cursor ) { return null; }
 		// Generated opaque cursors use lowercase hex JSON followed by an HMAC.
 		if ( strlen( $cursor ) > 2048 || ! preg_match( '/^([0-9a-f]+)\\.([0-9a-f]{64})$/D', $cursor, $matches ) ) {
@@ -334,9 +362,13 @@ final class WCA_Query_API {
 		$user_id = get_current_user_id();
 		$clinics = self::manageable_clinics( $user_id );
 		if ( is_wp_error( $clinics ) ) { return self::notice( __( 'Clinic dashboard data is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
-		$selected_ref = strtolower( sanitize_text_field( wp_unslash( $_GET['clinic_ref'] ?? '' ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selection.
+		$selected_param = wp_unslash( $_GET['clinic_ref'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only selection.
+		if ( ! is_string( $selected_param ) ) { return self::notice( __( 'Invalid clinic selection.', 'worldwide-clinic-appointments' ), 'error' ); }
+		$selected_ref = strtolower( sanitize_text_field( $selected_param ) );
 		if ( ! $selected_ref && $clinics ) { $selected_ref = strtolower( (string) $clinics[0]['public_ref'] ); }
-		$cursor = sanitize_text_field( wp_unslash( $_GET['schedule_cursor'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- signed read-only cursor.
+		$cursor_input = wp_unslash( $_GET['schedule_cursor'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- signed read-only cursor.
+		$cursor = self::cursor_input( $cursor_input );
+		if ( is_wp_error( $cursor ) ) { return self::notice( __( 'Invalid schedule cursor.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$schedule = $selected_ref ? self::list_clinic_schedule( $selected_ref, $user_id, array( 'cursor' => $cursor, 'per_page' => 20 ) ) : array( 'items' => array(), 'next_cursor' => '' );
 		if ( is_wp_error( $schedule ) ) { return self::notice( __( 'Clinic schedule is temporarily unavailable or you no longer have access.', 'worldwide-clinic-appointments' ), 'error' ); }
 		ob_start(); ?>
