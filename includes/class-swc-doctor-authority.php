@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 final class SWC_Doctor_Authority {
 	const FILE_00_MIN_VERSION = '1.2.4';
 	const FILE_00_MAX_VERSION = '1.3.0';
-	const FILE_00_CONTRACT    = '1.1.2';
+	const FILE_00_CONTRACT    = '1.2.3';
 	const FILE_09_MIN_VERSION = '1.1.0';
 	const FILE_09_MAX_VERSION = '1.4.0';
 
