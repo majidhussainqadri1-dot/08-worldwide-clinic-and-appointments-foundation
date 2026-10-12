@@ -2,7 +2,7 @@
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t21-ten-round-2026-09-09`
+- Working review branch: `review/file08-t27-r2-combined-cursor-notifications-2026-10-12`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
@@ -78,3 +78,7 @@ This repository does not prove the current staging or live installation. Exact d
 ## Historical evidence note
 
 T13–T25 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T26 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+
+
+## T27-R2 combined candidate (12 October 2026)
+T27-R2 review source candidate (unmerged): originated from File08 PR #12 exact head `1134d81a74a30ae399baf2fd1e28877bef6a09d3`, integrated File08 PR #13 cursor change exact head `091e69b51aceaf72c9974138fcc336b1f4dacd50`, plus native signed-cursor encoder/decoder parity safeguards; immutable reviewed ledger `docs/T27-R2-TWENTY-REVIEW-FROZEN-LEDGER.md`. Twenty topical checks were bounded, not exhaustive. File17/File19 source code inherited unchanged from PR #12; real owner deployed compatibility unverified. Tests of both candidate fixes must pass on the NEW exact branch head, not inferred from old separate CI runs. Actual installed version, physical DB/migrations, staging backups/reviews, Founder authorization and live retest unverified.
