@@ -110,7 +110,7 @@ $db->rows[0]['sort_time'] = 'historical-non-calendar';
 $bad = WCA_Query_API::list_patient_appointments( 77, array( 'per_page' => 1 ) );
 $check( is_wp_error( $bad ) && 'wca_query_cursor_source_invalid' === $bad->code &&
     503 === $bad->data['status'], 'patient list silently returned unconsumable cursor/partial success' );
-$db->rows = array( array( 'ID' => 0, 'sort_time' => $valid ), array( 'ID' => 50, 'sort_time' => $valid ) );
+$db->rows = array( array( 'ID' => 0, 'sort_time' => $valid ), array( 'ID' => 0, 'sort_time' => $valid ) );
 $bad = WCA_Query_API::list_patient_appointments( 77, array( 'per_page' => 1 ) );
 $check( is_wp_error( $bad ) && 'wca_query_cursor_source_invalid' === $bad->code,
     'patient list declared no next cursor despite source rows due to missing identity' );
