@@ -10,6 +10,13 @@ if ( ! function_exists( 'get_current_user_id' ) ) {
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $v ) { return json_encode( $v ); }
 }
+final class WCA_Service {
+	public static function strict_id( $value, $allow_zero = false ) {
+		if ( ! is_int( $value ) && ! ( is_string( $value ) && ctype_digit( $value ) ) ) { return null; }
+		$id = (int) $value;
+		return $id > 0 || ( $allow_zero && 0 === $id ) ? $id : null;
+	}
+}
 final class WCA_Authorization {
 	public static $subject = '';
 	public static function claims( $actor ) { return array( 'patient' => true ); }
@@ -101,6 +108,6 @@ $check( $db->reads === $before_reads + 1, 'valid canonical UUID never reached na
 $source = file_get_contents( dirname( __DIR__ ) . '/includes/class-wca-future24.php' );
 $check( false === strpos( $source, "'member_ref' => WCA_Authorization::subject_uuid(" ),
 	'group member still writes unverified inline subject_uuid' );
-$check( false !== strpos( $source, "'member_ref' => $member_ref" ),
+$check( false !== strpos( $source, "'member_ref' => " . '$member_ref' ),
 	'group member identity not reusing validated canonical reference' );
 echo 'T31 real Future24 Group and persisted DTO PHP checks: PASS ' . $checks . '/' . $checks . "\n";
