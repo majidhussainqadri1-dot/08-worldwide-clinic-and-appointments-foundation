@@ -139,7 +139,7 @@ final class WCA_Outbox {
 		do_action( 'wca_outbox_event_' . sanitize_key( str_replace( '.', '_', $topic ) ), $envelope );
 
 		if ( 'File19.NotificationRequested.v1' === $topic ) {
-			return self::dispatch_notification( $payload, $trace_id );
+			return self::dispatch_notification( $payload, $trace_id, $message_id );
 		}
 		if ( 0 === strpos( $topic, 'CF03.' ) ) {
 			return apply_filters( 'wca_cf03_dispatch_result', true, $envelope );
@@ -150,38 +150,60 @@ final class WCA_Outbox {
 		return apply_filters( 'wca_outbox_dispatch_result', true, $envelope );
 	}
 
-	private static function dispatch_notification( $payload, $trace_id ) {
-		$provider = function_exists( 'sn_notify_users' ) ? 'file19' : 'fallback_mail';
+	/**
+	 * Hand notification facts to File 19's current event/producer API.
+	 *
+	 * File 19 is the notification delivery/preferences owner; never bypass it
+	 * through an unconsented direct wp_mail fallback. Our outbox message ID is
+	 * the durable idempotency identity across dispatcher retries.
+	 */
+	private static function dispatch_notification( $payload, $trace_id, $message_id ) {
+		$provider = 'file19';
+		$recipients = array_values( array_unique( array_filter( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ) ) ) );
+		if ( empty( $recipients ) ) { return true; }
 		if ( WCA_Observability::circuit_open( $provider ) ) {
-			return new WP_Error( 'wca_provider_circuit_open', 'Notification provider circuit is temporarily open.', array( 'retry_after' => 60 ) );
+			return new WP_Error( 'wca_provider_circuit_open', __( 'Notification service is temporarily unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 503, 'retry_after' => 60 ) );
 		}
-		if ( 'file19' === $provider ) {
-			$result = sn_notify_users( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ), sanitize_key( $payload['event'] ?? 'clinic_update' ), array(
-				'appointment_ref' => sanitize_text_field( $payload['appointment_ref'] ?? '' ),
-				'trace_id'        => $trace_id,
-			) );
-			if ( is_wp_error( $result ) || false === $result ) {
-				$message = is_wp_error( $result ) ? $result->get_error_message() : 'File 19 rejected the notification.';
-				WCA_Observability::circuit_failure( $provider, $message );
-				return new WP_Error( 'wca_file19_delivery', $message );
-			}
-			WCA_Observability::circuit_success( $provider );
-			return true;
+		if ( ! function_exists( 'sun_register_notification_producer' ) || ! function_exists( 'sun_ingest_domain_event' ) ) {
+			WCA_Observability::circuit_failure( $provider, 'file19_contract_unavailable' );
+			return new WP_Error( 'wca_file19_contract_unavailable', __( 'The canonical notification service is unavailable; delivery will be retried.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
-
-		// Privacy-minimal fallback: no clinical reason, note, phone, or appointment time.
-		$subject = __( 'Clinic appointment update', 'worldwide-clinic-appointments' );
-		$message = __( 'There is an update to your clinic appointment. Sign in to the platform to view it securely.', 'worldwide-clinic-appointments' );
-		$recipients = array_unique( array_filter( array_map( 'absint', (array) ( $payload['recipients'] ?? array() ) ) ) );
-		if ( empty( $recipients ) ) { WCA_Observability::circuit_success( $provider ); return true; }
-		$all_sent = true;
-		foreach ( $recipients as $user_id ) {
-			$user = get_userdata( $user_id );
-			if ( ! $user || ! is_email( $user->user_email ) || ! wp_mail( $user->user_email, $subject, $message ) ) { $all_sent = false; }
+		$message_id = sanitize_text_field( (string) $message_id );
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{1,128}$/', $message_id ) ) {
+			return new WP_Error( 'wca_notification_message_id_invalid', __( 'The notification identifier is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
-		if ( ! $all_sent ) {
-			WCA_Observability::circuit_failure( $provider, 'Notification fallback did not deliver to every intended recipient.' );
-			return new WP_Error( 'wca_mail_delivery', 'Notification fallback did not deliver to every intended recipient.' );
+		$registered = sun_register_notification_producer( 'file08', array(
+			'owner'               => 'File 08',
+			'event_types'         => array( 'Clinic.AppointmentUpdated' ),
+			'schema_versions'     => array( '1.0.0' ),
+			'allowed_data_fields' => array( 'action_name', 'summary' ),
+		) );
+		if ( true !== $registered ) {
+			WCA_Observability::circuit_failure( $provider, 'file19_producer_registration_failed' );
+			return new WP_Error( 'wca_file19_producer_unavailable', __( 'Notification producer registration failed; delivery will be retried.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$event = array(
+			'producer'       => 'file08',
+			'owner'          => 'File 08',
+			'event_id'       => 'wca-notification-' . $message_id,
+			'event_type'     => 'Clinic.AppointmentUpdated',
+			'schema_version' => '1.0.0',
+			'occurred_at'    => gmdate( 'c' ),
+			'recipients'    => $recipients,
+			'trace_id'      => sanitize_text_field( (string) $trace_id ),
+			'category'      => 'clinic',
+			'priority'      => 'normal',
+			'sensitivity'   => 'sensitive',
+			'source_version'=> WCA_VERSION,
+			'data'          => array(
+				'action_name' => __( 'Clinic appointment update', 'worldwide-clinic-appointments' ),
+				'summary'     => __( 'Sign in to the platform to view your appointment update securely.', 'worldwide-clinic-appointments' ),
+			),
+		);
+		$result = sun_ingest_domain_event( $event );
+		if ( is_wp_error( $result ) || ! is_array( $result ) || ! in_array( (string) ( $result['status'] ?? '' ), array( 'processed', 'duplicate' ), true ) ) {
+			WCA_Observability::circuit_failure( $provider, 'file19_ingest_failed' );
+			return new WP_Error( 'wca_file19_delivery', __( 'The notification service did not confirm durable acceptance; delivery will be retried.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
 		WCA_Observability::circuit_success( $provider );
 		return true;

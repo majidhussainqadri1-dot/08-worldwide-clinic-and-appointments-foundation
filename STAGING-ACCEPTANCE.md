@@ -107,3 +107,9 @@ This checklist must be completed against the **exact final File 08 candidate com
 - [ ] Live deployment explicitly authorized.
 - [ ] After deployment, exact deployed version/files/checksum, DB/schema/migration state and active configuration are frozen and compared to the approved candidate.
 - [ ] Live real-role re-test and parity confirmation pass before the release is marked Operational/Resolved.
+
+
+## T29 mandatory installed-state parity acceptance after T28/T27 cursor integration
+**Source-only T29** baseline PR#12 latest `0dbfddc789f295b30b9aa1b71cb7ec4fda443bff` with PR#14 strict cursor code; this is NOT an installed release. Before touching production, independently inventory active Hostinger File08 ZIP/root/source hash and PHP/WordPress runtime, DB physical tables/columns/indexes/wp_options/migration checkpoints/rows, backup and isolated restore; check exact File00 (SMC 1.2.3 + CF01 1.1.0), File09 valid reinstated/renewal_due (with live sanctions/revocation), and File17/19/03/07/14/20/24/25/26/CF01 installed versions and contracts. Repo version cannot stand for deployed plugin or schema state.
+
+On genuinely installed staging with two independently fresh adversarial cycles: real patient/guardian/doctor/delegated-staff authenticated private appointments and doctor/clinic schedules; HMAC wrong-scope, cross-user, cross-clinic, boolean/fractional/negative/string page IDs, forged signature; canonical leap-day UTC & invalid source timestamp/no partial pagination; verify no private/IDOR leakage and no-store/noindex. Continue prior T28 98+ executable PHP cases with explicit File00/09/CF01 contract parity; File17 no native appointment ID fallback and File19 registered producer ack, durable duplicate, opt-out, outage retry. Real MySQL concurrent hold/reschedule, File09 suspension, File00 guardians, File25 RTL/mobile, rollback and backups. Require Founder authorization and exact ZIP/live parity plus post-deploy retest before declaring resolved.
