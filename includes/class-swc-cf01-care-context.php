@@ -10,7 +10,7 @@ final class SWC_CF01_Care_Context {
 	const CONTRACT_NAME       = 'swc.cf01.care-context';
 	const CONTRACT_VERSION    = '1.0.0';
 	const FILE_00_MIN_VERSION = '1.2.7';
-	const FILE_00_CONTRACT    = '1.0.0';
+	const FILE_00_CONTRACT    = '1.1.0';
 	const ASSERTION_TTL       = 60;
 
 	private static $purposes = array(
