@@ -29,11 +29,15 @@ final class WCA_Authorization {
 		$staff     = self::has_active_clinic_delegation( $user_id );
 		$role      = $founder ? 'founder' : ( $doctor ? 'doctor' : ( user_can( $user_id, 'manage_worldwide_clinic' ) ? 'administrator' : ( $staff ? 'clinic_staff' : 'member' ) ) );
 
+		$subject_uuid = self::subject_uuid( $user_id );
+		if ( '' === $subject_uuid ) {
+			return new WP_Error( 'wca_canonical_subject_unavailable', __( 'Current canonical member identity could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		$claims = array(
 			'contract'      => 'wca.identity-claims',
 			'version'       => '1.1.0',
 			'user_id'       => $user_id,
-			'subject_uuid'  => self::subject_uuid( $user_id ),
+			'subject_uuid'  => $subject_uuid,
 			'approved'      => $eligible && ! $suspended,
 			'founder'       => (bool) $founder,
 			'doctor'        => (bool) $doctor,
@@ -67,13 +71,12 @@ final class WCA_Authorization {
 
 	public static function subject_uuid( $user_id ) {
 		$user_id = absint( $user_id );
-		if ( function_exists( 'smc_get_subject_uuid' ) ) {
-			try { $value = smc_get_subject_uuid( $user_id ); } catch ( Throwable $e ) { return ''; }
-			if ( is_wp_error( $value ) || ! is_string( $value ) ) { return ''; }
-			return preg_match( '/^[0-9a-f-]{36}$/i', $value ) ? strtolower( $value ) : '';
-		}
-		$value = (string) get_user_meta( $user_id, '_smc_subject_uuid', true );
-		return preg_match( '/^[0-9a-f-]{36}$/i', $value ) ? strtolower( $value ) : '';
+		if ( ! $user_id || ! class_exists( 'SMC_CF01_Contract' ) || ! method_exists( 'SMC_CF01_Contract', 'ensure_subject_uuid' ) ) { return ''; }
+		try { $ref = SMC_CF01_Contract::ensure_subject_uuid( $user_id ); }
+		catch ( Throwable $error ) { return ''; }
+		if ( is_wp_error( $ref ) || ! is_string( $ref ) ) { return ''; }
+		$ref = strtolower( trim( $ref ) );
+		return preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $ref ) ? $ref : '';
 	}
 
 	/** @return array<int,string> */
