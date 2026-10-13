@@ -24,7 +24,7 @@ jobs:
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '${{ matrix.php }}', coverage: none, extensions: zip}
       - name: PHP syntax
-        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+        run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -P 8 -n1 php -l
       - name: Master-plan, security and state tests
         run: php tests/run-all.php
       - name: JavaScript syntax
