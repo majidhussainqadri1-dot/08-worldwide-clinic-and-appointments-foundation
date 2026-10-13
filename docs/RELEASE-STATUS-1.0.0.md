@@ -1,3 +1,6 @@
+Runtime candidate: **1.2.16**
+Core schema: **3.4.0**
+
 # Release Status — File 08 — document version 1.0.0
 
 The `1.0.0` in this filename is the release-status document version; it is **not** the current plugin runtime.
