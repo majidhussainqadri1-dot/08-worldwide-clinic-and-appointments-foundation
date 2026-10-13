@@ -427,6 +427,29 @@ final class WCA_Future24 {
 		return $capacity;
 	}
 
+	/** FUT13's four-field, structured, nonclinical rules only; no arbitrary nested data. */
+	private static function verified_prerequisite_rules( $raw ) {
+		if ( ! is_array( $raw ) || ! $raw || count( $raw ) > 20 ) {
+			return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'A valid bounded prerequisite rule set is required.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$out = array();
+		foreach ( $raw as $rule ) {
+			if ( ! is_array( $rule ) || 4 !== count( $rule )
+				|| ! isset( $rule['key'], $rule['type'], $rule['label'], $rule['missing_behavior'] )
+				|| ! is_string( $rule['key'] ) || ! is_string( $rule['type'] )
+				|| ! is_string( $rule['label'] ) || ! is_string( $rule['missing_behavior'] )
+				|| '' === $rule['type'] || '' === $rule['label']
+				|| strlen( $rule['type'] ) > 120 || strlen( $rule['label'] ) > 120
+				|| strlen( $rule['key'] ) > 255
+				|| ! hash_equals( $rule['type'] . ':' . $rule['label'], $rule['key'] )
+				|| ! in_array( $rule['missing_behavior'], array( 'block', 'provisional' ), true ) ) {
+				return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'The approved prerequisite rule structure failed validation.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$out[] = $rule;
+		}
+		return $out;
+	}
+
 	/** Generic operational record writer. Never stores clinical narrative. */
 	private static function put_record( $feature_id, $data, $actor_user_id = 0 ) {
 		global $wpdb;
@@ -439,6 +462,14 @@ final class WCA_Future24 {
 		if ( is_wp_error( $claims ) ) { return $claims; }
 		$payload = self::sanitize_operational_payload( isset( $data['payload'] ) && is_array( $data['payload'] ) ? $data['payload'] : array(), true );
 		if ( is_wp_error( $payload ) ) { return $payload; }
+		// FUT13 is the ONLY allowed structured nested operational list.
+		// The generic sanitizer intentionally drops nested arrays to prevent
+		// clinical narrative from entering File08 operational storage.
+		if ( 'F08-FUT-13' === $feature_id ) {
+			$requirements = self::verified_prerequisite_rules( $data['payload']['requirements'] ?? null );
+			if ( is_wp_error( $requirements ) ) { return $requirements; }
+			$payload['requirements'] = $requirements;
+		}
 		$json = wp_json_encode( $payload );
 		if ( ! is_string( $json ) || strlen( $json ) > self::MAX_PAYLOAD ) {
 			return new WP_Error( 'wca_future24_payload', __( 'Operational payload is too large.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) );
@@ -1432,9 +1463,20 @@ self::release_semantic_lock( $lock );
 				"SELECT {$columns} FROM {$table} WHERE feature_id=%s AND clinic_id=%d AND status=%s AND id>%d ORDER BY id ASC LIMIT %d",
 				$feature_id, absint( $clinic_id ), $status, $cursor, $batch
 			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			$rows = (array) $rows_raw;
-			foreach ( $rows as $row ) { $cursor = max( $cursor, absint( $row['id'] ?? 0 ) ); $out[] = $row; }
+			if ( ! is_array( $rows_raw ) || '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$rows = $rows_raw;
+			foreach ( $rows as $row ) {
+				$raw_id = is_array( $row ) ? ( $row['id'] ?? null ) : null;
+				$valid_id = is_int( $raw_id ) || ( is_string( $raw_id ) && ctype_digit( $raw_id ) );
+				$id = $valid_id ? (int) $raw_id : 0;
+				if ( ! $valid_id || $id <= $cursor || (string) $id !== (string) $raw_id ) {
+					return new WP_Error( 'wca_future24_policy_cursor_corrupt', __( 'Stored Future24 policy page order could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$cursor = $id;
+				$out[] = $row;
+			}
 		} while ( count( $rows ) === $batch );
 		return $out;
 	}
@@ -1453,8 +1495,20 @@ self::release_semantic_lock( $lock );
 		if ( is_wp_error( $rows ) ) { return $rows; }
 		$rows = array_reverse( $rows );
 		foreach ( $rows as $row ) {
-			$payload = json_decode( (string) $row['payload_json'], true );
-			if ( ! is_array( $payload ) ) { continue; }
+			$payload_raw = isset( $row['payload_json'] ) && is_string( $row['payload_json'] ) ? $row['payload_json'] : '';
+			$payload_native = json_decode( $payload_raw );
+			$payload = json_decode( $payload_raw, true );
+			$allowed_fields = array( 'reason', 'category', 'symptoms_summary', 'medications_summary', 'allergies_summary', 'accessibility_needs', 'preferred_language', 'notes' );
+			$fields_valid = is_array( $payload ) && isset( $payload['fields'] ) && is_array( $payload['fields'] ) && count( $payload['fields'] ) >= 1 && count( $payload['fields'] ) <= count( $allowed_fields );
+			if ( $fields_valid ) {
+				foreach ( $payload['fields'] as $field ) {
+					if ( ! is_string( $field ) || ! in_array( $field, $allowed_fields, true ) ) { $fields_valid = false; break; }
+				}
+				if ( count( array_unique( $payload['fields'] ) ) !== count( $payload['fields'] ) ) { $fields_valid = false; }
+			}
+			if ( ! is_object( $payload_native ) || ! $fields_valid ) {
+				return new WP_Error( 'wca_questionnaire_policy_corrupt', __( 'An active previsit questionnaire is corrupt; no unsafe partial questionnaire was returned.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
 			$template_service = strtolower( sanitize_text_field( isset( $payload['service_ref'] ) ? $payload['service_ref'] : '' ) );
 			if ( $template_service && ( ! $service_ref || ! hash_equals( $template_service, $service_ref ) ) ) { continue; }
 			return array(
@@ -1544,8 +1598,14 @@ self::release_semantic_lock( $lock );
 		$rules = array_reverse( $rules );
 		$requirements = array();
 		foreach ( $rules as $row ) {
-			$p = json_decode( (string) $row['payload_json'], true );
-			if ( ! is_array( $p ) ) { continue; }
+			$raw_policy = isset( $row['payload_json'] ) && is_string( $row['payload_json'] ) ? $row['payload_json'] : '';
+			$native_policy = json_decode( $raw_policy );
+			$p = json_decode( $raw_policy, true );
+			if ( ! is_object( $native_policy ) || ! is_array( $p )
+				|| ! isset( $p['requirements'] ) || ! is_array( $p['requirements'] )
+				|| ! $p['requirements'] ) {
+				return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'An active prerequisite rule set is corrupt; readiness cannot be confirmed.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
 			$rule_service = strtolower( sanitize_text_field( $p['service_ref'] ?? '' ) );
 			if ( $rule_service && ( ! $service_ref || ! hash_equals( $rule_service, $service_ref ) ) ) { continue; }
 			foreach ( (array) ( $p['requirements'] ?? array() ) as $r ) {
