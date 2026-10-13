@@ -18,7 +18,7 @@ $historical_t18_covered = strpos($historical_note,'T18')!==false
  || strpos($historical_note,'T13-T20')!==false
  || preg_match('/T(?:1[0-8]|[0-9])(?:\x{2013}|-)+T(?:1[8-9]|[2-9][0-9])/u', $historical_note)===1;
 $checks=array(
- 'runtime contract remains 1.2.15'=>strpos($contracts,"RUNTIME_VERSION                 = '1.2.15'")!==false,
+ 'runtime contract remains 1.2.16'=>strpos($contracts,"RUNTIME_VERSION                 = '1.2.16'")!==false,
  'core runtime schema is 3.4.0'=>strpos($contracts,"SCHEMA_VERSION                  = '3.4.0'")!==false,
  'future runtime schema is 1.1.0'=>strpos($future,"SCHEMA_VERSION   = '1.1.0'")!==false,
  'readme current release records core 3.4.0'=>strpos($readme,'current core schema is 3.4.0')!==false,

@@ -789,6 +789,17 @@ final class WCA_Service {
 			return $result;
 		}
 		WCA_Observability::metric( 'appointment_requested_total', 1, array( 'mode' => $service['consultation_type'] ?? 'unknown' ) );
+		// A privacy-minimized File14 observer may count this *committed* owner
+		// request only under separate optional analytics consent. This event
+		// carries no patient/doctor, clinical, slot, fee or scheduling data.
+		// Never let optional analytics turn an accepted appointment into an error.
+		if ( ! empty( $result['public_ref'] ) && is_string( $result['public_ref'] ) && wp_is_uuid( $result['public_ref'] ) ) {
+			try {
+				do_action( 'wca_appointment_requested_committed_v1', $result['public_ref'] );
+			} catch ( Throwable $analytics_failure ) {
+				WCA_Observability::metric( 'optional_file14_outcome_observer_failed_total', 1 );
+			}
+		}
 		return $result;
 	}
 

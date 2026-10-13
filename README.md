@@ -1,3 +1,7 @@
+# File08 v1.2.16 — Owner Outcome Integration Candidate
+
+Runtime candidate: **1.2.16**. File08 post-commit nonclinical owner event for optional File14 analytics; source-only pending staging/live parity. No appointment outcome guarantee.
+
 # File 08 — Worldwide Clinic and Appointments
 
 Canonical repository implementation of **File 08 — Worldwide Clinic and Appointments Complete Master Plan 2026** plus the approved **Future Clinic Intelligence & Interoperability 24** amendment for the Sabri Social Homeopathy Platform.

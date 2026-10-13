@@ -1,3 +1,6 @@
+Current repository runtime candidate:** 1.2.16
+Core schema:** 3.4.0
+
 # File 08 Master-Plan Traceability — document version 1.0.0
 
 **Plan:** SSH-F08-PLAN-2026-v1.0  

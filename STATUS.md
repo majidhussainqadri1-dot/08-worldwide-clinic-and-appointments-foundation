@@ -1,3 +1,7 @@
+# File08 v1.2.16 — Owner Integration Review
+
+Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, runtime logs, staging and live unverified. PR #21 introduces bounded postcommit owner fact with no clinical data; approval required.
+
 # File 08 — Worldwide Clinic and Appointments — Candidate Status
 
 ## Current repository candidate
