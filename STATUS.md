@@ -2,7 +2,7 @@
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t31-future24-identity-and-stored-record-integrity-2026-10-13`
+- Working review branch: `review/file08-t32-40-plan-crossfile-checks-2026-10-13`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
