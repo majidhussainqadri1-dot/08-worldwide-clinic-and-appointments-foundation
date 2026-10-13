@@ -50,5 +50,5 @@ $bad=WCA_Future24::join_group_session('aabbccdd-aabb-4abb-8abb-aabbccddeeff',arr
 t32_check(is_wp_error($bad) && 'wca_group_session_payload_corrupt'===$bad->get_error_code(),'Malformed group service/privacy scope is rejected before joining.');
 t32_check($GLOBALS['wpdb']->calls===$before+1,'Corrupt group record stops before membership storage.');
 $source=file_get_contents(dirname(__DIR__).'/includes/class-wca-future24.php');
-t32_check(strpos($source,'future24_waitlist_filter_corrupt')!==false && strpos($source,'! is_object( $wait_root )')!==false,'Malformed waitlist filter cannot broaden into an unrestricted offer.');
+t32_check(strpos($source,'future24_waitlist_filter_corrupt')!==false && strpos($source,'! is_object( $wait_root )')!==false && strpos($source,"WCA_Service::valid_date( \$payload['date_from'] )")!==false && strpos($source,"WCA_Service::valid_date( \$payload['date_to'] )")!==false,'Malformed waitlist filter cannot broaden into an unrestricted offer.');
 echo "T32 persisted operational policy/state regressions: PASS\n";
