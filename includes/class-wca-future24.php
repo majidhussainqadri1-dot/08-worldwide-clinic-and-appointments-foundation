@@ -1608,13 +1608,25 @@ self::release_semantic_lock( $lock );
 			}
 			$rule_service = strtolower( sanitize_text_field( $p['service_ref'] ?? '' ) );
 			if ( $rule_service && ( ! $service_ref || ! hash_equals( $rule_service, $service_ref ) ) ) { continue; }
-			foreach ( (array) ( $p['requirements'] ?? array() ) as $r ) {
-				if ( is_string( $r ) ) { $key=sanitize_text_field($r); if($key){$requirements[$key]='block';} continue; }
-				if ( ! is_array( $r ) ) { continue; }
-				$key = sanitize_text_field( $r['key'] ?? '' );
-				if ( ! $key && isset( $r['type'],$r['label'] ) ) { $key=sanitize_key($r['type']).':'.substr(sanitize_text_field($r['label']),0,120); }
-				if ( ! $key ) { continue; }
-				$requirements[$key] = 'block' === sanitize_key( $r['missing_behavior'] ?? 'provisional' ) ? 'block' : 'provisional';
+			foreach ( $p['requirements'] as $r ) {
+				if ( is_string( $r ) ) {
+					$key = sanitize_text_field( $r );
+					if ( '' === $key || strlen( $key ) > 255 ) {
+						return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'A stored legacy prerequisite is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+					}
+					$requirements[ $key ] = 'block';
+					continue;
+				}
+				if ( ! is_array( $r ) || ! isset( $r['type'], $r['label'], $r['missing_behavior'] )
+					|| ! is_string( $r['type'] ) || ! is_string( $r['label'] )
+					|| ! in_array( $r['missing_behavior'], array( 'block', 'provisional' ), true ) ) {
+					return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'A stored prerequisite rule has an invalid structure.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$key = ! empty( $r['key'] ) && is_string( $r['key'] ) ? $r['key'] : sanitize_key( $r['type'] ) . ':' . substr( sanitize_text_field( $r['label'] ), 0, 120 );
+				if ( '' === $key || strlen( $key ) > 255 ) {
+					return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'The stored prerequisite identity is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$requirements[ $key ] = $r['missing_behavior'];
 			}
 		}
 		$raw_evidence = (array) SWC_Helpers::meta( $appointment_id, 'prerequisite_evidence_refs', array() );
