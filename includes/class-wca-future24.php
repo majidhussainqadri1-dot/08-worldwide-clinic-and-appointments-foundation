@@ -433,6 +433,7 @@ final class WCA_Future24 {
 			return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'A valid bounded prerequisite rule set is required.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
 		$out = array();
+		$seen = array();
 		foreach ( $raw as $rule ) {
 			if ( ! is_array( $rule ) || 4 !== count( $rule )
 				|| ! isset( $rule['key'], $rule['type'], $rule['label'], $rule['missing_behavior'] )
@@ -445,6 +446,10 @@ final class WCA_Future24 {
 				|| ! in_array( $rule['missing_behavior'], array( 'block', 'provisional' ), true ) ) {
 				return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'The approved prerequisite rule structure failed validation.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 			}
+			if ( isset( $seen[ $rule['key'] ] ) ) {
+				return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'Duplicate structured prerequisite rule identity cannot be persisted.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$seen[ $rule['key'] ] = true;
 			$out[] = $rule;
 		}
 		return $out;
@@ -1568,6 +1573,7 @@ self::release_semantic_lock( $lock );
 		$raw_requirements = (array) ( $data['requirements'] ?? array() );
 		if ( count( $raw_requirements ) > 20 ) { return new WP_Error( 'wca_prerequisite_rules_limit', __( 'No more than 20 prerequisite rules may be saved in one policy.', 'worldwide-clinic-appointments' ), array( 'status' => 413 ) ); }
 		$requirements = array();
+		$seen_rule_keys = array();
 		foreach ( $raw_requirements as $item ) {
 			if ( ! is_array( $item ) ) { return new WP_Error( 'wca_prerequisite_rule_invalid', __( 'Every prerequisite rule must be a structured object.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 			$type = sanitize_key( $item['type'] ?? 'document' );
@@ -1575,7 +1581,12 @@ self::release_semantic_lock( $lock );
 			if ( ! $label ) { return new WP_Error( 'wca_prerequisite_rule_invalid', __( 'Each prerequisite rule requires a label.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 			$behavior = sanitize_key( $item['missing_behavior'] ?? ( $data['missing_behavior'] ?? 'provisional' ) );
 			if ( ! in_array( $behavior, array( 'provisional','block' ), true ) ) { return new WP_Error( 'wca_prerequisite_behavior_invalid', __( 'Prerequisite missing behavior must be provisional or block.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
-			$requirements[] = array( 'key' => $type . ':' . $label, 'type' => $type, 'label' => $label, 'missing_behavior' => $behavior );
+			$rule_key = $type . ':' . $label;
+			if ( isset( $seen_rule_keys[ $rule_key ] ) ) {
+				return new WP_Error( 'wca_prerequisite_rule_duplicate', __( 'A prerequisite rule may only be defined once in one policy.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+			}
+			$seen_rule_keys[ $rule_key ] = true;
+			$requirements[] = array( 'key' => $rule_key, 'type' => $type, 'label' => $label, 'missing_behavior' => $behavior );
 		}
 		if ( ! $requirements ) { return new WP_Error( 'wca_prerequisite_rules_empty', __( 'At least one valid prerequisite rule is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		return self::put_record( 'F08-FUT-13', array(
@@ -1606,15 +1617,22 @@ self::release_semantic_lock( $lock );
 				|| ! $p['requirements'] ) {
 				return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'An active prerequisite rule set is corrupt; readiness cannot be confirmed.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 			}
+			if ( isset( $p['service_ref'] ) && ! is_string( $p['service_ref'] ) ) {
+				return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'Stored prerequisite service scope is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
 			$rule_service = strtolower( sanitize_text_field( $p['service_ref'] ?? '' ) );
 			if ( $rule_service && ( ! $service_ref || ! hash_equals( $rule_service, $service_ref ) ) ) { continue; }
+			$policy_requirements = array();
 			foreach ( $p['requirements'] as $r ) {
 				if ( is_string( $r ) ) {
 					$key = sanitize_text_field( $r );
 					if ( '' === $key || strlen( $key ) > 255 ) {
 						return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'A stored legacy prerequisite is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 					}
-					$requirements[ $key ] = 'block';
+					if ( isset( $policy_requirements[ $key ] ) ) {
+						return new WP_Error( 'wca_prerequisite_policy_duplicate', __( 'Stored prerequisite policy contains repeated rule identity.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+					}
+					$policy_requirements[ $key ] = 'block';
 					continue;
 				}
 				if ( ! is_array( $r ) || ! isset( $r['type'], $r['label'], $r['missing_behavior'] )
@@ -1626,7 +1644,18 @@ self::release_semantic_lock( $lock );
 				if ( '' === $key || strlen( $key ) > 255 ) {
 					return new WP_Error( 'wca_prerequisite_policy_corrupt', __( 'The stored prerequisite identity is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 				}
-				$requirements[ $key ] = $r['missing_behavior'];
+				if ( isset( $policy_requirements[ $key ] ) ) {
+					return new WP_Error( 'wca_prerequisite_policy_duplicate', __( 'Stored prerequisite policy contains repeated rule identity.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$policy_requirements[ $key ] = $r['missing_behavior'];
+			}
+			foreach ( $policy_requirements as $key => $behavior ) {
+				// Multiple active policy versions have no authorized implicit
+				// precedence rule: deny disagreement rather than downgrade BLOCK.
+				if ( isset( $requirements[ $key ] ) && $requirements[ $key ] !== $behavior ) {
+					return new WP_Error( 'wca_prerequisite_policy_conflict', __( 'Conflicting active prerequisite policies require review before readiness can be confirmed.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$requirements[ $key ] = $behavior;
 			}
 		}
 		$raw_evidence = (array) SWC_Helpers::meta( $appointment_id, 'prerequisite_evidence_refs', array() );

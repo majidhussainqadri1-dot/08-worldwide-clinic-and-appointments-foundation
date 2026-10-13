@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - main
+      # Exact-source QA for stacked T33; this branch is NOT a release target.
+      - review/file08-t33-40-review-prerequisite-policy-conflicts-2026-10-13
   pull_request:
     branches: [main]
 permissions:

@@ -11,7 +11,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
-- Current review branch: `review/file08-t32-40-audits-future24-policies-2026-10-13`
+- Current review branch: `review/file08-t33-40-review-prerequisite-policy-conflicts-2026-10-13`
 - Current review cycle: **T26 closure cycle**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25, T22 and T21: closed; their recorded exact heads/runs are provenance only after later commits.
@@ -58,3 +58,7 @@ The 20 **bounded** File08/central/companion source reviews were frozen *before c
 
 ## T32 — 40 governed source checks and FUT11/13 operational policy safety (13 October 2026)
 Forty separate **bounded** original File08 FR001–018/NFR001–010/Future24 requirement-to-source inspections were FROZEN before fixes in `docs/T32-40-FROZEN-GOVERNING-REVIEWS-2026-10-13.md`, baseline exact PR18 SHA `258b8e00a4c1ea360802c636c10919bc13a89faa`. They are not forty complete real end-to-end audits. T32-D01: nested FUT13 blocking rule maps were discarded by generic operational sanitizer before storage, potentially making readiness falsely complete. Narrow canonical FUT13 rule whitelist in put_record now retains only four approved nonclinical fields. T32-D02: corrupt active FUT11 questionnaire and FUT13 rule JSON no longer silently becomes empty form/complete policy. T32-D03: keyset policy reader now rejects invalid/non-increasing source row IDs, avoiding nonprogress loops/duplicate projection. Real PHP `tests/t32-future24-policy-persistence-and-read-integrity.php` registered with all prior T31 tests and T28 zero-orphan gate. No source schema change: software `1.2.15`, Core `3.4.0`, Future24/Continuity `1.1.0`. Historical broken rows require actual DB inspection and controlled remediation; no physical migration performed, no claim of installed release or live verification.
+
+
+## T33 Source-only 40 governed File08/companion checks — 13 October 2026
+40 **bounded** requirement-to-exact-source checks (not forty independent full-application E2E reviews) frozen before any correction: `docs/T33-FORTY-FROZEN-PLAN-COMPANION-REVIEWS-2026-10-13.md`. Baseline PR19 HEAD `531fc91f5a4c7d0f86f015a34e85ebc3c907178c`. Current repository `main` separately advanced `9dcc8d16ea81d0bbd27184e71bc09ba04d30ba03` and unmerged PR20 `2b353c5ae6749208c504e97460101f561a85ee76` differs from PR19; **not automatically reconciled or merged**. FUT13 D01 duplicate normalized rule keys in new submitted policies rejected before storage, D02 duplicate historical stored rule keys fail closed, D03 contradictory simultaneously active block/provisional versions return an explicit policy conflict (503), rather than silently downgrading a blocking prerequisite. No undocumented automatic newest-vs-oldest precedence invented. `tests/t33-fut13-rule-uniqueness-and-policy-version-conflicts.php` is registered with full 105+ prior executable PHP suites, T28 zero-orphan guard, original T32 tests. Candidate source remains 1.2.15 / Core source schema 3.4.0 / Future24+Continuity source 1.1.0; no physical migration, deployment or live verification.
