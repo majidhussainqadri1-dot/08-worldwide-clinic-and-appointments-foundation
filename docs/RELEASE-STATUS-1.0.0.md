@@ -14,7 +14,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
-- Current review branch: `review/file08-t33-40-current-main-crossfile-20261013`
+- Current review branch: `review/file08-t34-forty-verified-fut13-owner-parity-20261013`
 - Current review cycle: **T26 closure cycle**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25, T22 and T21: closed; their recorded exact heads/runs are provenance only after later commits.
