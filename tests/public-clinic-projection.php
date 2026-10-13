@@ -1,6 +1,6 @@
 <?php
 /**
- * Dependency-free tests for File 08 public clinic projection contract 1.0.0.
+ * Dependency-free tests for File 08 public clinic projection contract 1.1.0.
  */
 
 define( 'ABSPATH', __DIR__ . '/' );
@@ -96,7 +96,7 @@ swc_contract_assert( array() === swc_get_public_clinic_projection( 8 ), 'private
 swc_contract_assert( array() === swc_get_public_clinic_projection( 9 ), 'generic private address does not fabricate a clinic section' );
 
 $projection = swc_get_public_clinic_projection( 7 );
-swc_contract_assert( '1.0.0' === $projection['contract_version'], 'contract version is exact' );
+swc_contract_assert( '1.1.0' === $projection['contract_version'], 'contract version is exact' );
 swc_contract_assert( 'Global Clinic' === $projection['clinic']['name'], 'clinic name is plain text' );
 swc_contract_assert( 'Monday, Wednesday · 09:00–13:00' === $projection['clinic']['hours'], 'hours are deterministic and bounded' );
 swc_contract_assert( 'Asia/Karachi' === $projection['clinic']['timezone'], 'timezone is projected from File 08 availability' );
