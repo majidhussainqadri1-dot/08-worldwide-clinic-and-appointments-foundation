@@ -433,6 +433,7 @@ final class WCA_Future24 {
 			return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'A valid bounded prerequisite rule set is required.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
 		$out = array();
+		$seen = array();
 		foreach ( $raw as $rule ) {
 			if ( ! is_array( $rule ) || 4 !== count( $rule )
 				|| ! isset( $rule['key'], $rule['type'], $rule['label'], $rule['missing_behavior'] )
@@ -445,6 +446,10 @@ final class WCA_Future24 {
 				|| ! in_array( $rule['missing_behavior'], array( 'block', 'provisional' ), true ) ) {
 				return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'The approved prerequisite rule structure failed validation.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 			}
+			if ( isset( $seen[ $rule['key'] ] ) ) {
+				return new WP_Error( 'wca_prerequisite_rules_corrupt', __( 'Duplicate structured prerequisite rule identity cannot be persisted.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$seen[ $rule['key'] ] = true;
 			$out[] = $rule;
 		}
 		return $out;
