@@ -3,12 +3,15 @@ Contributors: majidhussainqadri1-dot
 Tags: clinic, appointments, doctors, scheduling, privacy, accessibility
 Requires at least: 6.6
 Requires PHP: 7.4
-Stable tag: 1.2.15
+Stable tag: 1.2.16
 License: GPLv2 or later
 
 Canonical File 08 clinic and appointment runtime for the Sabri Social Homeopathy Platform.
 
 == Description ==
+
+Version 1.2.16 adds the optional File14-only owner outcome action after a committed appointment request; the action contains no patient/clinical details and cannot alter booking success. Staging/live acceptance of this cross-module contract is separate.
+
 
 Version 1.2.15 implements the File 08 Complete Master Plan and Future24 amendment. The current repository review sequence is **T26** on `review/file08-t21-ten-round-2026-09-09`. T26 R1 corrected Public Clinic canonical/runtime contract parity and candidate-verifier coverage; R2–R9 were clean; R10 corrected final release-currentness and historical-regression drift after its frozen ledger. T25 and earlier cycles remain historical provenance as recorded in the frozen review ledgers; an older round label or CI run never substitutes for exact-head evidence after a later commit. Current technical identity is core schema 3.4.0, continuity 1.1.0, Future24 1.1.0, Public Clinic 1.1.0 and CF-01 1.1.0. The runtime covers clinic identity and institutional activation, branches, services and fees, availability, timezone/DST-safe server-authoritative slots, atomic appointment-bound holds, explicit request idempotency and replay protection, appointment request/decision/reschedule/check-in/completion/cancellation/no-show state law, patient/guardian/doctor/delegated-staff authorization, opaque public scheduling references, dashboards, emergency diversion, versioned consent, expiring review eligibility, ICS calendar export, conditional payment and complaint bridges, scheduling-only CF-01 context, privacy, audit, outbox, observability, migration, rollback, accessibility, localization, secure continuity, and Future Clinic Intelligence & Interoperability 24.
 
