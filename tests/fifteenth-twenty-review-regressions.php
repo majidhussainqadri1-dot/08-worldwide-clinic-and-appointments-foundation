@@ -87,7 +87,7 @@ t15h('R13 CF01 uses canonical appointment authorization','includes/class-swc-cf0
 t15h('R13 verification reconciliation retry hook','includes/class-wca-verification-reconciliation.php','wca_retry_doctor_eligibility_reconciliation');
 t15h('R13 verification projection writes transactional','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_write');
 t15h('R13 verification clinic read failure explicit','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_read');
-t15h('R13 File19 WP_Error rejected','includes/class-wca-outbox.php','is_wp_error( $result ) || false === $result');
+t15h('R13 File19 WP_Error rejected','includes/class-wca-outbox.php','is_wp_error( $result ) || ! is_array( $result )');
 
 t15h('R14 secure browser UUID fallback','assets/js/clinic.js','crypto.getRandomValues');
 t15h('R14 stable slot-hold replay key','assets/js/clinic.js','idempotency_key: holdRequestKey');
