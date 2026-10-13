@@ -109,14 +109,14 @@ t15h('R16 cron process wrapper logs worker failure','includes/class-wca-outbox.p
 t15h('R16 maintenance cron wrapper logs failure','includes/class-wca-outbox.php','maintenance_cron_failed');
 t15h('R16 opportunistic worker logs failure','includes/class-wca-outbox.php','outbox_opportunistic_failed');
 
-t15h('R17 plugin release 1.2.15','worldwide-clinic.php','Version: 1.2.15');
-t15h('R17 runtime release 1.2.15','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.15'");
-t15h('R17 readme stable tag 1.2.15','readme.txt','Stable tag: 1.2.15');
-t15h('R17 package contract 1.2.15','tests/release-package-contract.php',"Version: 1.2.15");
+t15h('R17 plugin release 1.2.16','worldwide-clinic.php','Version: 1.2.16');
+t15h('R17 runtime release 1.2.16','includes/class-wca-contracts.php',"RUNTIME_VERSION                 = '1.2.16'");
+t15h('R17 readme stable tag 1.2.16','readme.txt','Stable tag: 1.2.16');
+t15h('R17 package contract 1.2.16','tests/release-package-contract.php',"Version: 1.2.16");
 
 t15missing('R18 temporary T15 probe removed','.github/workflows/t15-probe.yml');
 t15h('R18 old corrective status explicitly historical','CORRECTIVE-STATUS.md','Historical evidence only.');
-t15h('R18 master-plan version label truthful','tests/master-plan-contract.php','plugin version is 1.2.15');
+t15h('R18 master-plan version label truthful','tests/master-plan-contract.php','plugin version is 1.2.16');
 
 /* Historical T15/T19 closure evidence must remain recognizable, but historical
  * regressions must never require an old cycle to remain the current release identity. */
