@@ -555,8 +555,14 @@ final class WCA_Future24 {
 		$offered = 0;
 		$slot_date = substr( $start, 0, 10 );
 		foreach ( self::waitlist_candidates( $clinic_id ) as $wait ) {
-			$payload = json_decode( (string) $wait['payload_json'], true );
-			$payload = is_array( $payload ) ? $payload : array();
+			$raw_wait_payload = (string) ( $wait['payload_json'] ?? '' );
+			$wait_root = json_decode( $raw_wait_payload );
+			$payload = json_decode( $raw_wait_payload, true );
+			// A corrupt persisted filter must not turn a specific waitlist request into an unrestricted offer.
+			if ( ! is_object( $wait_root ) || ! is_array( $payload ) || ! array_key_exists( 'service_ref', $payload ) || ! array_key_exists( 'date_from', $payload ) || ! array_key_exists( 'date_to', $payload ) ) {
+				WCA_Observability::log( 'error', 'future24_waitlist_filter_corrupt', array( 'feature_id' => 'F08-FUT-01', 'record_id' => absint( $wait['id'] ?? 0 ) ) );
+				continue;
+			}
 			$wanted_service = strtolower( sanitize_text_field( isset( $payload['service_ref'] ) ? $payload['service_ref'] : '' ) );
 			if ( $wanted_service && ( ! $service_ref || ! hash_equals( $wanted_service, $service_ref ) ) ) { continue; }
 			$date_from = sanitize_text_field( isset( $payload['date_from'] ) ? $payload['date_from'] : '' );
@@ -997,8 +1003,13 @@ self::release_semantic_lock( $lock );
 			return new WP_Error( 'wca_group_missing', __( 'Group appointment session is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) );
 		}
 		$clinic = WCA_Repository::get_clinic( absint( $session['clinic_id'] ), true );
-		$session_payload = json_decode( (string) $session['payload_json'], true );
-		$service_ref = is_array( $session_payload ) ? sanitize_text_field( $session_payload['service_ref'] ?? '' ) : '';
+		$session_json = (string) ( $session['payload_json'] ?? '' );
+		$session_root = json_decode( $session_json );
+		$session_payload = json_decode( $session_json, true );
+		if ( ! is_object( $session_root ) || ! is_array( $session_payload ) || ! isset( $session_payload['service_ref'], $session_payload['visibility'] ) || ! is_string( $session_payload['service_ref'] ) || 'participants_private' !== (string) $session_payload['visibility'] ) {
+			return new WP_Error( 'wca_group_session_payload_corrupt', __( 'Stored group service or privacy scope could not be verified; joining is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$service_ref = sanitize_text_field( $session_payload['service_ref'] );
 		$service = $service_ref ? self::service_for_clinic( absint( $session['clinic_id'] ), $service_ref ) : null;
 		if ( ! $clinic || is_wp_error( $service ) || ( $service_ref && ! $service ) ) { return new WP_Error( 'wca_group_scope_stale', __( 'This group appointment is no longer bookable because its clinic or service is not active.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		if ( ! empty( $session['starts_at'] ) && strtotime( $session['starts_at'] . ' UTC' ) <= time() ) { return new WP_Error( 'wca_group_started', __( 'This group appointment has already started and is closed to new joins.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
@@ -1203,8 +1214,19 @@ self::release_semantic_lock( $lock );
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT payload_json FROM {$table} WHERE feature_id='F08-FUT-07' AND clinic_id=%d AND status='policy_active' ORDER BY id DESC LIMIT 1", absint( $clinic['id'] ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $row && '' !== (string) $wpdb->last_error ) { return false; }
 		if ( ! $row ) { return true; }
-		$policy = json_decode( (string) $row['payload_json'], true );
-		$policy = is_array( $policy ) ? $policy : array();
+		$raw_policy = (string) ( $row['payload_json'] ?? '' );
+		$policy_root = json_decode( $raw_policy );
+		$policy = json_decode( $raw_policy, true );
+		if ( ! is_object( $policy_root ) || ! is_array( $policy ) || 'server_slot_projection_and_hold_guard' !== ( $policy['enforcement'] ?? null ) ) {
+			WCA_Observability::log( 'error', 'future24_active_buffer_policy_corrupt', array( 'feature_id' => 'F08-FUT-07', 'clinic_id' => absint( $clinic['id'] ?? 0 ) ) );
+			return false;
+		}
+		foreach ( array( 'buffer_before' => 240, 'buffer_after' => 240, 'travel_gap_minutes' => 480, 'max_continuous_consultations' => 30 ) as $field => $limit ) {
+			if ( ! array_key_exists( $field, $policy ) || ! is_int( $policy[ $field ] ) || $policy[ $field ] < 0 || $policy[ $field ] > $limit ) {
+				WCA_Observability::log( 'error', 'future24_active_buffer_policy_fields_corrupt', array( 'feature_id' => 'F08-FUT-07', 'clinic_id' => absint( $clinic['id'] ?? 0 ) ) );
+				return false;
+			}
+		}
 		$before = min( 240, absint( isset( $policy['buffer_before'] ) ? $policy['buffer_before'] : 0 ) );
 		$after = min( 240, absint( isset( $policy['buffer_after'] ) ? $policy['buffer_after'] : 0 ) );
 		$travel = min( 480, absint( isset( $policy['travel_gap_minutes'] ) ? $policy['travel_gap_minutes'] : 0 ) );
