@@ -4,7 +4,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t31-future24-identity-and-stored-record-integrity-2026-10-13`
+- Repository review branch: `review/file08-t32-40-audits-future24-policies-2026-10-13`
 - Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.
@@ -79,3 +79,7 @@ Twenty bounded plan/central/companion owner inspections against T29 SHA `03a376e
 
 ## T31 original-plan Future24 integrity source candidate — 13 October 2026
 The 20 **bounded** File08/central/companion source reviews were frozen *before code changes* in `docs/T31-20-FROZEN-SOURCE-REVIEWS-2026-10-13.md`. T31-D01: canonical File00 subject UUID not available, yet prior Group Session join could persist an empty member_ref; new `WCA_Future24::join_group_session` validates the exact owner-issued UUID before any group session lookup or write. T31-D02: malformed historical Future24 payload_json could masquerade as empty operational state; `public_record` now rejects nonobject/nonempty positional JSON with structured privacy-safe logs and a 503, preserving valid {} and legacy [] empty. Native regression `tests/t31-future24-group-identity-and-record-integrity.php` registered in the canonical full no-orphan runner. All code-level corrections are source-only: unchanged software 1.2.15, Core schema 3.4.0 and Continuity/Future24 1.1.0. No installed Hostinger plugin, physical DB/schema/wp_options, migration, dependency/staging/live checks verified.
+
+
+## T32 — 40 governed source checks and FUT11/13 operational policy safety (13 October 2026)
+Forty separate **bounded** original File08 FR001–018/NFR001–010/Future24 requirement-to-source inspections were FROZEN before fixes in `docs/T32-40-FROZEN-GOVERNING-REVIEWS-2026-10-13.md`, baseline exact PR18 SHA `258b8e00a4c1ea360802c636c10919bc13a89faa`. They are not forty complete real end-to-end audits. T32-D01: nested FUT13 blocking rule maps were discarded by generic operational sanitizer before storage, potentially making readiness falsely complete. Narrow canonical FUT13 rule whitelist in put_record now retains only four approved nonclinical fields. T32-D02: corrupt active FUT11 questionnaire and FUT13 rule JSON no longer silently becomes empty form/complete policy. T32-D03: keyset policy reader now rejects invalid/non-increasing source row IDs, avoiding nonprogress loops/duplicate projection. Real PHP `tests/t32-future24-policy-persistence-and-read-integrity.php` registered with all prior T31 tests and T28 zero-orphan gate. No source schema change: software `1.2.15`, Core `3.4.0`, Future24/Continuity `1.1.0`. Historical broken rows require actual DB inspection and controlled remediation; no physical migration performed, no claim of installed release or live verification.
