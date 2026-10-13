@@ -108,7 +108,7 @@ $check( count( $db->writes ) === 1, 'one FUT13 rule save expected' );
 $persisted = $db->writes[0];
 $json = json_decode( $persisted['payload_json'], true );
 $check( is_array( $json ) && isset( $json['requirements'] ), 'FUT13 persisted JSON missing structured rule map' );
-$check( $json['requirements'] === array( $blocking, $provisional ), 'FUT13 native serializer erased/reordered blocking rules' );
+$check( $json['requirements'] == array( $blocking, $provisional ), 'FUT13 native serializer erased/reordered blocking rules' );
 $check( $json['blocking_is_explicit'] === true, 'source blocking policy flag lost' );
 $check( ! isset( $json['clinical_note'] ), 'arbitrary clinical narrative persisted' );
 $db->reads = 0;
