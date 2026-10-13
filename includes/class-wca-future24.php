@@ -559,7 +559,7 @@ final class WCA_Future24 {
 			$wait_root = json_decode( $raw_wait_payload );
 			$payload = json_decode( $raw_wait_payload, true );
 			// A corrupt persisted filter must not turn a specific waitlist request into an unrestricted offer.
-			if ( ! is_object( $wait_root ) || ! is_array( $payload ) || ! array_key_exists( 'service_ref', $payload ) || ! array_key_exists( 'date_from', $payload ) || ! array_key_exists( 'date_to', $payload ) ) {
+			if ( ! is_object( $wait_root ) || ! is_array( $payload ) || ! array_key_exists( 'service_ref', $payload ) || ! array_key_exists( 'date_from', $payload ) || ! array_key_exists( 'date_to', $payload ) || ! is_string( $payload['service_ref'] ) || ! is_string( $payload['date_from'] ) || ! is_string( $payload['date_to'] ) || ! WCA_Service::valid_date( $payload['date_from'] ) || ! WCA_Service::valid_date( $payload['date_to'] ) || $payload['date_to'] < $payload['date_from'] ) {
 				WCA_Observability::log( 'error', 'future24_waitlist_filter_corrupt', array( 'feature_id' => 'F08-FUT-01', 'record_id' => absint( $wait['id'] ?? 0 ) ) );
 				continue;
 			}
