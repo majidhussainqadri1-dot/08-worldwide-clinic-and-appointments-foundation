@@ -16,14 +16,14 @@ $js = f24_file( 'assets/js/future24.js' );
 $css = f24_file( 'assets/css/future24.css' );
 $doc = f24_file( 'docs/FUTURE-CLINIC-INTELLIGENCE-24-2026.md' );
 
-f24_has( 'runtime', $main, 'Version: 1.2.15' );
-f24_has( 'runtime', $main, "define( 'WCA_VERSION', '1.2.15' )" );
+f24_has( 'runtime', $main, 'Version: 1.2.16' );
+f24_has( 'runtime', $main, "define( 'WCA_VERSION', '1.2.16' )" );
 f24_has( 'bootstrap', $main, 'class-wca-future24.php' );
 f24_has( 'bootstrap', $activator, 'WCA_Future24::install_schema()' );
 f24_has( 'bootstrap', $main, 'WCA_Future24::boot()' );
 f24_has( 'bootstrap', $main, 'class-wca-calendar-link.php' );
 f24_has( 'bootstrap', $main, 'WCA_Calendar_Link::boot()' );
-f24_has( 'contracts', $contracts, "const RUNTIME_VERSION                 = '1.2.15'" );
+f24_has( 'contracts', $contracts, "const RUNTIME_VERSION                 = '1.2.16'" );
 f24_has( 'contracts', $contracts, 'FUTURE24_CONTRACT_VERSION' );
 f24_has( 'contracts', $contracts, 'future_requirements' );
 
