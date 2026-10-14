@@ -6,7 +6,7 @@ Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, r
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t34-forty-verified-fut13-owner-parity-20261013`
+- Working review branch: `review/file08-t35-40-check-guardian-queue-currentness-2026-10-14`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
@@ -82,3 +82,7 @@ This repository does not prove the current staging or live installation. Exact d
 ## Historical evidence note
 
 T13–T25 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T26 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+
+
+## T35 — Source-only FUT14 Guardian Paging and FUT16 Queue Freshness (14 Oct 2026)
+Forty new **bounded** File08 original-plan, central plans and companion-owner source inspections were frozen before changes in `docs/T35-FORTY-FROZEN-SOURCE-REVIEWS-2026-10-14.md`. Baseline exact-green PR24 SHA `25de8f7679a03da2635447d3a93b80f37363f14c` on current source runtime 1.2.16. T35-D01: `WCA_Future24::queue_position` now requires current appointment lifecycle `confirmed` or `reschedule_pending` before looking up an old arrival record; canceled, completed, no-show and other ineligible states fail 409 rather than showing a stale live queue. T35-D02: every `WCA_Future24::family_hub` WP_Query page must be an array and free of DB error, otherwise explicit 503 without claiming `pagination_complete` or leaking a partial dependent list. Native PHP7.4/8.3 fixture `tests/t35-future24-guardian-paging-and-stale-queue-regressions.php` uses actual methods, test runner/no-orphan gate retained. Existing rule and privacy patches preserved. Current repository source 1.2.16 (schema source version unchanged); exact installed Hostinger plugin and DB/migration, staging user IDOR, other canceled peer entries, backups, Founder approval and live re-test remain UNVERIFIED. This is neither merged nor deployed.
