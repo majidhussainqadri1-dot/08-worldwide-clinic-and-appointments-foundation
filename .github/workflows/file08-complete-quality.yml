@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - main
+      # Exact-HEAD QA only; T35 is a stacked draft, not an installed release.
+      - review/file08-t35-40-check-guardian-queue-currentness-2026-10-14
   pull_request:
     branches: [main]
 permissions:
