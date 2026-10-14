@@ -14,7 +14,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
-- Current review branch: `review/file08-t34-forty-verified-fut13-owner-parity-20261013`
+- Current review branch: `review/file08-t35-40-check-guardian-queue-currentness-2026-10-14`
 - Current review cycle: **T26 closure cycle**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25, T22 and T21: closed; their recorded exact heads/runs are provenance only after later commits.
@@ -45,3 +45,7 @@ A correction changes HEAD and makes prior CI/package evidence historical for fin
 T19, T20, T21, T22, T23, T24 and T25 remain historical provenance; T26 frozen ledgers are the current ten-round review record. Historical T22 and T21 remain closed historical evidence and never override current T26 release identity. Historical exact heads, runs and package hashes must never be presented as the current branch or current release status after later commits.
 
 Environment-dependent acceptance cannot be manufactured in source. Execute `STAGING-ACCEPTANCE-1.0.0.md`/`STAGING-ACCEPTANCE.md` on canonical Hostinger staging with the exact verified artifact, including the two required fresh post-final-runtime-code verification sweeps; then, only after explicit production authorization, freeze deployed artifact/version/schema/migration state and perform live parity re-test.
+
+
+## T35 — Source-only FUT14 Guardian Paging and FUT16 Queue Freshness (14 Oct 2026)
+Forty new **bounded** File08 original-plan, central plans and companion-owner source inspections were frozen before changes in `docs/T35-FORTY-FROZEN-SOURCE-REVIEWS-2026-10-14.md`. Baseline exact-green PR24 SHA `25de8f7679a03da2635447d3a93b80f37363f14c` on current source runtime 1.2.16. T35-D01: `WCA_Future24::queue_position` now requires current appointment lifecycle `confirmed` or `reschedule_pending` before looking up an old arrival record; canceled, completed, no-show and other ineligible states fail 409 rather than showing a stale live queue. T35-D02: every `WCA_Future24::family_hub` WP_Query page must be an array and free of DB error, otherwise explicit 503 without claiming `pagination_complete` or leaking a partial dependent list. Native PHP7.4/8.3 fixture `tests/t35-future24-guardian-paging-and-stale-queue-regressions.php` uses actual methods, test runner/no-orphan gate retained. Existing rule and privacy patches preserved. Current repository source 1.2.16 (schema source version unchanged); exact installed Hostinger plugin and DB/migration, staging user IDOR, other canceled peer entries, backups, Founder approval and live re-test remain UNVERIFIED. This is neither merged nor deployed.
