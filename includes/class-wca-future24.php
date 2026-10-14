@@ -948,6 +948,41 @@ final class WCA_Future24 {
 		return self::put_record( 'F08-FUT-04', array( 'clinic_id' => $clinic_id, 'status' => 'resource_active', 'capacity' => $capacity, 'payload' => array( 'resource_type' => $type, 'label' => sanitize_text_field( $data['label'] ?? '' ), 'branch_ref' => $branch_ref ) ), $actor );
 	}
 
+	/**
+	 * Validate the current stored resource scope before locking or reserving.
+	 * Corrupt operational records must never silently become unscoped resources.
+	 * @return array<string,string>|WP_Error
+	 */
+	private static function verified_resource_reservation_scope( $resource, $appointment_id = 0 ) {
+		$raw = isset( $resource['payload_json'] ) && is_string( $resource['payload_json'] ) ? $resource['payload_json'] : '';
+		$native = json_decode( $raw );
+		$payload = json_decode( $raw, true );
+		$valid_types = array( 'room', 'device', 'equipment', 'staff_pool', 'virtual_capacity' );
+		if ( ! is_object( $native ) || ! is_array( $payload )
+			|| ! isset( $payload['resource_type'], $payload['branch_ref'] )
+			|| ! is_string( $payload['resource_type'] ) || ! is_string( $payload['branch_ref'] )
+			|| ! in_array( $payload['resource_type'], $valid_types, true )
+			|| ( '' !== $payload['branch_ref'] && ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $payload['branch_ref'] ) ) ) {
+			return new WP_Error( 'wca_resource_payload_corrupt', __( 'Stored resource type or branch scope cannot be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		if ( $appointment_id && '' !== $payload['branch_ref'] ) {
+			$branch_id = absint( SWC_Helpers::meta( $appointment_id, 'branch_id', 0 ) );
+			if ( ! $branch_id ) {
+				return new WP_Error( 'wca_resource_branch_scope', __( 'A branch-specific resource requires an appointment assigned to that branch.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+			}
+			WCA_Repository::clear_read_error();
+			$branch = WCA_Repository::get_branch( $branch_id );
+			$read_failure = WCA_Repository::consume_read_error();
+			if ( is_wp_error( $read_failure ) ) { return $read_failure; }
+			if ( ! is_array( $branch ) || absint( $branch['clinic_id'] ?? 0 ) !== absint( $resource['clinic_id'] ?? 0 )
+				|| ! isset( $branch['public_ref'] ) || ! is_string( $branch['public_ref'] )
+				|| ! hash_equals( $payload['branch_ref'], strtolower( $branch['public_ref'] ) ) ) {
+				return new WP_Error( 'wca_resource_branch_scope', __( 'This appointment and branch-specific resource do not belong to the same current branch.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+			}
+		}
+		return array( 'resource_type' => $payload['resource_type'], 'branch_ref' => $payload['branch_ref'] );
+	}
+
 	public static function reserve_resource( $resource_ref, $data, $actor = 0 ) {
 		global $wpdb;
 		$resource = self::get_record( $resource_ref, 'F08-FUT-04' );
@@ -969,6 +1004,8 @@ final class WCA_Future24 {
 				return new WP_Error( 'wca_resource_appointment_scope', __( 'The appointment and scheduling resource must belong to the same clinic.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 			}
 		}
+		$scope = self::verified_resource_reservation_scope( $resource, $appointment_id );
+		if ( is_wp_error( $scope ) ) { return $scope; }
 		$lock = self::semantic_lock( 'resource', strtolower( $resource_ref ) );
 		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
@@ -977,8 +1014,7 @@ final class WCA_Future24 {
 			if ( null === $count_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_resource_capacity_read_failed', __( 'Current resource capacity could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			$count = (int) $count_raw;
 			if ( $count >= max( 1, absint( $resource['capacity'] ) ) ) { return new WP_Error( 'wca_resource_conflict', __( 'The resource is already at capacity for this time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-			$resource_payload = json_decode( (string) $resource['payload_json'], true );
-			$resource_type = is_array( $resource_payload ) && isset( $resource_payload['resource_type'] ) ? sanitize_key( $resource_payload['resource_type'] ) : '';
+			$resource_type = $scope['resource_type'];
 			return self::put_record( 'F08-FUT-04', array(
 				'clinic_id' => absint( $resource['clinic_id'] ),
 				'appointment_id' => absint( $appointment_id ),
