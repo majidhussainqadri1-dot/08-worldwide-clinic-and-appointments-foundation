@@ -1709,6 +1709,7 @@ self::release_semantic_lock( $lock );
 
 	/* FUT-14 */
 	public static function family_hub( $actor = 0 ) {
+		global $wpdb;
 		$actor = absint( $actor ?: get_current_user_id() );
 		$claims = WCA_Authorization::claims( $actor ); if ( is_wp_error( $claims ) ) { return $claims; }
 		if ( empty( $claims['guardian'] ) ) { return array( 'contract' => 'wca.family-hub', 'version' => self::CONTRACT_VERSION, 'guardian' => false, 'appointments' => array() ); }
@@ -1717,7 +1718,12 @@ self::release_semantic_lock( $lock );
 		$batch = 200;
 		do {
 			$q = new WP_Query( array( 'post_type' => SWC_Helpers::TYPE, 'post_status' => array( 'private','publish' ), 'fields' => 'ids', 'posts_per_page' => $batch, 'paged' => $page, 'orderby' => 'ID', 'order' => 'ASC', 'no_found_rows' => true, 'meta_key' => '_swc_guardian_user_id', 'meta_value' => $actor ) );
-			$ids = array_map( 'absint', (array) $q->posts );
+			// A failed page must not masquerade as a complete guardian list.
+			// Return no partial dependent records if the first or later page fails.
+			if ( ! isset( $q->posts ) || ! is_array( $q->posts ) || '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_family_hub_read_failed', __( 'Current guardian appointments could not be read completely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$ids = array_map( 'absint', $q->posts );
 			foreach ( $ids as $id ) {
 				$patient_id = absint( SWC_Helpers::meta( $id, 'patient_user_id', get_post_field( 'post_author', $id ) ) );
 				$guard = class_exists( 'WCA_Central_Governance' ) ? WCA_Central_Governance::validate_patient_guardian( $patient_id, $actor, $actor ) : new WP_Error( 'wca_guardian_recheck_unavailable', 'unavailable' );
@@ -1773,6 +1779,11 @@ self::release_semantic_lock( $lock );
 		global $wpdb;
 		$id = self::require_appointment( $appointment_ref, $actor );
 		if ( is_wp_error( $id ) ) { return $id; }
+		// An operational arrival must not outlive current scheduling truth:
+		// cancellation/completion/no-show removes eligibility for LIVE queue.
+		if ( ! in_array( SWC_Helpers::status( $id ), array( 'confirmed', 'reschedule_pending' ), true ) ) {
+			return new WP_Error( 'wca_queue_appointment_state', __( 'This appointment is no longer eligible for the live arrival queue.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
 		$table = self::tables()['records'];
 		$clinic_id = absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) );
 		$now = WCA_Repository::now();
