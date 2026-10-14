@@ -5,8 +5,8 @@
 
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'SMC_VERSION', '1.2.7' );
-define( 'SMC_CONTRACT_VERSION', '1.1.2' );
-define( 'GDO_VERSION', '1.1.0' );
+define( 'SMC_CONTRACT_VERSION', '1.2.3' );
+define( 'GDO_VERSION', '1.3.0' );
 
 final class WP_User {
 	public $ID;
@@ -58,7 +58,7 @@ function swc_authority_assert( $condition, $message ) {
 }
 
 $doctor_assertions = array(
-	'contract_version' => '1.1.2',
+	'contract_version' => '1.2.3',
 	'user_id' => 7,
 	'account_class' => 'member',
 	'membership_type' => 'doctor',
@@ -75,6 +75,14 @@ $GLOBALS['swc_gdo_verified'][7] = true;
 $GLOBALS['swc_spd_status'][7] = 'verified';
 
 swc_authority_assert( SWC_Doctor_Authority::is_eligible( 7 ), 'File 00 and File 09 agreement admits an eligible Doctor' );
+$GLOBALS['swc_gdo_decisions'][7] = array( 'state' => 'reinstated', 'verified' => true );
+swc_authority_assert( SWC_Doctor_Authority::is_eligible( 7 ), 'File 09 1.3 current verified reinstated doctor is eligible' );
+$GLOBALS['swc_gdo_decisions'][7] = array( 'state' => 'renewal_due', 'verified' => true, 'limited' => true );
+swc_authority_assert( SWC_Doctor_Authority::is_eligible( 7 ), 'File 09 1.3 verified renewal-due status remains eligible pending expiry' );
+$GLOBALS['swc_gdo_decisions'][7] = array( 'state' => 'renewal_due', 'verified' => false, 'limited' => true );
+swc_authority_assert( ! SWC_Doctor_Authority::is_eligible( 7 ), 'File 09 renewal-due without current verified claim is denied' );
+$GLOBALS['swc_gdo_decisions'][7] = array( 'state' => 'verified', 'verified' => true );
+
 $GLOBALS['swc_gdo_verified'][7] = false;
 swc_authority_assert( ! SWC_Doctor_Authority::is_eligible( 7 ), 'File 09 decision/helper disagreement fails closed' );
 $GLOBALS['swc_gdo_verified'][7] = true;
@@ -92,7 +100,7 @@ swc_authority_assert( ! SWC_Doctor_Authority::is_eligible( 7 ), 'File 03 revoked
 $GLOBALS['swc_spd_status'][7] = 'verified';
 
 $GLOBALS['swc_assertions'][8] = array(
-	'contract_version' => '1.1.2',
+	'contract_version' => '1.2.3',
 	'user_id' => 8,
 	'account_class' => 'founder',
 	'membership_type' => '',
@@ -104,7 +112,7 @@ $GLOBALS['swc_assertions'][8] = array(
 swc_authority_assert( SWC_Doctor_Authority::is_eligible( 8 ), 'canonical File 00 Founder is admitted without fabricated Doctor application state' );
 
 $GLOBALS['swc_assertions'][9] = array(
-	'contract_version' => '1.1.2',
+	'contract_version' => '1.2.3',
 	'user_id' => 9,
 	'account_class' => 'member',
 	'membership_type' => 'member',
@@ -122,7 +130,8 @@ $GLOBALS['swc_authority_filter'] = function ( $hook, $value, $user_id ) {
 swc_authority_assert( ! SWC_Doctor_Authority::is_eligible( 7 ), 'extension filters may revoke an otherwise eligible Doctor' );
 
 $contract = SWC_Doctor_Authority::contract();
-swc_authority_assert( '1.1.2' === $contract['file_00_contract'], 'File 00 assertion contract is exact' );
+swc_authority_assert( '1.2.3' === $contract['file_00_contract'], 'File 00 assertion contract is exact' );
+swc_authority_assert( '>=1.1.0 <1.4.0' === $contract['file_09_runtime_range'], 'Current File 09 1.3 consumer range is explicitly bounded' );
 swc_authority_assert( false === $contract['local_role_inference'] && false === $contract['local_meta_inference'], 'local role and metadata inference are prohibited' );
 
 echo "All {$tests} authoritative practitioner checks passed.\n";
