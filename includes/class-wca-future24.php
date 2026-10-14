@@ -2098,10 +2098,27 @@ self::release_semantic_lock( $lock );
 		$expected_version = WCA_Service::strict_id( $data['expected_version'] ?? null );
 		if ( null === $expected_version ) { return new WP_Error( 'wca_episode_version_required', __( 'Current episode version is required before changing episode links.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		if ( $expected_version !== absint( $row['version'] ) ) { return new WP_Error( 'wca_episode_stale', __( 'Episode changed. Refresh before updating it.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'current_version' => absint( $row['version'] ) ) ); }
-		$payload = json_decode( (string) $row['payload_json'], true );
-		$payload = is_array( $payload ) ? $payload : array();
-		$refs = array_values( array_unique( array_filter( array_map( 'strtolower', array_map( 'sanitize_text_field', (array) ( $payload['appointment_refs'] ?? array() ) ) ) ) ) );
+		$episode_json = isset( $row['payload_json'] ) && is_string( $row['payload_json'] ) ? $row['payload_json'] : '';
+		$episode_root = json_decode( $episode_json );
+		$payload = json_decode( $episode_json, true );
 		$status = (string) $row['status'];
+		// Never overwrite broken clinical episode links with a synthetic empty set.
+		if ( ! is_object( $episode_root ) || ! is_array( $payload )
+			|| ! isset( $payload['appointment_refs'] ) || ! is_array( $payload['appointment_refs'] )
+			|| count( $payload['appointment_refs'] ) > 50
+			|| ( 'episode_open' === $status && ! $payload['appointment_refs'] )
+			|| ! array_key_exists( 'clinical_narrative_stored', $payload ) || false !== $payload['clinical_narrative_stored']
+			|| ! array_key_exists( 'public_timeline', $payload ) || false !== $payload['public_timeline']
+			|| 'same_patient_doctor_clinic' !== ( $payload['scope_consistency'] ?? null ) ) {
+			return new WP_Error( 'wca_episode_payload_corrupt', __( 'Stored episode links or privacy scope could not be verified; no change was made.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$refs = array();
+		foreach ( $payload['appointment_refs'] as $ref ) {
+			if ( ! is_string( $ref ) || ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $ref ) || in_array( $ref, $refs, true ) ) {
+				return new WP_Error( 'wca_episode_payload_corrupt', __( 'Stored episode reference integrity could not be verified; no change was made.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$refs[] = $ref;
+		}
 		$expires_at = $row['expires_at'];
 		if ( 'archive' === $action ) {
 			if ( 'episode_archived' === $status ) { return self::public_record( $row ); }
