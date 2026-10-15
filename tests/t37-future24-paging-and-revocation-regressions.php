@@ -33,6 +33,8 @@ final class WP_Query {
         }
         if(self::$mode === 'page2' && $page === 1) {
             $this->posts = range(1, 200);
+        } elseif(self::$mode === 'page2' && $page === 2) {
+            $this->posts = array(201,202,203);
         } else {
             $this->posts = ($page === 1) ? array(17,18,19) : array();
         }
