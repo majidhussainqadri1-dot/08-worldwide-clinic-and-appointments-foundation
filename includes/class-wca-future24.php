@@ -1826,7 +1826,14 @@ self::release_semantic_lock( $lock );
 		$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $now ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $current && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_read_failed', __( 'Current queue state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $current ) { return new WP_Error( 'wca_queue_not_arrived', __( 'Arrival has not been registered or has expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-		$ahead_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(DISTINCT appointment_id) FROM {$table} WHERE feature_id='F08-FUT-15' AND clinic_id=%d AND status='arrived' AND created_at<%s AND (expires_at IS NULL OR expires_at>%s)", $clinic_id, $current['created_at'], $now ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// Count only peers that are still in a live scheduling state; old arrival records alone are never canonical.
+		// Mirror SWC_Helpers::status() and WCA_Contracts::legacy_status_map() without exposing any peer identity.
+		$appointment_posts = $wpdb->prefix . 'posts';
+		$appointment_meta  = $wpdb->prefix . 'postmeta';
+		$ahead_raw = $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(DISTINCT arrival.appointment_id) FROM {$table} arrival INNER JOIN {$appointment_posts} ap ON ap.ID=arrival.appointment_id AND ap.post_type=%s AND ap.post_status IN ('private','publish') INNER JOIN {$appointment_meta} status_meta ON status_meta.post_id=ap.ID AND status_meta.meta_key='_swc_status' AND status_meta.meta_value IN ('confirmed','accepted','reschedule_pending','reschedule-requested','reschedule_requested') WHERE arrival.feature_id='F08-FUT-15' AND arrival.clinic_id=%d AND arrival.status='arrived' AND arrival.created_at<%s AND (arrival.expires_at IS NULL OR arrival.expires_at>%s)",
+			SWC_Helpers::TYPE, $clinic_id, $current['created_at'], $now
+		) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $ahead_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_position_read_failed', __( 'Current queue position could not be calculated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$ahead = (int) $ahead_raw;
 		return array( 'contract' => 'wca.private-queue-position', 'version' => self::CONTRACT_VERSION, 'appointment_ref' => strtolower( $appointment_ref ), 'appointments_ahead' => $ahead, 'estimated_delay_minutes' => $ahead * 15, 'other_patient_identity_exposed' => false, 'estimate_only' => true );
