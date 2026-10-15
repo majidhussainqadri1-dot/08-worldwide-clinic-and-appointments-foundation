@@ -1375,6 +1375,7 @@ self::release_semantic_lock( $lock );
 		$from = $window_start->format( 'Y-m-d H:i:s' );
 		$to = $window_end->format( 'Y-m-d H:i:s' );
 		$ids = self::clinic_appointments_between_all( $clinic_id, $from, $to );
+		if ( is_wp_error( $ids ) ) { return $ids; }
 
 		$map = array();
 		for ( $i = 0; $i < $days; $i++ ) {
@@ -1488,6 +1489,7 @@ self::release_semantic_lock( $lock );
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$ids = self::clinic_appointments_between_all( $clinic_id, gmdate( 'Y-m-d H:i:s', time() - 365 * DAY_IN_SECONDS ), gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ) );
+		if ( is_wp_error( $ids ) ) { return $ids; }
 		$total = 0; $no_show = 0;
 		foreach ( $ids as $id ) { $status = SWC_Helpers::status( $id ); if ( in_array( $status, array( 'completed', 'no_show' ), true ) ) { $total++; if ( 'no_show' === $status ) { $no_show++; } } }
 		if ( $total < self::MIN_FORECAST_N ) { return array( 'contract' => 'wca.no-show-forecast', 'version' => self::CONTRACT_VERSION, 'suppressed' => true, 'minimum_sample' => self::MIN_FORECAST_N, 'patient_scoring' => false ); }
@@ -1851,7 +1853,9 @@ self::release_semantic_lock( $lock );
 		}
 		$effective_start=gmdate('Y-m-d H:i:s',max($start_ts,$now));
 		$affected=array();
-		foreach(self::clinic_appointments_between_all($clinic_id,$effective_start,$end) as $appointment_id){
+		$affected_rows=self::clinic_appointments_between_all($clinic_id,$effective_start,$end);
+		if(is_wp_error($affected_rows)){return $affected_rows;}
+		foreach($affected_rows as $appointment_id){
 			if(!in_array(SWC_Helpers::status($appointment_id),array('requested','confirmed','reschedule_pending'),true)){continue;}
 			$scheduled=self::utc(SWC_Helpers::meta($appointment_id,'preferred_at_utc',''));
 			if(!$scheduled||strtotime($scheduled.' UTC')<$now){continue;}
@@ -1915,6 +1919,30 @@ self::release_semantic_lock( $lock );
 		}
 	}
 
+	/**
+	 * Verify a persisted private support/interpreter role before a revocation write
+	 * or File17 event. Never fabricate a subject/role from broken stored JSON.
+	 *
+	 * @return array<string,string>|WP_Error
+	 */
+	private static function verified_support_participant_payload( $row ) {
+		$raw = isset( $row['payload_json'] ) && is_string( $row['payload_json'] ) ? $row['payload_json'] : '';
+		$native = json_decode( $raw );
+		$payload = json_decode( $raw, true );
+		$subject = is_array( $payload ) && isset( $payload['subject_uuid'] ) ? $payload['subject_uuid'] : null;
+		$role = is_array( $payload ) && isset( $payload['role'] ) ? $payload['role'] : null;
+		if ( ! is_object( $native ) || ! is_array( $payload ) || ! is_string( $subject ) || ! is_string( $role )
+			|| ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $subject )
+			|| ! in_array( $role, array( 'support', 'interpreter' ), true )
+			|| true !== ( $payload['appointment_bound'] ?? null )
+			|| true !== ( $payload['revocable'] ?? null )
+			|| false !== ( $payload['clinical_write_authority'] ?? null )
+			|| ! absint( $row['subject_user_id'] ?? 0 ) ) {
+			return new WP_Error( 'wca_support_participant_payload_corrupt', __( 'The stored support participant role cannot be verified safely; no change was made.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return array( 'subject_uuid' => $subject, 'role' => $role );
+	}
+
 	public static function revoke_participant( $appointment_ref, $participant_ref, $actor = 0 ) {
 		global $wpdb;
 		$actor_id = absint( $actor ?: get_current_user_id() );
@@ -1931,12 +1959,12 @@ self::release_semantic_lock( $lock );
 				$row = self::get_record( $participant_ref, 'F08-FUT-18' );
 				if ( is_wp_error( $row ) ) { return $row; }
 				if ( ! $row || absint( $row['appointment_id'] ) !== $id || 'participant_active' !== $row['status'] ) { return new WP_Error( 'wca_support_participant_missing', __( 'The active support participant was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+				$payload = self::verified_support_participant_payload( $row );
+				if ( is_wp_error( $payload ) ) { return $payload; }
 				$table = self::tables()['records'];
 				$now = WCA_Repository::now();
 				$updated = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',version=version+1,expires_at=%s,updated_at=%s WHERE id=%d AND status='participant_active' AND version=%d", $now, $now, absint( $row['id'] ), absint( $row['version'] ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 				if ( 1 !== (int) $updated ) { return new WP_Error( 'wca_support_revoke_conflict', __( 'The support participant changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-				$payload = json_decode( (string) $row['payload_json'], true );
-				$payload = is_array( $payload ) ? $payload : array();
 				$queued = WCA_Repository::enqueue( 'File17.AppointmentParticipantChanged.v1', strtolower( $appointment_ref ), array( 'appointment_ref' => strtolower( $appointment_ref ), 'participant_ref' => $participant_ref, 'subject_uuid' => sanitize_text_field( isset( $payload['subject_uuid'] ) ? $payload['subject_uuid'] : '' ), 'role' => sanitize_key( isset( $payload['role'] ) ? $payload['role'] : 'support' ), 'status' => 'revoked', 'transport_owner' => 'File17' ), WCA_Observability::trace_id() );
 				if ( is_wp_error( $queued ) ) { return $queued; }
 				$audit = self::audit( 'F08-FUT-18', 'participant_revoked', $participant_ref, array( 'appointment_ref' => strtolower( $appointment_ref ) ), $actor_id, false );
@@ -2184,10 +2212,12 @@ self::release_semantic_lock( $lock );
 
 	/** Return the complete affected appointment set in bounded pages; no silent fixed-count truncation. */
 	private static function clinic_appointments_between_all( $clinic_id, $from, $to ) {
+		global $wpdb;
 		$out = array();
 		$page = 1;
 		$batch = 200;
 		do {
+			$wpdb->last_error = '';
 			$q = new WP_Query( array(
 				'post_type' => SWC_Helpers::TYPE,
 				'post_status' => array( 'private','publish' ),
@@ -2202,8 +2232,26 @@ self::release_semantic_lock( $lock );
 					array( 'key' => '_swc_preferred_at_utc', 'value' => array( self::utc( $from ), self::utc( $to ) ), 'compare' => 'BETWEEN', 'type' => 'DATETIME' ),
 				),
 			) );
-			$ids = array_map( 'absint', (array) $q->posts );
+			// Never treat a failed/malformed WordPress page as a complete affected set.
+			if ( ! isset( $q->posts ) || ! is_array( $q->posts ) || '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_disruption_appointment_page_read_failed', __( 'Current clinic appointments could not be enumerated completely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$ids = array();
+			foreach ( $q->posts as $candidate ) {
+				if ( ! is_int( $candidate ) && ( ! is_string( $candidate ) || ! ctype_digit( $candidate ) ) ) {
+					return new WP_Error( 'wca_disruption_appointment_page_invalid', __( 'Current clinic appointments contained an invalid reference.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$id = absint( $candidate );
+				if ( ! $id ) {
+					return new WP_Error( 'wca_disruption_appointment_page_invalid', __( 'Current clinic appointments contained an invalid reference.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$ids[] = $id;
+			}
 			$out = array_merge( $out, $ids );
+			// An operationally oversized enumeration must stop explicitly, not truncate.
+			if ( count( $ids ) === $batch && $page >= 250 ) {
+				return new WP_Error( 'wca_disruption_appointment_page_limit', __( 'The clinic appointment set is too large for a safe synchronous projection.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
 			$page++;
 		} while ( count( $ids ) === $batch );
 		return array_values( array_unique( $out ) );
