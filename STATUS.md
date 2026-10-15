@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Integration Review
 
+> **CURRENT T36 repository review (15 October 2026):** This draft candidate is based on unmerged PR #26, includes the independent FUT04/FUT23 fixes from PR #25, and adds a FUT16 stale-peer-count correction. The four T36 frozen ledgers cover 40 scoped source-anchor screens, **not 40 full WordPress/browser/DB end-to-end tests**. Exact-HEAD CI/package, staging DB, installed plugin/dependencies, migrations, Founder approval, deployment and live parity must be verified separately. Prior T26 wording below is historical test-fixture text, not the current T36 review identity.
+
+
 Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, runtime logs, staging and live unverified. PR #21 introduces bounded postcommit owner fact with no clinical data; approval required.
 
 # File 08 — Worldwide Clinic and Appointments — Candidate Status
@@ -12,7 +15,7 @@ Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, r
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
 - Historical T22: **R1–R10 closed**; former T22 exact heads/runs are historical provenance only.
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
-- Runtime candidate: **1.2.15**
+- Runtime candidate: **1.2.16**
 - Core File 08 schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
 - Future24 additive operational schema/contract: **1.1.0**
