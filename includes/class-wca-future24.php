@@ -1919,6 +1919,30 @@ self::release_semantic_lock( $lock );
 		}
 	}
 
+	/**
+	 * Verify a persisted private support/interpreter role before a revocation write
+	 * or File17 event. Never fabricate a subject/role from broken stored JSON.
+	 *
+	 * @return array<string,string>|WP_Error
+	 */
+	private static function verified_support_participant_payload( $row ) {
+		$raw = isset( $row['payload_json'] ) && is_string( $row['payload_json'] ) ? $row['payload_json'] : '';
+		$native = json_decode( $raw );
+		$payload = json_decode( $raw, true );
+		$subject = is_array( $payload ) && isset( $payload['subject_uuid'] ) ? $payload['subject_uuid'] : null;
+		$role = is_array( $payload ) && isset( $payload['role'] ) ? $payload['role'] : null;
+		if ( ! is_object( $native ) || ! is_array( $payload ) || ! is_string( $subject ) || ! is_string( $role )
+			|| ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $subject )
+			|| ! in_array( $role, array( 'support', 'interpreter' ), true )
+			|| true !== ( $payload['appointment_bound'] ?? null )
+			|| true !== ( $payload['revocable'] ?? null )
+			|| false !== ( $payload['clinical_write_authority'] ?? null )
+			|| ! absint( $row['subject_user_id'] ?? 0 ) ) {
+			return new WP_Error( 'wca_support_participant_payload_corrupt', __( 'The stored support participant role cannot be verified safely; no change was made.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return array( 'subject_uuid' => $subject, 'role' => $role );
+	}
+
 	public static function revoke_participant( $appointment_ref, $participant_ref, $actor = 0 ) {
 		global $wpdb;
 		$actor_id = absint( $actor ?: get_current_user_id() );
@@ -1935,12 +1959,12 @@ self::release_semantic_lock( $lock );
 				$row = self::get_record( $participant_ref, 'F08-FUT-18' );
 				if ( is_wp_error( $row ) ) { return $row; }
 				if ( ! $row || absint( $row['appointment_id'] ) !== $id || 'participant_active' !== $row['status'] ) { return new WP_Error( 'wca_support_participant_missing', __( 'The active support participant was not found.', 'worldwide-clinic-appointments' ), array( 'status' => 404 ) ); }
+				$payload = self::verified_support_participant_payload( $row );
+				if ( is_wp_error( $payload ) ) { return $payload; }
 				$table = self::tables()['records'];
 				$now = WCA_Repository::now();
 				$updated = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status='revoked',version=version+1,expires_at=%s,updated_at=%s WHERE id=%d AND status='participant_active' AND version=%d", $now, $now, absint( $row['id'] ), absint( $row['version'] ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 				if ( 1 !== (int) $updated ) { return new WP_Error( 'wca_support_revoke_conflict', __( 'The support participant changed. Refresh and try again.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
-				$payload = json_decode( (string) $row['payload_json'], true );
-				$payload = is_array( $payload ) ? $payload : array();
 				$queued = WCA_Repository::enqueue( 'File17.AppointmentParticipantChanged.v1', strtolower( $appointment_ref ), array( 'appointment_ref' => strtolower( $appointment_ref ), 'participant_ref' => $participant_ref, 'subject_uuid' => sanitize_text_field( isset( $payload['subject_uuid'] ) ? $payload['subject_uuid'] : '' ), 'role' => sanitize_key( isset( $payload['role'] ) ? $payload['role'] : 'support' ), 'status' => 'revoked', 'transport_owner' => 'File17' ), WCA_Observability::trace_id() );
 				if ( is_wp_error( $queued ) ) { return $queued; }
 				$audit = self::audit( 'F08-FUT-18', 'participant_revoked', $participant_ref, array( 'appointment_ref' => strtolower( $appointment_ref ) ), $actor_id, false );
