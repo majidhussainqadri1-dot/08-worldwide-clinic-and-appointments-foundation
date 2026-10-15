@@ -1,3 +1,5 @@
+> **CURRENT T36 repository review (15 October 2026):** This draft candidate is based on unmerged PR #26, includes the independent FUT04/FUT23 fixes from PR #25, and adds a FUT16 stale-peer-count correction. The four T36 frozen ledgers cover 40 scoped source-anchor screens, **not 40 full WordPress/browser/DB end-to-end tests**. Exact-HEAD CI/package, staging DB, installed plugin/dependencies, migrations, Founder approval, deployment and live parity must be verified separately. Prior T26 wording below is historical test-fixture text, not the current T36 review identity.
+
 Runtime candidate: **1.2.16**
 Core schema: **3.4.0**
 
@@ -7,7 +9,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 
 ## Current repository identity
 
-- Runtime candidate: **1.2.15**
+- Runtime candidate: **1.2.16**
 - Core schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
 - Future24 schema/contract: **1.1.0**
