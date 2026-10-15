@@ -74,7 +74,7 @@ t15h('R11 readiness intake read failure explicit','includes/class-wca-future24.p
 t15h('R11 service-specific questionnaire fails closed','includes/class-wca-future24.php',"\$template_service && ( ! \$service_ref || ! hash_equals");
 t15h('R11 optional group service remains joinable','includes/class-wca-future24.php','( $service_ref && ! $service )');
 t15h('R11 arrival serialized by appointment','includes/class-wca-future24.php',"semantic_lock( 'arrival', \$id )");
-t15h('R11 queue counts distinct appointments','includes/class-wca-future24.php','COUNT(DISTINCT appointment_id)');
+t15h('R11 queue counts distinct appointments','includes/class-wca-future24.php','COUNT(DISTINCT arrival.appointment_id)');
 t15h('R11 subject resolver helper is authoritative','includes/class-wca-future24.php',"if ( is_wp_error( \$raw ) || ! is_scalar( \$raw ) )");
 t15h('R11 completed reschedule audit failure explicit','includes/class-wca-future24.php','wca_safe_reschedule_audit_failed');
 
@@ -87,7 +87,7 @@ t15h('R13 CF01 uses canonical appointment authorization','includes/class-swc-cf0
 t15h('R13 verification reconciliation retry hook','includes/class-wca-verification-reconciliation.php','wca_retry_doctor_eligibility_reconciliation');
 t15h('R13 verification projection writes transactional','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_write');
 t15h('R13 verification clinic read failure explicit','includes/class-wca-verification-reconciliation.php','wca_verification_reconciliation_read');
-t15h('R13 File19 WP_Error rejected','includes/class-wca-outbox.php','is_wp_error( $result ) || false === $result');
+t15h('R13 File19 WP_Error rejected','includes/class-wca-outbox.php','is_wp_error( $result ) || ! is_array( $result )');
 
 t15h('R14 secure browser UUID fallback','assets/js/clinic.js','crypto.getRandomValues');
 t15h('R14 stable slot-hold replay key','assets/js/clinic.js','idempotency_key: holdRequestKey');

@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Outcome Integration Candidate
 
+> **CURRENT T36 repository review (15 October 2026):** This draft candidate is based on unmerged PR #26, includes the independent FUT04/FUT23 fixes from PR #25, and adds a FUT16 stale-peer-count correction. The four T36 frozen ledgers cover 40 scoped source-anchor screens, **not 40 full WordPress/browser/DB end-to-end tests**. Exact-HEAD CI/package, staging DB, installed plugin/dependencies, migrations, Founder approval, deployment and live parity must be verified separately. Prior T26 wording below is historical test-fixture text, not the current T36 review identity.
+
+
 Runtime candidate: **1.2.16**. File08 post-commit nonclinical owner event for optional File14 analytics; source-only pending staging/live parity. No appointment outcome guarantee.
 
 # File 08 — Worldwide Clinic and Appointments
@@ -8,7 +11,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t21-ten-round-2026-09-09`
+- Repository review branch: `review/file08-t36-forty-gap-reconcile-2026-10-15`
 - Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.
@@ -16,7 +19,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
 - Package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.15**
+- Runtime candidate: **1.2.16**
 - Core schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
 - Future24 additive schema/contract: **1.1.0**
@@ -71,3 +74,7 @@ A repository candidate may be called **Coded**, **Packaged**, or **Automated-QA 
 T26 is the current closure cycle. R1 corrected Public Clinic canonical/runtime contract parity and the package-verifier blind spot; R2–R9 were clean; R10 corrected release-currentness and historical-regression drift. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status. Static documentation deliberately does not hard-code a future CI result; consult the canonical workflow on the exact HEAD being evaluated.
 
 Before production, run `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, recording actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback and Founder acceptance. After an explicitly authorized production deployment, freeze the exact deployed artifact/version/schema/migration state and perform live parity re-test before any live resolution claim.
+
+
+## T35 — Source-only FUT14 Guardian Paging and FUT16 Queue Freshness (14 Oct 2026)
+Forty new **bounded** File08 original-plan, central plans and companion-owner source inspections were frozen before changes in `docs/T35-FORTY-FROZEN-SOURCE-REVIEWS-2026-10-14.md`. Baseline exact-green PR24 SHA `25de8f7679a03da2635447d3a93b80f37363f14c` on current source runtime 1.2.16. T35-D01: `WCA_Future24::queue_position` now requires current appointment lifecycle `confirmed` or `reschedule_pending` before looking up an old arrival record; canceled, completed, no-show and other ineligible states fail 409 rather than showing a stale live queue. T35-D02: every `WCA_Future24::family_hub` WP_Query page must be an array and free of DB error, otherwise explicit 503 without claiming `pagination_complete` or leaking a partial dependent list. Native PHP7.4/8.3 fixture `tests/t35-future24-guardian-paging-and-stale-queue-regressions.php` uses actual methods, test runner/no-orphan gate retained. Existing rule and privacy patches preserved. Current repository source 1.2.16 (schema source version unchanged); exact installed Hostinger plugin and DB/migration, staging user IDOR, other canceled peer entries, backups, Founder approval and live re-test remain UNVERIFIED. This is neither merged nor deployed.

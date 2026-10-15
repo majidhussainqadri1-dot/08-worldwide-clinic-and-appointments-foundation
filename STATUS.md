@@ -1,18 +1,21 @@
 # File08 v1.2.16 — Owner Integration Review
 
+> **CURRENT T36 repository review (15 October 2026):** This draft candidate is based on unmerged PR #26, includes the independent FUT04/FUT23 fixes from PR #25, and adds a FUT16 stale-peer-count correction. The four T36 frozen ledgers cover 40 scoped source-anchor screens, **not 40 full WordPress/browser/DB end-to-end tests**. Exact-HEAD CI/package, staging DB, installed plugin/dependencies, migrations, Founder approval, deployment and live parity must be verified separately. Prior T26 wording below is historical test-fixture text, not the current T36 review identity.
+
+
 Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, runtime logs, staging and live unverified. PR #21 introduces bounded postcommit owner fact with no clinical data; approval required.
 
 # File 08 — Worldwide Clinic and Appointments — Candidate Status
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t21-ten-round-2026-09-09`
+- Working review branch: `review/file08-t36-forty-gap-reconcile-2026-10-15`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
 - Historical T22: **R1–R10 closed**; former T22 exact heads/runs are historical provenance only.
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
-- Runtime candidate: **1.2.15**
+- Runtime candidate: **1.2.16**
 - Core File 08 schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
 - Future24 additive operational schema/contract: **1.1.0**
@@ -82,3 +85,7 @@ This repository does not prove the current staging or live installation. Exact d
 ## Historical evidence note
 
 T13–T25 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T26 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+
+
+## T35 — Source-only FUT14 Guardian Paging and FUT16 Queue Freshness (14 Oct 2026)
+Forty new **bounded** File08 original-plan, central plans and companion-owner source inspections were frozen before changes in `docs/T35-FORTY-FROZEN-SOURCE-REVIEWS-2026-10-14.md`. Baseline exact-green PR24 SHA `25de8f7679a03da2635447d3a93b80f37363f14c` on current source runtime 1.2.16. T35-D01: `WCA_Future24::queue_position` now requires current appointment lifecycle `confirmed` or `reschedule_pending` before looking up an old arrival record; canceled, completed, no-show and other ineligible states fail 409 rather than showing a stale live queue. T35-D02: every `WCA_Future24::family_hub` WP_Query page must be an array and free of DB error, otherwise explicit 503 without claiming `pagination_complete` or leaking a partial dependent list. Native PHP7.4/8.3 fixture `tests/t35-future24-guardian-paging-and-stale-queue-regressions.php` uses actual methods, test runner/no-orphan gate retained. Existing rule and privacy patches preserved. Current repository source 1.2.16 (schema source version unchanged); exact installed Hostinger plugin and DB/migration, staging user IDOR, other canceled peer entries, backups, Founder approval and live re-test remain UNVERIFIED. This is neither merged nor deployed.
