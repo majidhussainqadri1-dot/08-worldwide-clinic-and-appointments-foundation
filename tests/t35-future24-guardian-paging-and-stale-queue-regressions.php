@@ -25,6 +25,7 @@ final class T35_WPDB {
     public $queue_reads = 0;
     public $arrival = array( 'id' => 1, 'appointment_id' => 51, 'created_at' => '2026-10-14 00:10:00' );
     public $ahead = '2';
+    public $last_ahead_sql = '';
     public $fail_arrival = false;
     public $fail_ahead = false;
     public function prepare( $sql ) { return $sql; }
@@ -34,6 +35,7 @@ final class T35_WPDB {
         return $this->fail_arrival ? null : $this->arrival;
     }
     public function get_var( $sql ) {
+        $this->last_ahead_sql = $sql;
         $this->reads++; $this->queue_reads++;
         $this->last_error = $this->fail_ahead ? 'injected queue SQL error' : '';
         return $this->fail_ahead ? null : $this->ahead;
@@ -121,6 +123,18 @@ foreach ( array( 'confirmed', 'reschedule_pending' ) as $status ) {
     $test( $result['other_patient_identity_exposed'] === false &&
         ! array_key_exists( 'other_patient_refs', $result ), 'queue exposed other patient identifiers' );
 }
+// T36: execute actual queue_position and verify that its aggregate counts only live peers.
+$peer_sql = $GLOBALS['wpdb']->last_ahead_sql;
+$test( false !== strpos( $peer_sql, 'JOIN wp_posts' ) && false !== strpos( $peer_sql, 'JOIN wp_postmeta' ),
+    'queue aggregation still relies solely on stale operational arrivals' );
+$test( false !== strpos( $peer_sql, "status_meta.meta_key='_swc_status'" ) &&
+    false !== strpos( $peer_sql, "status_meta.meta_value IN ('confirmed','accepted','reschedule_pending','reschedule-requested','reschedule_requested')" ),
+    'queue aggregation does not constrain peers to current canonical/legacy live lifecycle states' );
+$test( false !== strpos( $peer_sql, 'COUNT(DISTINCT arrival.appointment_id)' ) &&
+    false !== strpos( $peer_sql, 'arrival.clinic_id=%d' ) &&
+    false !== strpos( $peer_sql, '(arrival.expires_at IS NULL OR arrival.expires_at>%s)' ),
+    'queue projection lost DISTINCT, clinic isolation, or arrival expiry while filtering peers' );
+
 $GLOBALS['wpdb']->arrival = null;
 $r = WCA_Future24::queue_position( $ref, 77 );
 $test( is_wp_error( $r ) && $r->code === 'wca_queue_not_arrived',
