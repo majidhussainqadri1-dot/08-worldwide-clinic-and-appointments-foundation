@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Outcome Integration Candidate
 
+> **CURRENT T36 repository review (15 October 2026):** This draft candidate is based on unmerged PR #26, includes the independent FUT04/FUT23 fixes from PR #25, and adds a FUT16 stale-peer-count correction. The four T36 frozen ledgers cover 40 scoped source-anchor screens, **not 40 full WordPress/browser/DB end-to-end tests**. Exact-HEAD CI/package, staging DB, installed plugin/dependencies, migrations, Founder approval, deployment and live parity must be verified separately. Prior T26 wording below is historical test-fixture text, not the current T36 review identity.
+
+
 Runtime candidate: **1.2.16**. File08 post-commit nonclinical owner event for optional File14 analytics; source-only pending staging/live parity. No appointment outcome guarantee.
 
 # File 08 — Worldwide Clinic and Appointments
@@ -16,7 +19,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
 - Package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.15**
+- Runtime candidate: **1.2.16**
 - Core schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
 - Future24 additive schema/contract: **1.1.0**
