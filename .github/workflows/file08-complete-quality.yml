@@ -23,10 +23,20 @@ jobs:
         php: ['7.4', '8.3']
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: '${{ github.event.pull_request.head.sha || github.sha }}'
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '${{ matrix.php }}', coverage: none, extensions: zip}
       - name: PHP syntax
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: T36 forty entire-runtime source/requirement and PHP syntax passes
+        run: php tools/t36-forty-runtime-source-audit.php
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: file08-t36-40-source-audit-php-${{ matrix.php }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/t36-forty-runtime-source-review.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Master-plan, security and state tests
         run: php tests/run-all.php
       - name: JavaScript syntax
