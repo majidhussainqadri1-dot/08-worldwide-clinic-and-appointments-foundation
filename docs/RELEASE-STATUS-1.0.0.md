@@ -1,3 +1,5 @@
+> **CURRENT T42 (17 October 2026):** Forty original-plan/cross-owner source checks; strict FUT01 waiting-list no-auto-book replay and FUT19 File17 room consent/TTL replay guards are proposed in a **Draft** GitHub candidate. Earlier T41–T36 reports are historical repository evidence, NOT live-state truth. Exact-head PHP CI, reproducible package, installed File00/File09/File17/19 contracts, actual schema/migrations, staging workflows, backup/restore and founder-approved live re-test remain separate acceptance gates.
+
 > **CURRENT T41 (16 October 2026):** Forty fresh File08 original-plan/cross-file source requirement scopes and two FUT05 group-member privacy/canonical-identity corrections are on the T41 Draft branch. Historical T40/T39/T38 evidence below refers only to earlier source candidates. Exact-HEAD CI/package, installed File00 subject provider and File09 verification, real database/migrations, File17 companion integration, staging backup/restore and Live acceptance remain separate gates. No production deployment claimed.
 
 > **CURRENT T40 (16 October 2026):** Forty File08 FR/NFR/Future24 plan-to-code screens and FUT22 calendar owner/reconciliation hardening are on the T40 Draft candidate. Historical T39/T38/T37/T36 green evidence below is repository-only. Final exact-head QA, independent package, installed File00/09 counterpart, staging DB/migrations, backup/restore, Founder acceptance and Live parity remain separate gates; no live resolution claim.
@@ -24,7 +26,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
-- Current review branch: `review/file08-t41-forty-group-privacy-2026-10-16`
+- Current review branch: `review/file08-t42-forty-crossplan-waitlist-room-2026-10-17`
 - Current review cycle: **T26 closure cycle**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25, T22 and T21: closed; their recorded exact heads/runs are provenance only after later commits.
