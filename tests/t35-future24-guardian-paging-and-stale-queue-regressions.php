@@ -26,10 +26,12 @@ final class T35_WPDB {
     public $arrival = array( 'id' => 1, 'appointment_id' => 51, 'created_at' => '2026-10-14 00:10:00' );
     public $ahead = '2';
     public $last_ahead_sql = '';
+    public $last_arrival_sql = '';
     public $fail_arrival = false;
     public $fail_ahead = false;
     public function prepare( $sql ) { return $sql; }
     public function get_row( $sql, $shape = null ) {
+        $this->last_arrival_sql = $sql;
         $this->reads++; $this->queue_reads++;
         $this->last_error = $this->fail_arrival ? 'injected arrival SQL error' : '';
         return $this->fail_arrival ? null : $this->arrival;
@@ -134,6 +136,21 @@ $test( false !== strpos( $peer_sql, 'COUNT(DISTINCT arrival.appointment_id)' ) &
     false !== strpos( $peer_sql, 'arrival.clinic_id=%d' ) &&
     false !== strpos( $peer_sql, '(arrival.expires_at IS NULL OR arrival.expires_at>%s)' ),
     'queue projection lost DISTINCT, clinic isolation, or arrival expiry while filtering peers' );
+
+// T39 R36: historical arrival clinic alone must never authorize the live queue.
+// Verify that queue_position's actual SQL gates both subject and peers on the
+// appointment's CURRENT canonical clinic metadata.
+$test( false !== strpos( $peer_sql, "clinic_meta.meta_key='_swc_clinic_id'" ) &&
+    false !== strpos( $peer_sql, 'clinic_meta.meta_value=%s' ),
+    'peer queue can still count appointments moved to another clinic' );
+$test( false !== strpos( $GLOBALS['wpdb']->last_arrival_sql, 'AND clinic_id=%d' ),
+    'subject queue lookup still reuses an operational arrival from a prior clinic' );
+$t39_src = file_get_contents( dirname( __DIR__ ) . '/includes/class-wca-future24.php' );
+$t39_start = strpos( $t39_src, 'public static function arrive(' );
+$t39_end = strpos( $t39_src, 'public static function queue_position(', $t39_start );
+$t39_arrive = substr( $t39_src, $t39_start, $t39_end - $t39_start );
+$test( false !== strpos( $t39_arrive, "AND clinic_id=%d" ),
+    'arrival deduplication can replay an expired-clinic operational signal after clinic transfer' );
 
 $GLOBALS['wpdb']->arrival = null;
 $r = WCA_Future24::queue_position( $ref, 77 );
