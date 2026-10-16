@@ -2023,15 +2023,23 @@ self::release_semantic_lock( $lock );
 		}
 	}
 
+	/**
+	 * Resolve a File00 canonical platform UUID through the File00-owned
+	 * internal resolver only. Direct reads of File00 private usermeta are not a
+	 * supported integration contract, even for legacy compatibility.
+	 */
 	private static function subject_user_id( $subject ) {
 		$subject = strtolower( sanitize_text_field( $subject ) );
-		if ( function_exists( 'smc_get_user_id_by_subject_uuid' ) ) {
-			try { $raw = smc_get_user_id_by_subject_uuid( $subject ); } catch ( Throwable $error ) { return 0; }
-			if ( is_wp_error( $raw ) || ! is_scalar( $raw ) ) { return 0; }
-			return absint( $raw );
-		}
-		$users = get_users( array( 'fields' => 'ids', 'number' => 2, 'meta_key' => '_smc_subject_uuid', 'meta_value' => $subject ) );
-		return 1 === count( $users ) ? absint( $users[0] ) : 0;
+		if ( ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $subject )
+			|| ! function_exists( 'smc_get_user_id_by_subject_uuid' )
+			|| ! class_exists( 'WCA_Authorization' ) ) { return 0; }
+		try { $raw = smc_get_user_id_by_subject_uuid( $subject ); }
+		catch ( Throwable $error ) { return 0; }
+		if ( ! is_int( $raw ) || $raw < 1 ) { return 0; }
+		// Independently verify the forward canonical identity; an erroneous
+		// adapter return must never silently grant a support role to another user.
+		$current = WCA_Authorization::subject_uuid( $raw );
+		return is_string( $current ) && hash_equals( $subject, $current ) ? $raw : 0;
 	}
 
 	/* FUT-20 */
