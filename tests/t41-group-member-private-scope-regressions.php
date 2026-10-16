@@ -31,8 +31,8 @@ $check = static function( $actual, $label, $should_pass = false ) {
     }
     return $count;
 };
-$call = static function($r,$s=$session,$id=77,$ref=$session_ref)use($validator) {
-    return $validator->invoke(null,$r,$s,$id,$ref);
+$call = static function($r,$s=null,$id=77,$ref=null)use($validator,$session,$session_ref) {
+    return $validator->invoke(null,$r,$s === null ? $session : $s,$id,$ref === null ? $session_ref : $ref);
 };
 $count=$check($call($row),'valid patient private group-member',true);
 foreach(array('group_left','group_cancelled') as $status) {
