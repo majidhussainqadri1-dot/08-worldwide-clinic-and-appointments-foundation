@@ -13,6 +13,7 @@ final class WCA_Plan_Guard {
     public static function practitioner_ref($id){return '00000000-0000-4000-8000-000000000077';}
 }
 final class SWC_Doctor_Authority { public static function is_eligible($id){return (int)$id===77;} }
+final class WCA_Repository { public static function now(){return gmdate('Y-m-d H:i:s');} }
 final class T40_DB {
     public $prefix='wp_';public $last_error='';public $reads=0;public $fail=false;
     public function prepare($query){return $query;}
