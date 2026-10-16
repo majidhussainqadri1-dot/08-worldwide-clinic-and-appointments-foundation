@@ -41,7 +41,7 @@ $checks = array(
     array( "NFR010", "includes/class-wca-service.php", array( "function valid_timezone(", "function valid_currency(" ) ),
     array( "FUT01+02", "includes/class-wca-future24.php", array( "function join_waitlist(", "function save_windows(" ) ),
     array( "FUT03+04", "includes/class-wca-future24.php", array( "function create_series(", "verified_resource_reservation_scope(" ) ),
-    array( "FUT05+06", "includes/class-wca-future24.php", array( "function join_group_session(", "function leave_group_session(", "function verified_group_member_scope(", "verified_group_member_scope( $existing_member", "verified_group_member_scope( $member", "function safe_reschedule(" ) ),
+    array( "FUT05+06", "includes/class-wca-future24.php", array( "function join_group_session(", "function leave_group_session(", "function verified_group_member_scope(", 'verified_group_member_scope( $existing_member', 'verified_group_member_scope( $member', "function safe_reschedule(" ) ),
     array( "FUT07+08", "includes/class-wca-future24.php", array( "function set_buffers(", "function heatmap(" ) ),
     array( "FUT09+10", "includes/class-wca-future24.php", array( "function advisor(", "function no_show_forecast(" ) ),
     array( "FUT11+12", "includes/class-wca-future24.php", array( "function save_questionnaire(", "function readiness(" ) ),
