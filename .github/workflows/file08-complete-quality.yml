@@ -6,6 +6,7 @@ on:
       # Exact-HEAD QA only; T35 is a stacked draft, not an installed release.
       - review/file08-t35-40-check-guardian-queue-currentness-2026-10-14
       - review/file08-t37-forty-crossplan-semantic-2026-10-15
+      - review/file08-t38-forty-plan-crossowner-2026-10-16
   pull_request:
     branches: [main]
 permissions:
@@ -30,6 +31,8 @@ jobs:
         with: {php-version: '${{ matrix.php }}', coverage: none, extensions: zip}
       - name: PHP syntax
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: T38 FUT18 identity/replay negative preflight
+        run: php tests/t38-active-participant-identity-replay-regressions.php
       - name: T36 forty entire-runtime source/requirement and PHP syntax passes
         run: php tools/t36-forty-runtime-source-audit.php
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
