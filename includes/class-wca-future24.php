@@ -1057,6 +1057,40 @@ self::release_semantic_lock( $lock );
 		), $actor );
 	}
 
+	/**
+	 * File08 owner-only member revalidation for both idempotent group JOIN and
+	 * LEAVE. File00 supplies current canonical identity; File17 does not own
+	 * group scheduling. A corrupt/stale member is never rewritten as success.
+	 *
+	 * @return true|WP_Error
+	 */
+	private static function verified_group_member_scope( $row, $session, $patient_user_id, $session_ref ) {
+		$patient_user_id = absint( $patient_user_id );
+		$member_ref = $patient_user_id && class_exists( 'WCA_Authorization' )
+			? WCA_Authorization::subject_uuid( $patient_user_id ) : '';
+		$raw = is_array( $row ) && isset( $row['payload_json'] ) && is_string( $row['payload_json'] )
+			? $row['payload_json'] : '';
+		$root = json_decode( $raw );
+		$payload = json_decode( $raw, true );
+		$expected_parent = strtolower( sanitize_text_field( (string) $session_ref ) );
+		$stored_member_ref = is_array( $payload ) ? ( $payload['member_ref'] ?? null ) : null;
+		$guardian_id = is_array( $payload ) ? ( $payload['guardian_user_id'] ?? null ) : null;
+		if ( ! is_array( $row ) || ! is_array( $session ) || ! $patient_user_id
+			|| ! is_string( $member_ref ) || ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $member_ref )
+			|| ! is_object( $root ) || ! is_array( $payload )
+			|| ! is_string( $stored_member_ref ) || ! hash_equals( $member_ref, $stored_member_ref )
+			|| ! array_key_exists( 'peer_identity_visible', $payload ) || false !== $payload['peer_identity_visible']
+			|| ! is_int( $guardian_id ) || $guardian_id < 0
+			|| absint( $row['subject_user_id'] ?? 0 ) !== $patient_user_id
+			|| absint( $row['clinic_id'] ?? 0 ) !== absint( $session['clinic_id'] ?? 0 )
+			|| ! absint( $session['clinic_id'] ?? 0 )
+			|| ! is_string( $row['parent_ref'] ?? null ) || ! hash_equals( $expected_parent, (string) $row['parent_ref'] )
+			|| ! in_array( (string) ( $row['status'] ?? '' ), array( 'group_member', 'group_left', 'group_cancelled' ), true ) ) {
+			return new WP_Error( 'wca_group_member_scope_corrupt', __( 'Stored group-member identity or privacy scope cannot be verified safely; no membership was changed.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return true;
+	}
+
 	public static function join_group_session( $session_ref, $data = array(), $actor = 0 ) {
 		global $wpdb;
 		$actor = absint( $actor ?: get_current_user_id() );
@@ -1091,7 +1125,11 @@ self::release_semantic_lock( $lock );
 		try {
 			$existing_member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status='group_member' LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $existing_member && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_membership_read_failed', __( 'Current group membership could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			if ( $existing_member ) { return self::public_record( $existing_member ); }
+			if ( $existing_member ) {
+				$member_scope = self::verified_group_member_scope( $existing_member, $session, $context['patient_user_id'], $session_ref );
+				if ( is_wp_error( $member_scope ) ) { return $member_scope; }
+				return self::public_record( $existing_member );
+			}
 			$count_raw = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND status='group_member'", strtolower( $session_ref ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $count_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_capacity_read_failed', __( 'Current group capacity could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			$count = (int) $count_raw;
@@ -1129,6 +1167,8 @@ self::release_semantic_lock( $lock );
 			$member = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-05' AND parent_ref=%s AND subject_user_id=%d AND status IN ('group_member','group_left','group_cancelled') ORDER BY id DESC LIMIT 1", strtolower( $session_ref ), $context['patient_user_id'] ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $member && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_group_leave_read_failed', __( 'Current group membership could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( ! $member ) { return array( 'session_ref' => strtolower( $session_ref ), 'left' => true, 'already_absent' => true ); }
+			$member_scope = self::verified_group_member_scope( $member, $session, $context['patient_user_id'], $session_ref );
+			if ( is_wp_error( $member_scope ) ) { return $member_scope; }
 			if ( in_array( (string) $member['status'], array( 'group_left', 'group_cancelled' ), true ) ) { return self::public_record( $member ); }
 			$result = WCA_Repository::transaction( function () use ( $table, $member, $session_ref, $context ) {
 				global $wpdb;

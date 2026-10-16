@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Integration Review
 
+> **CURRENT T41 (16 October 2026):** Forty fresh File08 original-plan/cross-file source requirement scopes and two FUT05 group-member privacy/canonical-identity corrections are on the T41 Draft branch. Historical T40/T39/T38 evidence below refers only to earlier source candidates. Exact-HEAD CI/package, installed File00 subject provider and File09 verification, real database/migrations, File17 companion integration, staging backup/restore and Live acceptance remain separate gates. No production deployment claimed.
+
+
 > **CURRENT T40 (16 October 2026):** Forty File08 FR/NFR/Future24 plan-to-code screens and FUT22 calendar owner/reconciliation hardening are on the T40 Draft candidate. Historical T39/T38/T37/T36 green evidence below is repository-only. Final exact-head QA, independent package, installed File00/09 counterpart, staging DB/migrations, backup/restore, Founder acceptance and Live parity remain separate gates; no live resolution claim.
 
 
@@ -18,7 +21,7 @@ Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, r
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t40-forty-reconciliation-safety-2026-10-16`
+- Working review branch: `review/file08-t41-forty-group-privacy-2026-10-16`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
