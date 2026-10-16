@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Outcome Integration Candidate
 
+> **CURRENT T40 (16 October 2026):** Forty File08 FR/NFR/Future24 plan-to-code screens and FUT22 calendar owner/reconciliation hardening are on the T40 Draft candidate. Historical T39/T38/T37/T36 green evidence below is repository-only. Final exact-head QA, independent package, installed File00/09 counterpart, staging DB/migrations, backup/restore, Founder acceptance and Live parity remain separate gates; no live resolution claim.
+
+
 > **CURRENT T39 (16 October 2026):** Forty fresh plan/cross-owner source checks, stale-clinic arrival queue and explicit FUT18 role validation corrections are on the T39 DRAFT candidate. The T38/T37/T36 records below are historical source-level evidence only. Exact-head GitHub CI/package, File00 installed contract, staging database/migrations, companion runtime parity, backup/restore, Founder approval, deployment and live re-test are distinct gates; no operational/live claim.
 
 
@@ -17,7 +20,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t39-forty-crossplan-safety-2026-10-16`
+- Repository review branch: `review/file08-t40-forty-reconciliation-safety-2026-10-16`
 - Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.

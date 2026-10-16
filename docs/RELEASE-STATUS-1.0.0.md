@@ -1,3 +1,5 @@
+> **CURRENT T40 (16 October 2026):** Forty File08 FR/NFR/Future24 plan-to-code screens and FUT22 calendar owner/reconciliation hardening are on the T40 Draft candidate. Historical T39/T38/T37/T36 green evidence below is repository-only. Final exact-head QA, independent package, installed File00/09 counterpart, staging DB/migrations, backup/restore, Founder acceptance and Live parity remain separate gates; no live resolution claim.
+
 > **CURRENT T39 (16 October 2026):** Forty fresh plan/cross-owner source checks, stale-clinic arrival queue and explicit FUT18 role validation corrections are on the T39 DRAFT candidate. The T38/T37/T36 records below are historical source-level evidence only. Exact-head GitHub CI/package, File00 installed contract, staging database/migrations, companion runtime parity, backup/restore, Founder approval, deployment and live re-test are distinct gates; no operational/live claim.
 
 > **T38 (16 October 2026):** Forty plan-derived source/cross-owner screens plus two FUT18 File00 subject-identity/idempotent-replay corrections are under review on the T38 branch. Exact-head PHP QA and package, cross-repository runtime integration, DB/schema/migration, staging and live acceptance are separate gates. Earlier T37/T36 status below is historical evidence only, not current deployed truth.
@@ -20,7 +22,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
-- Current review branch: `review/file08-t39-forty-crossplan-safety-2026-10-16`
+- Current review branch: `review/file08-t40-forty-reconciliation-safety-2026-10-16`
 - Current review cycle: **T26 closure cycle**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25, T22 and T21: closed; their recorded exact heads/runs are provenance only after later commits.

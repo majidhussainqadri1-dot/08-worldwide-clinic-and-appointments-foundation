@@ -8,6 +8,7 @@ on:
       - review/file08-t37-forty-crossplan-semantic-2026-10-15
       - review/file08-t38-forty-plan-crossowner-2026-10-16
       - review/file08-t39-forty-crossplan-safety-2026-10-16
+      - review/file08-t40-forty-reconciliation-safety-2026-10-16
   pull_request:
     branches: [main]
 permissions:
@@ -54,6 +55,12 @@ jobs:
         with:
           name: file08-t39-40-plan-source-php-${{ matrix.php }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: build/t39-forty-crossplan-review.json
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: file08-t40-40-plan-source-php-${{ matrix.php }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/t40-forty-crossplan-review.json
           if-no-files-found: error
           retention-days: 30
       - name: JavaScript syntax
