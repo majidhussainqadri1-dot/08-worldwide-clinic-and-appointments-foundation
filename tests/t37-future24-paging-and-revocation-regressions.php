@@ -40,6 +40,12 @@ final class WP_Query {
         }
     }
 }
+// File00 subject contract fixture is required after T38's strict persisted identity binding.
+final class WCA_Authorization {
+    public static function subject_uuid( $user_id ) {
+        return (int) $user_id === 77 ? '00000000-0000-4000-8000-000000000077' : '';
+    }
+}
 require dirname(__DIR__) . '/includes/class-wca-future24.php';
 $checks=0;
 $test = static function($bool, $message) use (&$checks) {
