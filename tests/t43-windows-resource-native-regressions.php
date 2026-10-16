@@ -30,7 +30,7 @@ final class T43_DB {
         return array('id'=>1,'clinic_id'=>51,'status'=>'resource_active','capacity'=>2,
             'payload_json'=>json_encode(array('resource_type'=>'room','branch_ref'=>'')));
     }
-    public function get_var($q){$this->lock_count++;return 1;}
+    public function get_var($q){if(strpos($q,'GET_LOCK')!==false || strpos($q,'RELEASE_LOCK')!==false){$this->lock_count++;return 1;}return null;}
     public function insert($table,$data){$this->write_count++;return 1;}
     public function update($table,$data,$where){$this->write_count++;return 1;}
 }
