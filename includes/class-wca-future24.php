@@ -1906,7 +1906,19 @@ self::release_semantic_lock( $lock );
 		try{
 			$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-18' AND appointment_id=%d AND subject_user_id=%d AND status='participant_active' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,$subject_user_id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if(null===$existing && ''!==(string)$wpdb->last_error){return new WP_Error('wca_support_participant_read_failed',__('Current support-participant state could not be verified safely.','worldwide-clinic-appointments'),array('status'=>503));}
-			if($existing){$payload=json_decode((string)$existing['payload_json'],true); if(is_array($payload)&&sanitize_key($payload['role'] ?? '')===$role){return self::public_record($existing);} return new WP_Error('wca_support_participant_conflict',__('This participant already has an active appointment role.','worldwide-clinic-appointments'),array('status'=>409));}
+			if($existing){
+				// Do not treat matching role text as idempotent success when
+				// persisted participant identity/consent scope is broken or reassigned.
+				$payload = self::verified_support_participant_payload( $existing );
+				if ( is_wp_error( $payload ) ) { return $payload; }
+				if ( absint( $existing['appointment_id'] ?? 0 ) === $id
+					&& absint( $existing['subject_user_id'] ?? 0 ) === $subject_user_id
+					&& hash_equals( $subject, $payload['subject_uuid'] )
+					&& $payload['role'] === $role ) {
+					return self::public_record($existing);
+				}
+				return new WP_Error('wca_support_participant_conflict',__('This participant already has an active appointment role.','worldwide-clinic-appointments'),array('status'=>409));
+			}
 			$end=self::utc(SWC_Helpers::meta($id,'appointment_end_utc','')); $expiry=$end?min(strtotime($end.' UTC')+DAY_IN_SECONDS,time()+30*DAY_IN_SECONDS):time()+7*DAY_IN_SECONDS;
 			return WCA_Repository::transaction( function () use ( $id, $subject_user_id, $expiry, $subject, $role, $actor_id, $appointment_ref ) {
 				$result=self::put_record('F08-FUT-18',array('appointment_id'=>$id,'clinic_id'=>absint(SWC_Helpers::meta($id,'clinic_id',0)),'subject_user_id'=>$subject_user_id,'status'=>'participant_active','expires_at'=>gmdate('Y-m-d H:i:s',$expiry),'payload'=>array('subject_uuid'=>$subject,'role'=>$role,'appointment_bound'=>true,'revocable'=>true,'clinical_write_authority'=>false)),$actor_id);
@@ -1939,6 +1951,14 @@ self::release_semantic_lock( $lock );
 			|| false !== ( $payload['clinical_write_authority'] ?? null )
 			|| ! absint( $row['subject_user_id'] ?? 0 ) ) {
 			return new WP_Error( 'wca_support_participant_payload_corrupt', __( 'The stored support participant role cannot be verified safely; no change was made.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		// File00 canonical subject is authoritative. A syntactically valid but
+		// mismatched stored UUID must not identify a different File17 participant.
+		// Fail closed if subject provider is unavailable or the user's subject changed.
+		$current_subject = class_exists( 'WCA_Authorization' )
+			? WCA_Authorization::subject_uuid( absint( $row['subject_user_id'] ) ) : '';
+		if ( ! is_string( $current_subject ) || '' === $current_subject || ! hash_equals( $current_subject, $subject ) ) {
+			return new WP_Error( 'wca_support_participant_payload_corrupt', __( 'The stored participant identity no longer matches the canonical member account; no change was made.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
 		}
 		return array( 'subject_uuid' => $subject, 'role' => $role );
 	}
@@ -2003,15 +2023,23 @@ self::release_semantic_lock( $lock );
 		}
 	}
 
+	/**
+	 * Resolve a File00 canonical platform UUID through the File00-owned
+	 * internal resolver only. Direct reads of File00 private usermeta are not a
+	 * supported integration contract, even for legacy compatibility.
+	 */
 	private static function subject_user_id( $subject ) {
 		$subject = strtolower( sanitize_text_field( $subject ) );
-		if ( function_exists( 'smc_get_user_id_by_subject_uuid' ) ) {
-			try { $raw = smc_get_user_id_by_subject_uuid( $subject ); } catch ( Throwable $error ) { return 0; }
-			if ( is_wp_error( $raw ) || ! is_scalar( $raw ) ) { return 0; }
-			return absint( $raw );
-		}
-		$users = get_users( array( 'fields' => 'ids', 'number' => 2, 'meta_key' => '_smc_subject_uuid', 'meta_value' => $subject ) );
-		return 1 === count( $users ) ? absint( $users[0] ) : 0;
+		if ( ! preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $subject )
+			|| ! function_exists( 'smc_get_user_id_by_subject_uuid' )
+			|| ! class_exists( 'WCA_Authorization' ) ) { return 0; }
+		try { $raw = smc_get_user_id_by_subject_uuid( $subject ); }
+		catch ( Throwable $error ) { return 0; }
+		if ( ! is_int( $raw ) || $raw < 1 ) { return 0; }
+		// Independently verify the forward canonical identity; an erroneous
+		// adapter return must never silently grant a support role to another user.
+		$current = WCA_Authorization::subject_uuid( $raw );
+		return is_string( $current ) && hash_equals( $subject, $current ) ? $raw : 0;
 	}
 
 	/* FUT-20 */
