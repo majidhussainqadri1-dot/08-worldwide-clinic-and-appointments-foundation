@@ -7,6 +7,7 @@ on:
       - review/file08-t35-40-check-guardian-queue-currentness-2026-10-14
       - review/file08-t37-forty-crossplan-semantic-2026-10-15
       - review/file08-t38-forty-plan-crossowner-2026-10-16
+      - review/file08-t39-forty-crossplan-safety-2026-10-16
   pull_request:
     branches: [main]
 permissions:
