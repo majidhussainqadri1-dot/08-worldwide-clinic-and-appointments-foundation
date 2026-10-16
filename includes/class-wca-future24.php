@@ -794,6 +794,34 @@ final class WCA_Future24 {
 	}
 
 	/* FUT-01 */
+	/**
+	 * FUT01: require current patient, guardian, search and no-auto-book scope
+	 * before returning any prior waitlist enrollment as idempotent success.
+	 * @return true|WP_Error
+	 */
+	private static function verified_waitlist_replay_scope( $row, $clinic_id, $context, $fingerprint, $service_ref, $date_from, $date_to, $timezone ) {
+		$raw = is_array( $row ) && is_string( $row['payload_json'] ?? null ) ? $row['payload_json'] : '';
+		$root = json_decode( $raw );
+		$payload = json_decode( $raw, true );
+		$guardian_id = is_array( $payload ) ? ( $payload['guardian_user_id'] ?? null ) : null;
+		$expires = is_array( $row ) && is_string( $row['expires_at'] ?? null ) ? strtotime( $row['expires_at'] . ' UTC' ) : false;
+		if ( ! is_array( $row ) || ! is_array( $context ) || ! is_object( $root ) || ! is_array( $payload )
+			|| absint( $row['clinic_id'] ?? 0 ) !== absint( $clinic_id )
+			|| absint( $row['subject_user_id'] ?? 0 ) !== absint( $context['patient_user_id'] ?? 0 )
+			|| 'waiting' !== ( $row['status'] ?? null )
+			|| ! is_string( $row['parent_ref'] ?? null ) || ! hash_equals( $fingerprint, $row['parent_ref'] )
+			|| ! is_int( $guardian_id ) || $guardian_id !== absint( $context['guardian_user_id'] ?? 0 )
+			|| ! is_string( $payload['service_ref'] ?? null ) || ! hash_equals( $service_ref, $payload['service_ref'] )
+			|| ! is_string( $payload['date_from'] ?? null ) || ! hash_equals( $date_from, $payload['date_from'] )
+			|| ! is_string( $payload['date_to'] ?? null ) || ! hash_equals( $date_to, $payload['date_to'] )
+			|| ! is_string( $payload['timezone'] ?? null ) || ! hash_equals( $timezone, $payload['timezone'] )
+			|| ! array_key_exists( 'auto_book', $payload ) || false !== $payload['auto_book']
+			|| false === $expires || $expires <= time() ) {
+			return new WP_Error( 'wca_waitlist_replay_scope_corrupt', __( 'Stored waitlist identity, expiry or no-auto-booking scope cannot be verified; no enrollment was changed.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return true;
+	}
+
 	public static function join_waitlist( $data, $actor = 0 ) {
 		global $wpdb;
 		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
@@ -819,7 +847,11 @@ final class WCA_Future24 {
 		try {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_waitlist_dedupe_read_failed', __( 'Current waitlist state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			if ( $existing ) { return self::public_record( $existing ); }
+			if ( $existing ) {
+				$stored_scope = self::verified_waitlist_replay_scope( $existing, $clinic_id, $context, $fingerprint, $service_ref, $date_from, $date_to, $timezone );
+				if ( is_wp_error( $stored_scope ) ) { return $stored_scope; }
+				return self::public_record( $existing );
+			}
 			return self::put_record( 'F08-FUT-01', array(
 				'clinic_id' => $clinic_id,
 				'subject_user_id' => $context['patient_user_id'],
@@ -2047,6 +2079,38 @@ self::release_semantic_lock( $lock );
 	}
 
 	/* FUT-19 */
+	/**
+	 * FUT19: replay an existing room request only while its saved purpose,
+	 * clinic, original requester, live consent and short File17 TTL remain safe.
+	 * @return true|WP_Error
+	 */
+	private static function verified_virtual_room_replay_scope( $row, $appointment_id, $appointment_ref ) {
+		$raw = is_array( $row ) && is_string( $row['payload_json'] ?? null ) ? $row['payload_json'] : '';
+		$root = json_decode( $raw );
+		$payload = json_decode( $raw, true );
+		$owner_user_id = is_array( $row ) ? absint( $row['subject_user_id'] ?? 0 ) : 0;
+		$created = is_array( $row ) && is_string( $row['created_at'] ?? null ) ? strtotime( $row['created_at'] . ' UTC' ) : false;
+		$expires = is_array( $row ) && is_string( $row['expires_at'] ?? null ) ? strtotime( $row['expires_at'] . ' UTC' ) : false;
+		$appointment_ref = strtolower( (string) $appointment_ref );
+		if ( ! is_array( $row ) || ! is_object( $root ) || ! is_array( $payload )
+			|| absint( $row['appointment_id'] ?? 0 ) !== absint( $appointment_id )
+			|| ! absint( $appointment_id )
+			|| ! absint( $row['clinic_id'] ?? 0 )
+			|| absint( $row['clinic_id'] ) !== absint( SWC_Helpers::meta( $appointment_id, 'clinic_id', 0 ) )
+			|| ! $owner_user_id || true !== WCA_Authorization::can_view_appointment( $appointment_id, $owner_user_id )
+			|| 'room_requested' !== ( $row['status'] ?? null )
+			|| ! is_string( $payload['appointment_ref'] ?? null ) || ! hash_equals( $appointment_ref, $payload['appointment_ref'] )
+			|| 'File17' !== ( $payload['transport_owner'] ?? null )
+			|| false !== ( $payload['recording_assumed'] ?? null )
+			|| true !== ( $payload['teleconsult_consent_verified'] ?? null )
+			|| true !== ( $payload['idempotent_request'] ?? null )
+			|| false === $created || false === $expires || $created > time() + MINUTE_IN_SECONDS
+			|| $expires <= time() || $expires <= $created || $expires - $created > HOUR_IN_SECONDS + MINUTE_IN_SECONDS ) {
+			return new WP_Error( 'wca_virtual_room_replay_scope_corrupt', __( 'Saved room request identity, consent or short-lived File17 scope cannot be verified; no request was replayed.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return true;
+	}
+
 	public static function request_virtual_room( $appointment_ref, $actor = 0 ) {
 		global $wpdb;
 		$actor_id=absint($actor?:get_current_user_id()); $id=self::require_appointment($appointment_ref,$actor_id); if(is_wp_error($id)){return $id;}
@@ -2062,7 +2126,11 @@ self::release_semantic_lock( $lock );
 				global $wpdb;
 				$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE feature_id='F08-FUT-19' AND appointment_id=%d AND status='room_requested' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1",$id,WCA_Repository::now()),ARRAY_A); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 				if(null===$existing && ''!==(string)$wpdb->last_error){return new WP_Error('wca_virtual_room_read_failed',__('Current virtual-room request state could not be verified safely.','worldwide-clinic-appointments'),array('status'=>503));}
-				if($existing){return self::public_record($existing);}
+				if($existing){
+					$room_scope = self::verified_virtual_room_replay_scope( $existing, $id, $appointment_ref );
+					if(is_wp_error($room_scope)){return $room_scope;}
+					return self::public_record($existing);
+				}
 				$record=self::put_record('F08-FUT-19',array('appointment_id'=>$id,'clinic_id'=>absint(SWC_Helpers::meta($id,'clinic_id',0)),'subject_user_id'=>$actor_id,'status'=>'room_requested','expires_at'=>gmdate('Y-m-d H:i:s',time()+HOUR_IN_SECONDS),'payload'=>array('appointment_ref'=>strtolower($appointment_ref),'transport_owner'=>'File17','recording_assumed'=>false,'teleconsult_consent_verified'=>true,'idempotent_request'=>true)),$actor_id);
 				if(is_wp_error($record)){return $record;}
 				$queued=WCA_Repository::enqueue('File17.VirtualRoomRequested.v1',strtolower($appointment_ref),array('appointment_ref'=>strtolower($appointment_ref),'request_ref'=>$record['public_ref'],'recording_allowed'=>false,'teleconsult_consent_verified'=>true),WCA_Observability::trace_id());
