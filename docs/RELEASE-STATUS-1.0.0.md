@@ -1,3 +1,5 @@
+> **CURRENT T45 (17 October 2026):** New 40-plan/cross-owner source checks and corrections to FUT08 full-slot break overlaps and bounded partial closure availability capacity projections reside only in Draft GitHub source. Previous T44–T36 evidence is repository-level, not installed site. Exact-head PHP CI, reproducible candidate, live WordPress/DB/schema/migrations, installed File00/09/17/19/CF01, staging real-role/DST/capacity tests, backup/restore, Founder acceptance and live re-test are separate gates.
+
 > **CURRENT T44 (17 October 2026):** Forty plan/central/cross-file source reviews and two FUT08 capacity heatmap SQL/degraded-projection hardening changes are in Draft source only. Earlier T43–T36 source CI outcomes are historical; installed File08, File00/09/17/19, WordPress/MySQL/schema/wp_options, migration and live status remain separate, unverified truths. The T44 exact-head CI/package, staging role/DB faults, backup/rollback, founder approval and live re-test are mandatory release gates; no live resolution claim.
 
 > **CURRENT T43 (17 October 2026):** Forty File08 original-plan/central/companion requirement source reviews plus FUT02 saved flexible-window replay and FUT04 stale resource reservation hardening are on a Draft GitHub candidate. Earlier T42–T36 outcomes remain repository-only evidence. Real PHP7.4/8.3 exact-head CI/package, active plugin/DB/schema/migrations/wp_options, installed File00/File09/File17/File19/CF01 parity, backup/restore, staging and Founder-approved live re-test are independent acceptance gates. No live fix claim.
@@ -30,7 +32,7 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - Public Clinic Contract: **1.1.0**
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
-- Current review branch: `review/file08-t44-heatmap-source-integrity-2026-10-17`
+- Current review branch: `review/file08-t45-heatmap-slot-closure-parity-2026-10-17`
 - Current review cycle: **T26 closure cycle**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25, T22 and T21: closed; their recorded exact heads/runs are provenance only after later commits.
