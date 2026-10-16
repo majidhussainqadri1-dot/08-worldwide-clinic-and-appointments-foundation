@@ -2100,6 +2100,11 @@ self::release_semantic_lock( $lock );
 
 	public static function save_verified_external_busy( $doctor_id, $provider, $event_id, $window ) {
 		$doctor_id = absint( $doctor_id ); $provider = sanitize_key( (string) $provider ); $event_id = sanitize_text_field( (string) $event_id );
+		// Reconciliation must be attributable to a genuine provider and opaque event.
+		// Never persist an empty/oversized event hash which could alias unrelated updates.
+		if ( '' === $provider || '' === trim( $event_id ) || strlen( $provider ) > 64 || strlen( $event_id ) > 256 ) {
+			return new WP_Error( 'wca_external_busy_provider_provenance', __( 'A bounded calendar provider and event identity are required for verified reconciliation.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
 		if ( ! $doctor_id || ! SWC_Doctor_Authority::is_eligible( $doctor_id ) || ! is_array( $window ) ) { return new WP_Error( 'wca_external_busy_verified_scope', __( 'Verified external calendar window is not bound to an eligible practitioner.', 'worldwide-clinic-appointments' ), array( 'status' => 403 ) ); }
 		$start = self::utc( $window['start_utc'] ?? '' ); $end = self::utc( $window['end_utc'] ?? '' );
 		if ( ! $start || ! $end || strtotime( $end . ' UTC' ) <= strtotime( $start . ' UTC' ) || strtotime( $end . ' UTC' ) - strtotime( $start . ' UTC' ) > 14 * DAY_IN_SECONDS || strtotime( $start . ' UTC' ) < time() - DAY_IN_SECONDS || strtotime( $start . ' UTC' ) > time() + 180 * DAY_IN_SECONDS ) { return new WP_Error( 'wca_external_busy_verified_window', __( 'Verified external calendar busy window is invalid or outside the bounded synchronization horizon.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
@@ -2133,7 +2138,7 @@ self::release_semantic_lock( $lock );
 	}
 
 	public static function external_busy_conflict( $practitioner_ref, $start, $end ) {
-		global $wpdb; $doctor_id=WCA_Plan_Guard::practitioner_id($practitioner_ref); if(!$doctor_id){return false;} $start=self::utc($start); $end=self::utc($end); if(!$start||!$end||strtotime($end.' UTC')<=strtotime($start.' UTC')){return new WP_Error('wca_external_busy_time_invalid',__('External calendar conflict window is invalid.','worldwide-clinic-appointments'),array('status'=>400));} $table=self::tables()['records'];
+		global $wpdb; $doctor_id=WCA_Plan_Guard::practitioner_id($practitioner_ref); if(!$doctor_id){return new WP_Error('wca_external_busy_practitioner_unavailable',__('Current File09 practitioner identity cannot be verified for calendar conflict checking.','worldwide-clinic-appointments'),array('status'=>503,'degraded'=>true));} $start=self::utc($start); $end=self::utc($end); if(!$start||!$end||strtotime($end.' UTC')<=strtotime($start.' UTC')){return new WP_Error('wca_external_busy_time_invalid',__('External calendar conflict window is invalid.','worldwide-clinic-appointments'),array('status'=>400));} $table=self::tables()['records'];
 		$wpdb->last_error = '';
 		$busy=$wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE feature_id='F08-FUT-22' AND subject_user_id=%d AND status='busy' AND expires_at>%s AND starts_at<%s AND ends_at>%s LIMIT 1",$doctor_id,self::now(),$end,$start));
 		if ( '' !== (string) $wpdb->last_error ) { return new WP_Error('wca_external_busy_read_failed',__('External calendar availability could not be verified safely.','worldwide-clinic-appointments'),array('status'=>503)); }
