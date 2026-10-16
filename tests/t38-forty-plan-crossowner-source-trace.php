@@ -47,7 +47,7 @@ $checks = array(
     array( "FUT11+12", "includes/class-wca-future24.php", array( "function save_questionnaire(", "function readiness(" ) ),
     array( "FUT13+14", "includes/class-wca-future24.php", array( "function verified_prerequisite_rules(", "function family_hub(" ) ),
     array( "FUT15+16", "includes/class-wca-future24.php", array( "function arrive(", "function queue_position(" ) ),
-    array( "FUT17+18", "includes/class-wca-future24.php", array( "function create_disruption(", "verified_support_participant_payload( $existing )", "hash_equals( $current_subject, $subject )" ) ),
+    array( "FUT17+18", "includes/class-wca-future24.php", array( "function create_disruption(", 'verified_support_participant_payload( $existing )', 'hash_equals( $current_subject, $subject )' ) ),
     array( "FUT19+20", "includes/class-wca-future24.php", array( "function request_virtual_room(", "function fhir_projection(" ) ),
     array( "FUT21+22", "includes/class-wca-future24.php", array( "function smart_find(", "function external_busy_conflict(" ) ),
     array( "FUT23+24", "includes/class-wca-future24.php", array( "function mutate_episode(", "function governance_log(", "wca_episode_payload_corrupt" ) ),
