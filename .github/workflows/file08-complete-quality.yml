@@ -12,6 +12,7 @@ on:
       - review/file08-t41-forty-group-privacy-2026-10-16
       - review/file08-t42-forty-crossplan-waitlist-room-2026-10-17
       - review/file08-t43-forty-windows-resource-2026-10-17
+      - review/file08-t44-heatmap-source-integrity-2026-10-17
   pull_request:
     branches: [main]
 permissions:
