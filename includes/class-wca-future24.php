@@ -873,6 +873,37 @@ final class WCA_Future24 {
 	}
 
 	/* FUT-02 */
+	/**
+	 * FUT02: never treat a stored flexible-window row as confirmed patient
+	 * preference unless its exact normalized UTC list and current guardian,
+	 * expiry, clinic, service, timezone and no-auto-book scope still match.
+	 * @return true|WP_Error
+	 */
+	private static function verified_windows_replay_scope( $row, $clinic_id, $context, $fingerprint, $windows, $service_ref, $timezone ) {
+		$raw = is_array( $row ) && is_string( $row['payload_json'] ?? null ) ? $row['payload_json'] : '';
+		$root = json_decode( $raw );
+		$payload = json_decode( $raw, true );
+		$guardian_id = is_array( $payload ) ? ( $payload['guardian_user_id'] ?? null ) : null;
+		$expires = is_array( $row ) && is_string( $row['expires_at'] ?? null ) ? strtotime( $row['expires_at'] . ' UTC' ) : false;
+		if ( ! is_array( $row ) || ! is_array( $context ) || ! is_object( $root ) || ! is_array( $payload )
+			|| ! absint( $clinic_id )
+			|| absint( $row['clinic_id'] ?? 0 ) !== absint( $clinic_id )
+			|| absint( $row['subject_user_id'] ?? 0 ) !== absint( $context['patient_user_id'] ?? 0 )
+			|| 'open' !== ( $row['status'] ?? null )
+			|| ! is_string( $row['parent_ref'] ?? null ) || ! hash_equals( $fingerprint, $row['parent_ref'] )
+			|| ! is_int( $guardian_id ) || $guardian_id !== absint( $context['guardian_user_id'] ?? 0 )
+			|| ! isset( $payload['windows'] ) || ! is_array( $payload['windows'] )
+			|| count( $payload['windows'] ) < 1 || count( $payload['windows'] ) > 12
+			|| array_values( $payload['windows'] ) !== array_values( $windows )
+			|| ! is_string( $payload['service_ref'] ?? null ) || ! hash_equals( $service_ref, $payload['service_ref'] )
+			|| ! is_string( $payload['timezone'] ?? null ) || ! hash_equals( $timezone, $payload['timezone'] )
+			|| ! array_key_exists( 'auto_book', $payload ) || false !== $payload['auto_book']
+			|| false === $expires || $expires <= time() || $expires > time() + 181 * DAY_IN_SECONDS ) {
+			return new WP_Error( 'wca_windows_replay_scope_corrupt', __( 'Stored appointment windows, guardian, expiry or no-auto-booking scope cannot be verified safely; no preference was replayed.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return true;
+	}
+
 	public static function save_windows( $data, $actor = 0 ) {
 		global $wpdb;
 		$clinic_id=self::input_id($data,'clinic_id'); if(is_wp_error($clinic_id)){return $clinic_id;}
@@ -910,7 +941,11 @@ final class WCA_Future24 {
 		try {
 			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-02' AND clinic_id=%d AND subject_user_id=%d AND parent_ref=%s AND status='open' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $clinic_id, $context['patient_user_id'], $fingerprint, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_windows_dedupe_read_failed', __( 'Current flexible-window state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			if ( $existing ) { return self::public_record( $existing ); }
+			if ( $existing ) {
+				$stored_scope = self::verified_windows_replay_scope( $existing, $clinic_id, $context, $fingerprint, $windows, $service_ref, $timezone );
+				if ( is_wp_error( $stored_scope ) ) { return $stored_scope; }
+				return self::public_record( $existing );
+			}
 			return self::put_record( 'F08-FUT-02', array(
 				'clinic_id' => $clinic_id,
 				'subject_user_id' => $context['patient_user_id'],
@@ -1026,6 +1061,16 @@ final class WCA_Future24 {
 		$end = self::utc( isset( $data['end_utc'] ) ? $data['end_utc'] : '' );
 		if ( ! $start || ! $end || $end <= $start || strtotime( $end . ' UTC' ) - strtotime( $start . ' UTC' ) > DAY_IN_SECONDS ) {
 			return new WP_Error( 'wca_resource_window', __( 'A valid UTC resource window of no more than 24 hours is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		// A reservation is a future capacity claim, not a retrospective note.
+		// Reject already-elapsed or unbounded schedules before MySQL locks/writes.
+		$start_ts = strtotime( $start . ' UTC' );
+		$end_ts = strtotime( $end . ' UTC' );
+		$now_ts = time();
+		if ( false === $start_ts || false === $end_ts || $end_ts <= $now_ts
+			|| $start_ts < $now_ts - 5 * MINUTE_IN_SECONDS
+			|| $start_ts > $now_ts + 180 * DAY_IN_SECONDS ) {
+			return new WP_Error( 'wca_resource_window_stale', __( 'A resource reservation requires a current or future bounded UTC time window.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		$appointment_id = 0;
 		$appointment_ref = sanitize_text_field( isset( $data['appointment_ref'] ) ? $data['appointment_ref'] : '' );

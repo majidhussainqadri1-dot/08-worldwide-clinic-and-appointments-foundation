@@ -4,6 +4,7 @@ require __DIR__ . '/bootstrap.php';
 if (!defined('ARRAY_A')) { define('ARRAY_A', 'ARRAY_A'); }
 if (!defined('HOUR_IN_SECONDS')) { define('HOUR_IN_SECONDS', 3600); }
 if (!defined('DAY_IN_SECONDS')) { define('DAY_IN_SECONDS', 86400); }
+if (!defined('MINUTE_IN_SECONDS')) { define('MINUTE_IN_SECONDS', 60); }
 function sanitize_text_field($x){return trim((string)$x);}
 function get_current_user_id(){return 77;}
 function get_posts($args){return array(91);}
@@ -43,7 +44,8 @@ $GLOBALS['t35_actual_branch']='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 require dirname(__DIR__) . '/includes/class-wca-future24.php';
 $resource_ref='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 $base=array('clinic_id'=>7,'status'=>'resource_active','capacity'=>1);
-$input=array('start_utc'=>'2030-01-01 10:00:00','end_utc'=>'2030-01-01 11:00:00');
+$t35_start=time()+7*DAY_IN_SECONDS;
+$input=array('start_utc'=>gmdate('Y-m-d H:i:s',$t35_start),'end_utc'=>gmdate('Y-m-d H:i:s',$t35_start+HOUR_IN_SECONDS));
 $execute=function($payload,$appointment_ref='') use ($base,$resource_ref,$input){
  $GLOBALS['wpdb']->resource=array_merge($base,array('payload_json'=>$payload));
  $GLOBALS['wpdb']->lock_calls=0;

@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Integration Review
 
+> **CURRENT T43 (17 October 2026):** Forty File08 original-plan/central/companion requirement source reviews plus FUT02 saved flexible-window replay and FUT04 stale resource reservation hardening are on a Draft GitHub candidate. Earlier T42–T36 outcomes remain repository-only evidence. Real PHP7.4/8.3 exact-head CI/package, active plugin/DB/schema/migrations/wp_options, installed File00/File09/File17/File19/CF01 parity, backup/restore, staging and Founder-approved live re-test are independent acceptance gates. No live fix claim.
+
+
 > **CURRENT T42 (17 October 2026):** Forty original-plan/cross-owner source checks; strict FUT01 waiting-list no-auto-book replay and FUT19 File17 room consent/TTL replay guards are proposed in a **Draft** GitHub candidate. Earlier T41–T36 reports are historical repository evidence, NOT live-state truth. Exact-head PHP CI, reproducible package, installed File00/File09/File17/19 contracts, actual schema/migrations, staging workflows, backup/restore and founder-approved live re-test remain separate acceptance gates.
 
 
@@ -24,7 +27,7 @@ Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, r
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t42-forty-crossplan-waitlist-room-2026-10-17`
+- Working review branch: `review/file08-t43-forty-windows-resource-2026-10-17`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
