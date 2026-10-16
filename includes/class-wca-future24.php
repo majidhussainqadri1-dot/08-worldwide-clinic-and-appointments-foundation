@@ -1791,15 +1791,17 @@ self::release_semantic_lock( $lock );
 		if ( $now < strtotime( $start . ' UTC' ) - 4 * HOUR_IN_SECONDS || $now > strtotime( $end . ' UTC' ) + 6 * HOUR_IN_SECONDS ) {
 			return new WP_Error( 'wca_arrival_window', __( 'Arrival may only be announced near the scheduled appointment time.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
+		$clinic_id = absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) );
+		if ( ! $clinic_id ) { return new WP_Error( 'wca_arrival_clinic_missing', __( 'The current appointment clinic is unavailable.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$lock = self::semantic_lock( 'arrival', $id );
 		if ( is_wp_error( $lock ) ) { return $lock; }
 		try {
 			$table = self::tables()['records'];
-			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$existing = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND clinic_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $clinic_id, WCA_Repository::now() ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			if ( null === $existing && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_arrival_dedupe_read_failed', __( 'Current arrival state could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 			if ( $existing ) { return self::public_record( $existing ); }
 			return self::put_record( 'F08-FUT-15', array(
-				'clinic_id' => absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) ),
+				'clinic_id' => $clinic_id,
 				'appointment_id' => $id,
 				'subject_user_id' => $actor_id,
 				'status' => 'arrived',
@@ -1825,7 +1827,7 @@ self::release_semantic_lock( $lock );
 		$table = self::tables()['records'];
 		$clinic_id = absint( SWC_Helpers::meta( $id, 'clinic_id', 0 ) );
 		$now = WCA_Repository::now();
-		$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $now ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$current = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE feature_id='F08-FUT-15' AND appointment_id=%d AND clinic_id=%d AND status='arrived' AND (expires_at IS NULL OR expires_at>%s) ORDER BY id DESC LIMIT 1", $id, $clinic_id, $now ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $current && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_read_failed', __( 'Current queue state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		if ( ! $current ) { return new WP_Error( 'wca_queue_not_arrived', __( 'Arrival has not been registered or has expired.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) ); }
 		// Count only peers that are still in a live scheduling state; old arrival records alone are never canonical.
@@ -1833,8 +1835,8 @@ self::release_semantic_lock( $lock );
 		$appointment_posts = $wpdb->prefix . 'posts';
 		$appointment_meta  = $wpdb->prefix . 'postmeta';
 		$ahead_raw = $wpdb->get_var( $wpdb->prepare(
-			"SELECT COUNT(DISTINCT arrival.appointment_id) FROM {$table} arrival INNER JOIN {$appointment_posts} ap ON ap.ID=arrival.appointment_id AND ap.post_type=%s AND ap.post_status IN ('private','publish') INNER JOIN {$appointment_meta} status_meta ON status_meta.post_id=ap.ID AND status_meta.meta_key='_swc_status' AND status_meta.meta_value IN ('confirmed','accepted','reschedule_pending','reschedule-requested','reschedule_requested') WHERE arrival.feature_id='F08-FUT-15' AND arrival.clinic_id=%d AND arrival.status='arrived' AND arrival.created_at<%s AND (arrival.expires_at IS NULL OR arrival.expires_at>%s)",
-			SWC_Helpers::TYPE, $clinic_id, $current['created_at'], $now
+			"SELECT COUNT(DISTINCT arrival.appointment_id) FROM {$table} arrival INNER JOIN {$appointment_posts} ap ON ap.ID=arrival.appointment_id AND ap.post_type=%s AND ap.post_status IN ('private','publish') INNER JOIN {$appointment_meta} status_meta ON status_meta.post_id=ap.ID AND status_meta.meta_key='_swc_status' AND status_meta.meta_value IN ('confirmed','accepted','reschedule_pending','reschedule-requested','reschedule_requested') INNER JOIN {$appointment_meta} clinic_meta ON clinic_meta.post_id=ap.ID AND clinic_meta.meta_key='_swc_clinic_id' AND clinic_meta.meta_value=%s WHERE arrival.feature_id='F08-FUT-15' AND arrival.clinic_id=%d AND arrival.status='arrived' AND arrival.created_at<%s AND (arrival.expires_at IS NULL OR arrival.expires_at>%s)",
+			SWC_Helpers::TYPE, (string) $clinic_id, $clinic_id, $current['created_at'], $now
 		) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		if ( null === $ahead_raw || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_queue_position_read_failed', __( 'Current queue position could not be calculated safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
 		$ahead = (int) $ahead_raw;
@@ -1893,13 +1895,21 @@ self::release_semantic_lock( $lock );
 		$who=WCA_Authorization::appointment_actor($id,$actor_id);
 		if(!in_array($who,array('patient','guardian'),true)){return new WP_Error('wca_support_actor',__('Only the patient or verified guardian may add a support participant.','worldwide-clinic-appointments'),array('status'=>403));}
 		if(!in_array(SWC_Helpers::status($id),array('requested','confirmed','reschedule_pending','checked_in'),true)){return new WP_Error('wca_support_state',__('A support participant cannot be added in this appointment state.','worldwide-clinic-appointments'),array('status'=>409));}
+		// An explicit role is security-relevant consent: never silently turn an
+		// unsupported input such as doctor or admin into support permission.
+		if ( ! is_array( $data ) ) { return new WP_Error( 'wca_support_role_invalid', __( 'Support participant details must be an object.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$role = 'support';
+		if ( array_key_exists( 'role', $data ) ) {
+			if ( ! is_string( $data['role'] ) ) { return new WP_Error( 'wca_support_role_invalid', __( 'An explicit support role must be support or interpreter.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+			$role = sanitize_key( $data['role'] );
+			if ( ! in_array( $role, array( 'support', 'interpreter' ), true ) ) { return new WP_Error( 'wca_support_role_invalid', __( 'Only support or interpreter are permitted appointment roles.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		}
 		$subject=strtolower(sanitize_text_field($data['subject_uuid'] ?? ''));
 		if(!preg_match('/^[0-9a-f-]{36}$/',$subject)){return new WP_Error('wca_support_subject',__('A valid platform participant subject reference is required.','worldwide-clinic-appointments'),array('status'=>400));}
 		$subject_user_id=self::subject_user_id($subject);
 		if(!$subject_user_id){return new WP_Error('wca_support_subject',__('A valid platform participant subject reference is required.','worldwide-clinic-appointments'),array('status'=>400));}
 		$subject_claims=WCA_Authorization::claims($subject_user_id);
 		if(is_wp_error($subject_claims)){return new WP_Error('wca_support_subject_ineligible',__('The selected support participant is not currently eligible.','worldwide-clinic-appointments'),array('status'=>409));}
-		$role=sanitize_key($data['role'] ?? 'support'); if(!in_array($role,array('support','interpreter'),true)){$role='support';}
 		$table=self::tables()['records'];
 		$lock=self::semantic_lock('support-participant',$id.'|'.$subject_user_id);
 		if(is_wp_error($lock)){return $lock;}
