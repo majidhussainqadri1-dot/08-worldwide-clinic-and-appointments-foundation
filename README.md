@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Outcome Integration Candidate
 
+> **CURRENT T44 (17 October 2026):** Forty plan/central/cross-file source reviews and two FUT08 capacity heatmap SQL/degraded-projection hardening changes are in Draft source only. Earlier T43–T36 source CI outcomes are historical; installed File08, File00/09/17/19, WordPress/MySQL/schema/wp_options, migration and live status remain separate, unverified truths. The T44 exact-head CI/package, staging role/DB faults, backup/rollback, founder approval and live re-test are mandatory release gates; no live resolution claim.
+
+
 > **CURRENT T43 (17 October 2026):** Forty File08 original-plan/central/companion requirement source reviews plus FUT02 saved flexible-window replay and FUT04 stale resource reservation hardening are on a Draft GitHub candidate. Earlier T42–T36 outcomes remain repository-only evidence. Real PHP7.4/8.3 exact-head CI/package, active plugin/DB/schema/migrations/wp_options, installed File00/File09/File17/File19/CF01 parity, backup/restore, staging and Founder-approved live re-test are independent acceptance gates. No live fix claim.
 
 
@@ -29,7 +32,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t43-forty-windows-resource-2026-10-17`
+- Repository review branch: `review/file08-t44-heatmap-source-integrity-2026-10-17`
 - Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.

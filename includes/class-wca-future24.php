@@ -1506,8 +1506,13 @@ self::release_semantic_lock( $lock );
 		}
 
 		$rules_table = WCA_Schema::tables()['availability'];
+		// A failed WordPress availability read can return an empty array. Never
+		// misrepresent a database error as a clinic having zero capacity.
+		$wpdb->last_error = '';
 		$rules = $wpdb->get_results( $wpdb->prepare( "SELECT id,rrule_json,breaks_json,exceptions_json,capacity,status,timezone FROM {$rules_table} WHERE clinic_id=%d AND status='active' ORDER BY id ASC", absint( $clinic_id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( null === $rules ) { return new WP_Error( 'wca_heatmap_rules_query', __( 'Availability capacity could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		if ( ! is_array( $rules ) || '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_heatmap_rules_read_failed', __( 'Availability capacity is temporarily unverifiable; no heatmap has been fabricated.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 
 		foreach ( (array) $rules as $rule ) {
 			$timezone = (string) ( $rule['timezone'] ?? '' );
@@ -1542,7 +1547,13 @@ self::release_semantic_lock( $lock );
 					if ( ! is_array( $exception ) || (string) ( $exception['date'] ?? '' ) !== $local_date ) { continue; }
 					$type = sanitize_key( $exception['type'] ?? '' );
 					if ( 'closed' === $type ) { $closed = true; break; }
-					if ( 'capacity' === $type ) { $override = WCA_Service::strict_int( $exception['capacity'] ?? null, 0, 50 ); if ( null !== $override ) { $day_capacity = $override; } }
+					if ( 'capacity' === $type ) {
+						$override = WCA_Service::strict_int( $exception['capacity'] ?? null, 0, 50 );
+						if ( null === $override ) {
+							return new WP_Error( 'wca_heatmap_exception_capacity_corrupt', __( 'An active capacity exception contains an invalid override; the heatmap cannot be calculated reliably.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+						}
+						$day_capacity = $override;
+					}
 					if ( 'open' === $type && WCA_Service::valid_hhmm( $exception['start'] ?? '' ) && WCA_Service::valid_hhmm( $exception['end'] ?? '' ) && $exception['end'] > $exception['start'] ) { $day_start=(string)$exception['start']; $day_end=(string)$exception['end']; }
 				}
 				if ( $closed || 0 === $day_capacity ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
