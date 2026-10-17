@@ -15,6 +15,7 @@ on:
       - review/file08-t44-heatmap-source-integrity-2026-10-17
       - review/file08-t45-heatmap-slot-closure-parity-2026-10-17
       - review/file08-t46-heatmap-availability-owner-parity-2026-10-17
+      - review/file08-t47-heatmap-open-dst-integrity-2026-10-17
   pull_request:
     branches: [main]
 permissions:
@@ -103,6 +104,12 @@ jobs:
         with:
           name: file08-t46-40-plan-source-php-${{ matrix.php }}-${{ github.event.pull_request.head.sha || github.sha }}
           path: build/t46-forty-crossplan-review.json
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: file08-t47-40-plan-source-php-${{ matrix.php }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/t47-forty-crossplan-review.json
           if-no-files-found: error
           retention-days: 30
       - name: JavaScript syntax

@@ -19,9 +19,8 @@ class_alias('T44_Query', 'WP_Query');
 final class WCA_Schema {
     public static function tables(){return array('availability'=>'wp_wca_availability');}
 }
-final class SWC_Helpers {
-    const TYPE='wca_appointment';
-}
+// Use File08's canonical real timezone parser; incomplete mocks hide DST drift.
+require dirname(__DIR__).'/includes/class-swc-helpers.php';
 final class WCA_Repository {
     public static function get_clinic($id,$public=false){return array('id'=>77,'public_ref'=>'00000000-0000-4000-8000-000000000077');}
 }
