@@ -1591,11 +1591,20 @@ self::release_semantic_lock( $lock );
 						$day_capacity = $override;
 					}
 					if ( 'open' === $type ) {
-						// An approved date-specific opening may override a normally closed weekday.
-						$open_override = true;
-						if ( WCA_Service::valid_hhmm( $exception['start'] ?? '' ) && WCA_Service::valid_hhmm( $exception['end'] ?? '' ) && $exception['end'] > $exception['start'] ) {
-							$day_start = (string) $exception['start'];
-							$day_end = (string) $exception['end'];
+						// A deliberate paired-empty override preserves canonical base hours.
+						// Missing/malformed/inverted stored bounds must never silently
+						// fall back while presenting an apparently healthy heatmap.
+						$open_from = $exception['start'] ?? null;
+						$open_to = $exception['end'] ?? null;
+						if ( '' === $open_from && '' === $open_to ) {
+							$open_override = true;
+						} elseif ( ! is_string( $open_from ) || ! is_string( $open_to )
+							|| ! WCA_Service::valid_hhmm( $open_from ) || ! WCA_Service::valid_hhmm( $open_to ) || $open_to <= $open_from ) {
+							return new WP_Error( 'wca_heatmap_open_exception_corrupt', __( 'A stored date-specific opening has invalid local time boundaries.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+						} else {
+							$open_override = true;
+							$day_start = $open_from;
+							$day_end = $open_to;
 						}
 					}
 				}
@@ -1604,9 +1613,26 @@ self::release_semantic_lock( $lock );
 
 				$slot = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_start, $tz );
 				$end = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_end, $tz );
+				// PHP normalizes nonexistent wall-time boundaries in DST spring gaps.
+				// Do not silently count those slots as if they were requested hours.
+				if ( $slot && $slot->format( 'Y-m-d H:i' ) !== $local_date . ' ' . $day_start ) {
+					return new WP_Error( 'wca_heatmap_local_time', __( 'Stored rule starts at a nonexistent local time.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				if ( $end && $end->format( 'Y-m-d H:i' ) !== $local_date . ' ' . $day_end ) {
+					return new WP_Error( 'wca_heatmap_local_time', __( 'Stored rule ends at a nonexistent local time.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
 				if ( ! $slot || ! $end || $end <= $slot ) { return new WP_Error( 'wca_heatmap_local_time', __( 'Availability local-time projection failed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
 				while ( $slot->modify( '+' . $interval . ' minutes' ) <= $end ) {
 					$slot_end = $slot->modify( '+' . $interval . ' minutes' );
+					// The File08 booking owner refuses ambiguous/repeated DST wall times.
+					// Apply identical validity to both ends of this capacity slot;
+					// an unbookable projected interval must not inflate the heatmap.
+					$slot_start_utc = SWC_Helpers::to_utc( $slot->format( 'Y-m-d' ), $slot->format( 'H:i' ), $timezone );
+					$slot_end_utc = SWC_Helpers::to_utc( $slot_end->format( 'Y-m-d' ), $slot_end->format( 'H:i' ), $timezone );
+					if ( ! $slot_start_utc || ! $slot_end_utc || $slot_end_utc <= $slot_start_utc ) {
+						$slot = $slot_end;
+						continue;
+					}
 					$in_break = false;
 					foreach ( $breaks as $break ) {
 						if ( ! is_array( $break ) ) { return new WP_Error( 'wca_heatmap_interval_corrupt', __( 'Stored break must be a structured local interval.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
