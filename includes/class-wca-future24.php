@@ -1567,9 +1567,9 @@ self::release_semantic_lock( $lock );
 				$local_date = $cursor_date->format( 'Y-m-d' );
 				if ( ( $effective_from && $local_date < $effective_from ) || ( $effective_until && $local_date > $effective_until ) ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
 				$weekday = strtolower( $cursor_date->format( 'l' ) );
-				if ( ! in_array( $weekday, (array) ( $rrule['days'] ?? array() ), true ) ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
+				// Day eligibility is checked AFTER explicit 'open' exceptions, exactly as canonical slot discovery does.
 
-				$day_start = $start_h; $day_end = $end_h; $day_capacity = $capacity; $closed = false; $partial_closed = array();
+				$day_start = $start_h; $day_end = $end_h; $day_capacity = $capacity; $closed = false; $partial_closed = array(); $open_override = false;
 				foreach ( $exceptions as $exception ) {
 					if ( ! is_array( $exception ) || (string) ( $exception['date'] ?? '' ) !== $local_date ) { continue; }
 					$type = sanitize_key( $exception['type'] ?? '' );
@@ -1590,14 +1590,22 @@ self::release_semantic_lock( $lock );
 						}
 						$day_capacity = $override;
 					}
-					if ( 'open' === $type && WCA_Service::valid_hhmm( $exception['start'] ?? '' ) && WCA_Service::valid_hhmm( $exception['end'] ?? '' ) && $exception['end'] > $exception['start'] ) { $day_start=(string)$exception['start']; $day_end=(string)$exception['end']; }
+					if ( 'open' === $type ) {
+						// An approved date-specific opening may override a normally closed weekday.
+						$open_override = true;
+						if ( WCA_Service::valid_hhmm( $exception['start'] ?? '' ) && WCA_Service::valid_hhmm( $exception['end'] ?? '' ) && $exception['end'] > $exception['start'] ) {
+							$day_start = (string) $exception['start'];
+							$day_end = (string) $exception['end'];
+						}
+					}
 				}
-				if ( $closed || 0 === $day_capacity ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
+				if ( ( ! in_array( $weekday, (array) ( $rrule['days'] ?? array() ), true ) && ! $open_override )
+					|| $closed || 0 === $day_capacity ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
 
 				$slot = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_start, $tz );
 				$end = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_end, $tz );
 				if ( ! $slot || ! $end || $end <= $slot ) { return new WP_Error( 'wca_heatmap_local_time', __( 'Availability local-time projection failed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-				while ( $slot < $end ) {
+				while ( $slot->modify( '+' . $interval . ' minutes' ) <= $end ) {
 					$slot_end = $slot->modify( '+' . $interval . ' minutes' );
 					$in_break = false;
 					foreach ( $breaks as $break ) {
