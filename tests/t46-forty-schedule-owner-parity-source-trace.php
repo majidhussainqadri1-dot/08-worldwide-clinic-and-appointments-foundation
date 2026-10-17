@@ -42,7 +42,7 @@ $checks = array(
     array( "FUT01+02", "includes/class-wca-future24.php", array( "function join_waitlist(", "function save_windows(", "function verified_windows_replay_scope(", 'verified_windows_replay_scope( $existing' ) ),
     array( "FUT03+04", "includes/class-wca-future24.php", array( "function create_series(", "function reserve_resource(", "wca_resource_window_stale" ) ),
     array( "FUT05+06", "includes/class-wca-future24.php", array( "function join_group_session(", "function leave_group_session(", "function verified_group_member_scope(", 'verified_group_member_scope( $existing_member', 'verified_group_member_scope( $member', "function safe_reschedule(" ) ),
-    array( "FUT07+08", "includes/class-wca-future24.php", array( "function set_buffers(", "function heatmap(", "function heatmap_interval_overlaps(", '$partial_closed[]', 'foreach ( $partial_closed as $closure )', '$slot_end = $slot->modify(', "wca_heatmap_interval_corrupt", "while ( $slot->modify(", "&& ! $open_override" ) ),
+    array( "FUT07+08", "includes/class-wca-future24.php", array( "function set_buffers(", "function heatmap(", "function heatmap_interval_overlaps(", '$partial_closed[]', 'foreach ( $partial_closed as $closure )', '$slot_end = $slot->modify(', "wca_heatmap_interval_corrupt", 'while ( $slot->modify(', '&& ! $open_override' ) ),
     array( "FUT09+10", "includes/class-wca-future24.php", array( "function advisor(", "function no_show_forecast(" ) ),
     array( "FUT11+12", "includes/class-wca-future24.php", array( "function save_questionnaire(", "function readiness(" ) ),
     array( "FUT13+14", "includes/class-wca-future24.php", array( "function verified_prerequisite_rules(", "function family_hub(" ) ),
