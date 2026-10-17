@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Integration Review
 
+> **CURRENT T46 (17 October 2026):** Forty current File08 master-plan, central and cross-owner source checks; corrected FUT08 capacity heatmap now excludes incomplete final intervals and honors date-specific opening exceptions on otherwise closed weekdays. This is Draft repository source only. Earlier T36–T45 source/CI proof is historic, never deployed WordPress truth. Exact-head PHP7.4/8.3, reproducible candidate package, installed File00/09/17/19/CF01, database/schema/wp_options/migrations, staging owner/race/DST tests, backup/restore, founder approval and live re-test are separate release gates.
+
+
 > **CURRENT T45 (17 October 2026):** New 40-plan/cross-owner source checks and corrections to FUT08 full-slot break overlaps and bounded partial closure availability capacity projections reside only in Draft GitHub source. Previous T44–T36 evidence is repository-level, not installed site. Exact-head PHP CI, reproducible candidate, live WordPress/DB/schema/migrations, installed File00/09/17/19/CF01, staging real-role/DST/capacity tests, backup/restore, Founder acceptance and live re-test are separate gates.
 
 
@@ -33,7 +36,7 @@ Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, r
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t45-heatmap-slot-closure-parity-2026-10-17`
+- Working review branch: `review/file08-t46-heatmap-availability-owner-parity-2026-10-17`
 - Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
