@@ -1,5 +1,8 @@
 # File08 v1.2.16 — Owner Outcome Integration Candidate
 
+> **CURRENT T47 (17 October 2026):** Forty File08 original-plan/central/companion source screens with FUT08 invalid date-specific open-boundary and repeated-hour DST heatmap fixes on a **Draft, unmerged source branch**. Both-empty opening retains the previously approved T46 base-hours behavior. Source CI and candidate package remain distinct from live reality: installed File08/File00/09/17/19, DB/schema/migrations/wp_options, Staging SQL/timezone tests, backup/restore, Founder consent and live re-test are not verified. No production defect is claimed resolved.
+
+
 > **CURRENT T46 (17 October 2026):** Forty current File08 master-plan, central and cross-owner source checks; corrected FUT08 capacity heatmap now excludes incomplete final intervals and honors date-specific opening exceptions on otherwise closed weekdays. This is Draft repository source only. Earlier T36–T45 source/CI proof is historic, never deployed WordPress truth. Exact-head PHP7.4/8.3, reproducible candidate package, installed File00/09/17/19/CF01, database/schema/wp_options/migrations, staging owner/race/DST tests, backup/restore, founder approval and live re-test are separate release gates.
 
 
@@ -38,7 +41,7 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t46-heatmap-availability-owner-parity-2026-10-17`
+- Repository review branch: `review/file08-t47-heatmap-open-dst-integrity-2026-10-17`
 - Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.
