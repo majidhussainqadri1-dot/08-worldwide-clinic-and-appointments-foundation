@@ -14,6 +14,7 @@ on:
       - review/file08-t43-forty-windows-resource-2026-10-17
       - review/file08-t44-heatmap-source-integrity-2026-10-17
       - review/file08-t45-heatmap-slot-closure-parity-2026-10-17
+      - review/file08-t46-heatmap-availability-owner-parity-2026-10-17
   pull_request:
     branches: [main]
 permissions:
