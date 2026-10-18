@@ -7,7 +7,8 @@ Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, r
 ## Current repository candidate
 
 - Canonical source: repository `main` at its verified exact HEAD; historical work used `review/file08-t21-ten-round-2026-09-09`.
-- Current review phase: **T28 — forty complete source-suite review passes and File14 sensitive REST privacy boundary acceptance**; code-level evidence only, no staging/live acceptance.
+- Current review phase: **T29 — forty distinct plan/cross-file source inspections, fingerprint-bound appointment completed-replay correction and post-fix regression**; repository-source evidence only, no staging/live acceptance.
+- Historical T28: forty complete source-level suite repeats and File14 sensitive REST privacy boundary acceptance; no historical CI proves a newer candidate.
 - Historical review phase: **T27 — File14 owner-outcome integration and runtime 1.2.16 release-currentness reconciliation**; historical evidence, not current release verification.
 - Historical review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Historical T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
@@ -64,7 +65,7 @@ T20 materially hardened that source after T19. T21 and T22 added further governa
 | State | Repository evidence rule |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Complete candidate** — current T28 review operates on runtime 1.2.16, incorporating the completed historical T26 review/correction sequence. |
+| Coded | **Complete candidate** — current T29 review operates on runtime 1.2.16, incorporating the completed historical T26 review/correction sequence. |
 | Packaged | **Exact-head only** — valid only for a HEAD whose canonical reproducible-candidate job succeeds; consult PR #10/current workflow evidence. |
 | Automated-QA Green | **Exact-head only** — valid only for a HEAD whose PHP 7.4/PHP 8.3/source/JS/hygiene gates are green; consult PR #10/current workflow evidence. |
 | Staging-Accepted | **Pending / not claimed.** |
