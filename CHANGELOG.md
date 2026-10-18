@@ -2,6 +2,8 @@
 
 ## 1.2.16 — current repository candidate
 
+- T28: all 40 consecutive complete File08 source regression-suite executions passed on the recorded audit branch; a frozen cross-file ledger identified File14 REST sensitive-route exclusion and added explicit File08 staging acceptance. This is code-level QA, not WordPress staging/live proof. Exact-final-HEAD CI evidence must be evaluated independently.
+
 - T27 adds a post-commit, opaque, privacy-minimized File14 outcome action after the owner appointment is committed; an observer cannot change the booking result. No staging/live assertion is implied.
 - Release-currentness audit reconciles current runtime `1.2.16` across the plugin header, contracts, public install instructions, repository status and independent tests; previous T26 reports remain historical.
 - Current core schema is **3.4.0**; continuity, Future24 schema/contract **1.1.0**, Public Clinic and CF-01 contract identities **1.1.0**. Exact-head CI/package evidence is necessary after every new commit.

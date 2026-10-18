@@ -47,11 +47,23 @@ jobs:
           test ! -e tools/verify-development-candidate.php
           test ! -e CHECKSUMS.sha256
           test ! -e CORRECTIVE-CHECKSUMS.sha256
+  forty_rounds:
+    name: Forty complete File08 source-review passes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quality
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
+        with: {php-version: '8.3', coverage: none, extensions: zip}
+      - name: T28 forty whole-suite passes (source QA, not staging)
+        shell: bash
+        run: bash tools/run-40-full-source-reviews.sh
   candidate:
     name: Reproducible candidate package
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: quality
+    needs: [quality, forty_rounds]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}

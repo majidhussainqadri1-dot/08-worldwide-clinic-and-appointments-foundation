@@ -80,6 +80,11 @@ This checklist must be completed against the **exact final File 08 candidate com
 - [ ] Structured audit/event evidence records relevant actor/object/state/trace data without leaking prohibited clinical narrative.
 - [ ] Privacy export contains all applicable user records/fields; erasure traverses the complete ownership graph and accurately reports retained legally held/anonymized data.
 - [ ] Retention jobs use real schema fields and respect active legal holds.
+- [ ] File 14's exact deployed owner-outcome observer and File 08's `wca_appointment_requested_committed_v1` hook are both checked for version/contract parity; a GitHub merge alone is not deployed parity.
+- [ ] A successful File 08 `POST /wp-json/wca/v1/appointments` request commits exactly one owner appointment, irrespective of File 14 absence, refusal, timeout or exception.
+- [ ] File 14 optional measurement is denied on the sensitive File 08 REST booking route (also verify `?rest_route=/wca/v1/appointments`) under its current privacy policy; no patient/clinical attributes or owner reference appear in public analytics output.
+- [ ] GPC, analytics consent withdrawal, low-data settings and restricted/minor sessions all fail closed for optional File 14 measurement while File 08 appointment ownership remains authoritative.
+- [ ] If independent File 14 booking-outcome counts are a product requirement, mark them **unavailable under the sensitive-route exclusion** until a new explicitly approved privacy-preserving contract/consent design passes staging; never silently treat an absent metric as a zero-success booking result.
 - [ ] File 17 receives appointment/participant/virtual-room context only within its transport ownership boundary.
 - [ ] File 19 receives privacy-minimal notification intents and provider failures follow retry/dead-letter policy.
 - [ ] File 26 receives public-safe factual projection changes only; no donor/paid/outcome ranking signal is introduced.
