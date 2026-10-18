@@ -15,7 +15,8 @@ The `1.0.0` in this filename is the release-status document version; it is **not
 - CF-01 scheduling context contract: **1.1.0**
 - Plan: **SSH-F08-PLAN-2026-v1.0**
 - Historical review branch: `review/file08-t21-ten-round-2026-09-09`; canonical release source is exact `main` HEAD.
-- Current review phase: **T28 — forty complete File08 source-suite reviews and File14 sensitive REST acceptance checks**; staging/live verification remains pending.
+- Current review phase: **T29 — forty distinct File08/central/cross-file plan inspections with completed-booking replay hardening**; staging/live verification remains pending.
+- Historical T28: forty full source-suite executions and File14 sensitive REST acceptance checks.
 - Historical review phase: **T27 — File14 postcommit owner-outcome integration and runtime 1.2.16 release truth**.
 - Historical review cycle: **T26 closure cycle**
 - Historical T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
@@ -27,7 +28,7 @@ T26 was the completed historical closure sequence and follows the mandatory Revi
 
 Implemented repository scope includes 18/18 FR, 10/10 NFR and Future24 24/24 capability governance; canonical data/schema and migration/rollback/recovery controls; security/privacy/reliability/accessibility/localization/observability; warning-clean source regression aggregation; and deterministic candidate engineering whose manifest binds exact commit, runtime, plan and core/continuity/Future24/Public-Clinic/CF-01 schema-contract identity.
 
-Historical T26 review evidence re-examined governing contract/release parity, API authorization, scheduling/concurrency, finance, privacy, calendar/outbox, Future24 interoperability, frontend/localization, schema/migration/operability and final release currentness. R1 was defect-bearing and corrected after its ledger was frozen; R2–R9 were clean; R10 was defect-bearing at release-currentness/regression level and corrected only after its frozen ledger. T26 R1 specifically aligned the Public Clinic runtime contract with canonical 1.1.0 and made both builder and independent verifier fail closed on Public Clinic contract mismatch. T26 corrections kept runtime 1.2.15 at that time; the later T27/T28 repository candidate runtime is 1.2.16.
+Historical T26 review evidence re-examined governing contract/release parity, API authorization, scheduling/concurrency, finance, privacy, calendar/outbox, Future24 interoperability, frontend/localization, schema/migration/operability and final release currentness. R1 was defect-bearing and corrected after its ledger was frozen; R2–R9 were clean; R10 was defect-bearing at release-currentness/regression level and corrected only after its frozen ledger. T26 R1 specifically aligned the Public Clinic runtime contract with canonical 1.1.0 and made both builder and independent verifier fail closed on Public Clinic contract mismatch. T26 corrections kept runtime 1.2.15 at that time; the later T27/T28/T29 repository candidate runtime is 1.2.16.
 
 ## Evidence-state classification
 

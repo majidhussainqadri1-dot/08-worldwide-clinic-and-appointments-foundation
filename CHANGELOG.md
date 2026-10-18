@@ -2,6 +2,8 @@
 
 ## 1.2.16 — current repository candidate
 
+- T29 review compares forty distinct File08, central-governing and companion-file requirement/owner paths. It fixes completed appointment same-key replay which previously rejected an already-booked hold before reaching stored idempotency outcome. Security-sensitive replay requires current participant authority and exact original request fingerprint; read/storage ambiguity fails closed. Exact-final-HEAD 40-run CI and real staging/live verification remain independent acceptance gates.
+
 - T28: all 40 consecutive complete File08 source regression-suite executions passed on the recorded audit branch; a frozen cross-file ledger identified File14 REST sensitive-route exclusion and added explicit File08 staging acceptance. This is code-level QA, not WordPress staging/live proof. Exact-final-HEAD CI evidence must be evaluated independently.
 
 - T27 adds a post-commit, opaque, privacy-minimized File14 outcome action after the owner appointment is committed; an observer cannot change the booking result. No staging/live assertion is implied.

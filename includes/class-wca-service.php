@@ -616,6 +616,34 @@ final class WCA_Service {
 		return WCA_Repository::hold_slot( $canonical );
 	}
 
+	/**
+	 * Authenticated read-only completed-booking replay for the governing HTTP
+	 * command, before inactive services or already-booked holds are consulted.
+	 * This does not reserve a key or change owner state.
+	 * @return array<string,mixed>|null|WP_Error
+	 */
+	public static function completed_appointment_replay( $data, $actor_user_id = 0 ) {
+		$data = is_array( $data ) ? $data : array();
+		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
+		$claims = WCA_Authorization::claims( $actor_user_id );
+		if ( is_wp_error( $claims ) ) { return $claims; }
+		$patient_user_id = array_key_exists( 'patient_user_id', $data ) ? self::strict_id( $data['patient_user_id'] ) : $actor_user_id;
+		if ( null === $patient_user_id ) { return new WP_Error( 'wca_patient_identifier', __( 'Patient identifier must be a positive integer.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$guardian_user_id = array_key_exists( 'guardian_user_id', $data ) ? self::strict_id( $data['guardian_user_id'], true ) : 0;
+		if ( null === $guardian_user_id ) { return new WP_Error( 'wca_guardian_identifier', __( 'Guardian identifier must be a non-negative integer.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$guardian = WCA_Authorization::guardian_context( $patient_user_id, $guardian_user_id, $actor_user_id );
+		if ( is_wp_error( $guardian ) ) { return $guardian; }
+		$patient_timezone = isset( $data['timezone'] ) && '' !== trim( (string) $data['timezone'] ) ? (string) $data['timezone'] : SWC_Helpers::user_timezone( $patient_user_id );
+		if ( ! self::valid_timezone( $patient_timezone ) ) { return new WP_Error( 'wca_patient_timezone_invalid', __( 'A valid IANA patient time zone is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$red_flag = self::emergency_red_flag( (string) ( $data['reason'] ?? '' ), (string) ( $data['category'] ?? '' ) );
+		if ( $red_flag ) { return new WP_Error( 'wca_emergency_diversion', $red_flag['message'], array( 'status' => 422, 'emergency' => true, 'category' => $red_flag['category'] ) ); }
+		if ( ! self::affirmative( $data['privacy_consent'] ?? null ) ) { return new WP_Error( 'wca_privacy_consent_required', __( 'Current privacy consent is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		if ( ! self::affirmative( $data['emergency_acknowledged'] ?? null ) ) { return new WP_Error( 'wca_emergency_ack_required', __( 'Current emergency-care limitation acknowledgement is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		$key = sanitize_text_field( $data['idempotency_key'] ?? '' );
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $key ) ) { return new WP_Error( 'wca_idempotency_required', __( 'A valid appointment idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		return WCA_Repository::completed_appointment_replay( $key, $actor_user_id, self::appointment_request_fingerprint( $data ) );
+	}
+
 	/** @return array<string,mixed>|WP_Error */
 	public static function request_appointment( $data, $actor_user_id = 0 ) {
 		$actor_user_id = absint( $actor_user_id ?: get_current_user_id() );
@@ -636,6 +664,10 @@ final class WCA_Service {
 		if ( ! self::affirmative( $data['emergency_acknowledged'] ?? null ) ) { return new WP_Error( 'wca_emergency_ack_required', __( 'You must acknowledge that this booking service is not emergency care.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
 		$idempotency_key = sanitize_text_field( $data['idempotency_key'] ?? '' );
 		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $idempotency_key ) ) { return new WP_Error( 'wca_idempotency_required', __( 'A valid 8-128 character idempotency key is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) ); }
+		// Replay completed requests before the original hold is marked booked,
+		// expired or the service/doctor becomes inactive. Exact actor+payload only.
+		$prior = WCA_Repository::completed_appointment_replay( $idempotency_key, $actor_user_id, self::appointment_request_fingerprint( $data ) );
+		if ( is_wp_error( $prior ) || is_array( $prior ) ) { return $prior; }
 		$hold = WCA_Repository::get_slot_hold( (string) ( $data['hold_token'] ?? '' ) );
 		if ( is_wp_error( $hold ) ) { return $hold; }
 		$hold_check = WCA_Plan_Guard::validate_bookable_hold( $hold, $patient_user_id );

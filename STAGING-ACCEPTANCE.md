@@ -59,6 +59,10 @@ This checklist must be completed against the **exact final File 08 candidate com
 
 - [ ] Canonical core mutation requests require an explicit idempotency key.
 - [ ] Same key + same full request replays the original successful response without duplicate state effects.
+- [ ] After the first appointment commits and its original hold is `booked`, replaying the identical owner booking request (same actor, key, hold and normalized payload) returns the original successful opaque appointment reference, even if the original hold is no longer `held`.
+- [ ] A subsequent change to the original doctor/service activation state never changes a previously verified completed idempotent booking result; new independent bookings still undergo current eligibility, emergency, consent, clinic and hold checks.
+- [ ] Cross-actor and changed-payload attempts with a previously completed booking idempotency key never disclose a stored appointment; conflicting payloads fail with 409, storage-read failure with 503, and stale/ambiguous processing requires reconciliation.
+- [ ] PHP-level replay and real WordPress POST/REST journeys show zero additional appointment, slot, outbox, File19 notification, File14 analytics or payment state mutations on a completed replay.
 - [ ] Same key + materially changed route/URL/query/body is rejected as a conflict.
 - [ ] Concurrent duplicate requests do not create duplicate clinics/branches/services/holds/appointments/complaints/transitions/payment intents.
 - [ ] Failed mutations release or safely expire their idempotency claim rather than permanently poisoning retries.

@@ -1345,6 +1345,55 @@ final class WCA_Repository {
 		return array_merge( array( 'id' => (int) $wpdb->insert_id, 'response' => array(), 'claimed_new' => true ), $row );
 	}
 
+	/**
+	 * Read the result of an already completed appointment request BEFORE checking
+	 * mutable holds, doctor eligibility or service publication.
+	 *
+	 * Never create a reservation here. The actor and exact original normalized
+	 * request fingerprint must both match; all ambiguous states fail closed.
+	 * @return array<string,mixed>|null|WP_Error
+	 */
+	public static function completed_appointment_replay( $key, $actor_user_id, $request_fingerprint ) {
+		global $wpdb;
+		$key = (string) $key;
+		if ( ! preg_match( '/^[A-Za-z0-9._:-]{8,128}$/', $key ) || absint( $actor_user_id ) < 1 || ! is_array( $request_fingerprint ) ) {
+			return new WP_Error( 'wca_replay_identifier_invalid', __( 'A valid appointment replay identity is required.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
+		}
+		$table = WCA_Schema::tables()['idempotency'];
+		$wpdb->last_error = '';
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT request_hash,status,response_code,response_json,updated_at FROM {$table} WHERE scope=%s AND key_hash=%s AND actor_user_id=%d LIMIT 1",
+				'request_appointment', hash( 'sha256', $key ), absint( $actor_user_id )
+			),
+			ARRAY_A
+		);
+		if ( null === $row && '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_replay_read_unverified', __( 'Previous appointment request state could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		if ( ! $row ) { return null; }
+		$expected_hash = hash( 'sha256', self::json( $request_fingerprint ) );
+		if ( ! isset( $row['request_hash'] ) || ! is_string( $row['request_hash'] )
+			|| ! hash_equals( $row['request_hash'], $expected_hash ) ) {
+			return new WP_Error( 'wca_idempotency_conflict', __( 'This idempotency key was used for a different request.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
+		}
+		if ( 'completed' === (string) ( $row['status'] ?? '' ) ) {
+			$response = self::decode( $row['response_json'] ?? '' );
+			if ( 201 !== (int) ( $row['response_code'] ?? 0 )
+				|| empty( $response['public_ref'] ) || ! is_string( $response['public_ref'] )
+				|| ! wp_is_uuid( $response['public_ref'] )
+				|| 'requested' !== (string) ( $response['status'] ?? '' ) ) {
+				return new WP_Error( 'wca_replay_response_unverified', __( 'Stored appointment outcome could not be verified safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			return $response;
+		}
+		if ( 'processing' === (string) ( $row['status'] ?? '' ) ) {
+			$stale = strtotime( (string) ( $row['updated_at'] ?? '' ) . ' UTC' ) <= time() - 2 * MINUTE_IN_SECONDS;
+			return new WP_Error( 'wca_idempotency_in_progress', __( 'This appointment request is already being processed or requires reconciliation.', 'worldwide-clinic-appointments' ), array( 'status' => 409, 'reconciliation_required' => $stale ) );
+		}
+		return new WP_Error( 'wca_replay_state_unverified', __( 'Stored appointment replay state could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+	}
+
 	/** Read-only authoritative replay status for a caller-owned mutation key. */
 	public static function idempotency_status( $scope, $key, $actor_user_id ) {
 		global $wpdb;
