@@ -1,18 +1,19 @@
 # File08 v1.2.16 — Owner Integration Review
 
-Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, runtime logs, staging and live unverified. PR #21 introduces bounded postcommit owner fact with no clinical data; approval required.
+Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, runtime logs, staging and live unverified. The File14 postcommit owner fact was merged into repository `main`; staging approval and live parity remain separate, unverified gates.
 
 # File 08 — Worldwide Clinic and Appointments — Candidate Status
 
 ## Current repository candidate
 
-- Working review branch: `review/file08-t21-ten-round-2026-09-09`
-- Current review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
-- Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
+- Canonical source: repository `main` at its verified exact HEAD; historical work used `review/file08-t21-ten-round-2026-09-09`.
+- Current review phase: **T27 — integrated File14 owner-outcome event and runtime 1.2.16 release-currentness reconciliation**; source evidence only, no staging/live acceptance.
+- Historical review discipline: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
+- Historical T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.**
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Former T25 exact heads/runs are historical provenance only.
 - Historical T22: **R1–R10 closed**; former T22 exact heads/runs are historical provenance only.
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
-- Runtime candidate: **1.2.15**
+- Runtime candidate: **1.2.16**
 - Core File 08 schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
 - Future24 additive operational schema/contract: **1.1.0**
@@ -23,7 +24,7 @@ Runtime candidate: **1.2.16**. Prior deployed WordPress plugin, DB/migrations, r
 
 Repository release identity is always the exact candidate HEAD together with its exact-head canonical GitHub Actions run, deterministic manifest, artifact digest and candidate SHA-256. The manifest must independently match the runtime, plan, core schema, continuity schema/contract, Future24 schema/contract, Public Clinic contract and CF-01 contract embedded in that same artifact.
 
-## Current T26 evidence law
+## Historical T26 evidence law
 
 Numbered-round checkpoints are maintained in PR #10 and frozen ledgers because a static repository file cannot truthfully claim a future CI result that occurs only after its own commit. For every T26 round, the governing order remains: full review-only pass → frozen ledger → complete correction batch → permanent regression → exact-head canonical CI/package → next round. A round is not closed merely because correction source exists; the exact corrected HEAD itself must pass the canonical gates.
 
@@ -62,7 +63,7 @@ T20 materially hardened that source after T19. T21 and T22 added further governa
 | State | Repository evidence rule |
 |---|---|
 | Specified | **Complete** — governing File 08 + Future24 requirements mapped. |
-| Coded | **Complete candidate** — current T26 review/correction sequence operates on the implemented 1.2.15 candidate. |
+| Coded | **Complete candidate** — current T27 candidate is runtime 1.2.16, incorporating the completed historical T26 review/correction sequence. |
 | Packaged | **Exact-head only** — valid only for a HEAD whose canonical reproducible-candidate job succeeds; consult PR #10/current workflow evidence. |
 | Automated-QA Green | **Exact-head only** — valid only for a HEAD whose PHP 7.4/PHP 8.3/source/JS/hygiene gates are green; consult PR #10/current workflow evidence. |
 | Staging-Accepted | **Pending / not claimed.** |
@@ -81,4 +82,4 @@ This repository does not prove the current staging or live installation. Exact d
 
 ## Historical evidence note
 
-T13–T25 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as current T26 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
+T13–T25 and earlier corrective cycles, original-archive manifests/checksums and their embedded exact-head/schema values are historical provenance only unless a statement is explicitly repeated as historical T26 evidence. Historical regression labels are retained only where old regression evidence requires them; they are not current release identity.
