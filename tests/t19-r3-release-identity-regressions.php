@@ -14,7 +14,7 @@ if ( preg_match( '/Working review branch:\s*`([^`]+)`/', $status, $branch_match 
 $checks = array(
 	'current README core schema' => false !== strpos( $readme, 'Core schema: **3.4.0**' ),
 	'current README Future24 schema contract' => false !== strpos( $readme, 'Future24 additive schema/contract: **1.1.0**' ),
-	'current status branch is T19 or a later review cycle' => '' !== $current_branch && 1 === preg_match( '/^review\/file08-t(?:19|[2-9][0-9]+)-/', $current_branch ),
+	'current status source is exact main HEAD' => false !== strpos( $status, 'Canonical source: repository `main` at its verified exact HEAD' ),
 	'current status schema truth' => false !== strpos( $status, 'Core File 08 schema: **3.4.0**' ) && false !== strpos( $status, 'Future24 additive operational schema/contract: **1.1.0**' ),
 	'traceability distinguishes document and runtime versions' => false !== strpos( $trace, 'Current repository runtime candidate:** 1.2.16' ) && false !== strpos( $trace, 'Core schema:** 3.4.0' ),
 	'release status distinguishes document and runtime versions' => false !== strpos( $release, 'Runtime candidate: **1.2.16**' ) && false !== strpos( $release, 'Core schema: **3.4.0**' ),
