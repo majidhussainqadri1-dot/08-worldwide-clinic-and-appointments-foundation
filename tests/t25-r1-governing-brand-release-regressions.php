@@ -14,7 +14,7 @@ $checks = array(
     'public clinic exact Sabri Green fallback' => false !== strpos( $clinic, '--wca-green:#087A4E' ),
     'admin primary exact Sabri Green fallback' => false !== strpos( $admin, '.button-primary{background:#087A4E;border-color:#087A4E}' ),
     'admin old divergent primary retired' => false === strpos( $admin, 'background:#166534' ),
-    'packaged readme identifies T26 current sequence' => false !== strpos( $readme, 'current repository review sequence is **T26**' ),
+    'packaged readme identifies T26 historical sequence' => false !== strpos( $readme, 'historical review sequence was **T26**' ),
     'packaged readme no longer identifies T25 as current' => false === strpos( $readme, 'current repository review sequence is **T25**' ),
     'historical T25 R1 ledger is preserved' => false !== strpos( $ledger, 'R1-D1' ) && false !== strpos( $ledger, 'Sabri Green' ),
     'packaged readme preserves exact-head evidence law' => false !== strpos( $readme, 'older round label or CI run never substitutes for exact-head evidence after a later commit' ),
