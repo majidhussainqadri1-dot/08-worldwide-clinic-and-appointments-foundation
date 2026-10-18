@@ -24,7 +24,7 @@ $checks=array(
  'readme current release records core 3.4.0'=>strpos($readme,'current core schema is 3.4.0')!==false,
  'readme current release records Future24 1.1.0'=>strpos($readme,'Future24 schema/contract 1.1.0')!==false,
  'readme preserves historical T15 provenance'=>strpos($readme,'Fifteenth fresh 20-round corrective cycle')!==false,
- 'status current branch advances beyond T18'=>$current_branch!=='' && $current_branch!=='review/file08-t18-ten-round-2026-09-06' && preg_match('/^review\/file08-t(?:19|[2-9][0-9]+)-/', $current_branch)===1,
+ 'status canonical source is exact main HEAD'=>strpos($status,'Canonical source: repository `main` at its verified exact HEAD')!==false,
  'status does not present T18 branch as current'=>strpos($current_status,'Working review branch: `review/file08-t18-ten-round-2026-09-06`')===false,
  'status current core schema is 3.4.0'=>strpos($status,'Core File 08 schema: **3.4.0**')!==false,
  'status current Future24 schema is 1.1.0'=>strpos($status,'Future24 additive operational schema/contract: **1.1.0**')!==false,
