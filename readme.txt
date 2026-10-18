@@ -46,7 +46,7 @@ The eighth fresh corrective audit removes residual total-page ceilings from doct
 
 = 1.2.16 =
 * T27 File14 owner-outcome integration is merged in repository source only; this is not staging or live acceptance.
-* Current repository review sequence is **T27**. Runtime 1.2.16; current core schema is 3.4.0; continuity/Future24/Public Clinic/CF-01 contracts remain 1.1.0. Consult exact-head CI/artifact evidence; never install historical v1.2.15 in place of current v1.2.16.
+* Current repository review sequence is **T28** (forty complete source-suite executions plus File14 sensitive REST integration acceptance gate). T27 is historical. Runtime 1.2.16; current core schema is 3.4.0; continuity/Future24/Public Clinic/CF-01 contracts remain 1.1.0. Consult exact-head CI/artifact evidence; never install historical v1.2.15 in place of current v1.2.16.
 
 = 1.2.15 =
 * T26 is a historical review sequence. T26 R1 and R10 were defect-bearing and corrected only after their frozen ledgers; R2–R9 were clean. R1 aligned Public Clinic runtime/canonical contract 1.1.0 and hardened builder/verifier parity; R10 corrected release-currentness and historical-regression drift. Any corrected HEAD requires its own exact-head CI/package proof.
