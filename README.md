@@ -9,7 +9,8 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 ## Canonical repository identity
 
 - Canonical source: `main` at its verified exact HEAD; historical review branch was `review/file08-t21-ten-round-2026-09-09`.
-- Current review cycle: **T27 — File14 owner-outcome integration and runtime 1.2.16 release-currentness checks**. These are repository-source checks only; staging/live parity remains unverified.
+- Current review cycle: **T28 — forty complete source-suite review passes and File14 sensitive REST boundary acceptance audit**. All forty baseline suite executions passed; exact-final-HEAD CI and live parity are separate gates.
+- Historical review phase: **T27 — File14 owner-outcome integration and runtime 1.2.16 release currentness**; no historical GitHub success substitutes for a newer HEAD.
 - Historical review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
 - Historical T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.
