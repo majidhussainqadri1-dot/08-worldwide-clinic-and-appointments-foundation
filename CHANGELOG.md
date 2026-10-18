@@ -4,7 +4,7 @@
 
 - T27 adds a post-commit, opaque, privacy-minimized File14 outcome action after the owner appointment is committed; an observer cannot change the booking result. No staging/live assertion is implied.
 - Release-currentness audit reconciles current runtime `1.2.16` across the plugin header, contracts, public install instructions, repository status and independent tests; previous T26 reports remain historical.
-- Current core schema is `3.4.0`; continuity, Future24, Public Clinic and CF-01 contract identities remain `1.1.0`. Exact-head CI/package evidence is necessary after every new commit.
+- Current core schema is **3.4.0**; continuity, Future24 schema/contract **1.1.0**, Public Clinic and CF-01 contract identities **1.1.0**. Exact-head CI/package evidence is necessary after every new commit.
 
 ## 1.2.15 — historical repository candidate
 
