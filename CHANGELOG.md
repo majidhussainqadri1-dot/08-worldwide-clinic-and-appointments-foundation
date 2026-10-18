@@ -1,8 +1,14 @@
 # Changelog
 
-## 1.2.15 — current repository candidate
+## 1.2.16 — current repository candidate
 
-- **T26 closure cycle is the current repository review sequence.** R1 was defect-bearing/corrected; R2–R9 were clean; R10 was defect-bearing/corrected at repository release-currentness/regression level. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.
+- T27 adds a post-commit, opaque, privacy-minimized File14 outcome action after the owner appointment is committed; an observer cannot change the booking result. No staging/live assertion is implied.
+- Release-currentness audit reconciles current runtime `1.2.16` across the plugin header, contracts, public install instructions, repository status and independent tests; previous T26 reports remain historical.
+- Current core schema is `3.4.0`; continuity, Future24, Public Clinic and CF-01 contract identities remain `1.1.0`. Exact-head CI/package evidence is necessary after every new commit.
+
+## 1.2.15 — historical repository candidate
+
+- **T26 closure cycle is historical repository review evidence.** R1 was defect-bearing/corrected; R2–R9 were clean; R10 was defect-bearing/corrected at repository release-currentness/regression level. Exact-head CI/package status is determined only by the canonical workflow on the exact HEAD under evaluation.
 - T26 hardening in the same 1.2.15 candidate aligns the Public Clinic runtime projection with canonical contract 1.1.0, makes candidate build/independent verification fail closed on Public Clinic canonical/runtime mismatch, and closes final current-cycle release/regression drift. R2–R9 re-audited the major API/authorization, scheduling, finance, privacy, provider/outbox, Future24, frontend/localization and migration/operability surfaces without proving another repository defect.
 - **Historical T25 R1–R10 is closed.** Defect-bearing rounds were R1, R8, R9 and R10; clean rounds were R2–R7. T25 hardening included governing brand/release alignment; atomic File26 search-projection invalidation; corrected checked-in CF-01 scheduling projection; bounded/dead-lettered verification reconciliation; complete CLI legacy-status migration; migration-aware health; and release-currentness/canonical-route documentation. Its former exact heads/runs are provenance only.
 - **Historical T22 R1–R10 is closed.** Its former exact heads/runs remain provenance only after later commits.
@@ -10,7 +16,7 @@
 - **T20 R1–R20 completed.** R1–R2 were clean; R3–R10 were defect/gap-bearing with R10 evidence-only; R11 was clean; R12 was defect-bearing; R13–R19 were clean; R20 was evidence-only defect-bearing. The latest T20 ten rounds were 8/10 clean (80%).
 - T20 materially hardened the same 1.2.15 runtime candidate with appointment idempotency-header normalization, reschedule lifecycle/hold cleanup, authorization-boundary hardening, availability-projection correction, payment-currency persistence parity, calendar-provider practitioner/source-order/idempotency hardening, and release-evidence alignment.
 - **Historical T19:** T19 R1–R20 completed before T20. Its defect-bearing rounds were R1–R9, R11, R18, R19 and R20; clean rounds were R10 and R12–R17. T19 corrections included test aggregation/workflow hygiene; release/schema/contract truth; query/object/participant authorization; appointment commit semantics; practitioner/service projection reconciliation; availability exception correctness; signed calendar-link/patient-timezone presentation; bounded reads; queue/dead-letter observability; migration/recovery operability; and release-surface hygiene.
-- Runtime remains **1.2.15**. Current core schema is **3.4.0**; restricted continuity schema/contract **1.1.0**; Future24 schema/contract **1.1.0**; Public Clinic and CF-01 contracts **1.1.0**.
+- Runtime was **1.2.15**. That release's core schema is **3.4.0**; restricted continuity schema/contract **1.1.0**; Future24 schema/contract **1.1.0**; Public Clinic and CF-01 contracts **1.1.0**.
 - Earlier exact heads, schemas and package hashes are historical evidence only. Current Packaged/Automated-QA status is valid only for the exact current HEAD with a successful canonical deterministic package run. Staging/live acceptance remains separate and is not claimed by repository evidence.
 
 ## 1.2.14 — 2026-08-12
