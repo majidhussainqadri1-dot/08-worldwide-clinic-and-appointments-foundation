@@ -62,6 +62,20 @@ final class WCA_Appointment_Command {
 		if ( ! self::affirmative( isset( $data['emergency_acknowledged'] ) ? $data['emergency_acknowledged'] : null ) ) {
 			return new WP_Error( 'wca_emergency_ack_required', __( 'You must acknowledge that this booking service is not emergency care.', 'worldwide-clinic-appointments' ), array( 'status' => 400 ) );
 		}
+		// An earlier identical request may have committed and changed its hold
+		// from held to booked (or its service may since have been disabled).
+		// Revalidate current participant authority and exact payload, but do
+		// not require mutable booking conditions for an already stored result.
+		$prior = WCA_Service::completed_appointment_replay( $data, $actor_user_id );
+		if ( is_wp_error( $prior ) ) { return $prior; }
+		if ( is_array( $prior ) ) {
+			$prior['command_contract'] = 'wca.appointment-request/' . self::CONTRACT_VERSION;
+			$prior['privacy_consent_verified'] = true;
+			$prior['emergency_ack_verified'] = true;
+			$prior['remote_consultation_consent_verified'] = self::affirmative( $data['telehealth_consent'] ?? null );
+			unset( $prior['appointment_id'] );
+			return $prior;
+		}
 		$hold_token = sanitize_text_field( isset( $data['hold_token'] ) ? $data['hold_token'] : '' );
 		$hold = $hold_token ? WCA_Repository::get_slot_hold( $hold_token ) : null;
 		if ( is_wp_error( $hold ) ) { return $hold; }
