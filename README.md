@@ -8,15 +8,16 @@ Canonical repository implementation of **File 08 — Worldwide Clinic and Appoin
 
 ## Canonical repository identity
 
-- Repository review branch: `review/file08-t21-ten-round-2026-09-09`
-- Current review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
-- Current T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
+- Canonical source: `main` at its verified exact HEAD; historical review branch was `review/file08-t21-ten-round-2026-09-09`.
+- Current review cycle: **T27 — File14 owner-outcome integration and runtime 1.2.16 release-currentness checks**. These are repository-source checks only; staging/live parity remains unverified.
+- Historical review cycle: **T26 closure cycle — Review → Ledger Freeze → Fix → Regression → Exact-head CI/package → Next Round**
+- Historical T26 ten-round cycle: **R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected at repository release-currentness/regression level.** Exact-head CI/package status is defined only by the current canonical workflow and is never inferred from an older run recorded in a static document.
 - Historical T25: **R1–R10 closed**; defect-bearing R1, R8, R9 and R10; clean R2–R7. Its former exact heads/runs are historical provenance only.
 - Historical T22: **R1–R10 closed**; its former exact heads/runs are historical provenance only.
 - Historical T21: **R1–R10 closed**; defect-bearing R1–R6, R9, R10; clean R7–R8.
 - Package folder: `08-worldwide-clinic-and-appointments`
 - WordPress plugin entry: `worldwide-clinic.php`
-- Runtime candidate: **1.2.15**
+- Runtime candidate: **1.2.16**
 - Core schema: **3.4.0**
 - Restricted continuity schema/contract: **1.1.0**
 - Future24 additive schema/contract: **1.1.0**
@@ -68,6 +69,6 @@ The canonical GitHub Actions quality workflow repeats PHP 7.4/8.3 syntax and sou
 
 A repository candidate may be called **Coded**, **Packaged**, or **Automated-QA Green** only when the respective evidence applies to the exact same HEAD. It is not `Staging-Accepted`, `Live-Deployed`, or `Operational` from repository evidence alone.
 
-T26 is the current closure cycle. R1 corrected Public Clinic canonical/runtime contract parity and the package-verifier blind spot; R2–R9 were clean; R10 corrected release-currentness and historical-regression drift. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status. Static documentation deliberately does not hard-code a future CI result; consult the canonical workflow on the exact HEAD being evaluated.
+T26 was the previous completed closure cycle. R1 corrected Public Clinic canonical/runtime contract parity and the package-verifier blind spot; R2–R9 were clean; R10 corrected release-currentness and historical-regression drift. Any correction changes HEAD and therefore requires a fresh exact-head canonical CI/package run before that corrected HEAD may inherit `Packaged` or `Automated-QA Green` status. Static documentation deliberately does not hard-code a future CI result; consult the canonical workflow on the exact HEAD being evaluated.
 
 Before production, run `STAGING-ACCEPTANCE.md` against the exact CI artifact on canonical Hostinger staging, recording actual DB/schema/migration state, companion-package parity, real-role journeys, concurrency/replay/provider-outage behavior, privacy/cache/accessibility acceptance, backup/restore/rollback and Founder acceptance. After an explicitly authorized production deployment, freeze the exact deployed artifact/version/schema/migration state and perform live parity re-test before any live resolution claim.

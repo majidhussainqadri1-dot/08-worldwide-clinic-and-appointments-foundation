@@ -16,11 +16,11 @@ foreach ( array( $readme, $status, $release, $change, $package, $contracts, $wor
 }
 $round_truth = 'R1 defect-bearing/corrected; R2–R9 clean; R10 defect-bearing/corrected';
 $checks = array(
-    'README identifies T26 current' => false !== strpos( $readme, 'Current review cycle: **T26 closure cycle' ),
-    'STATUS identifies T26 current' => false !== strpos( $status, 'Current review discipline: **T26 closure cycle' ),
-    'release status identifies T26 current' => false !== strpos( $release, 'Current review cycle: **T26 closure cycle**' ),
-    'changelog identifies T26 current' => false !== strpos( $change, '**T26 closure cycle is the current repository review sequence.**' ),
-    'packaged readme identifies T26 current' => false !== strpos( $package, 'current repository review sequence is **T26**' ),
+    'README identifies T26 historical' => false !== strpos( $readme, 'Historical review cycle: **T26 closure cycle' ),
+    'STATUS identifies T26 historical' => false !== strpos( $status, 'Historical review discipline: **T26 closure cycle' ),
+    'release status identifies T26 historical' => false !== strpos( $release, 'Historical review cycle: **T26 closure cycle**' ),
+    'changelog identifies T26 historical' => false !== strpos( $change, '**T26 closure cycle is historical repository review evidence.**' ),
+    'packaged readme identifies T26 historical' => false !== strpos( $package, 'historical review sequence was **T26**' ),
     'README carries T26 round truth' => false !== strpos( $readme, $round_truth ),
     'STATUS carries T26 round truth' => false !== strpos( $status, $round_truth ),
     'release carries T26 round truth' => false !== strpos( $release, $round_truth ),
@@ -32,7 +32,7 @@ $checks = array(
     'canonical exact-head workflow remains' => false !== strpos( $workflow, "php: ['7.4', '8.3']" ) && false !== strpos( $workflow, 'Build twice' ) && false !== strpos( $workflow, 'Independent verification' ),
     'live truth remains unclaimed' => false !== strpos( $status, 'Live-Deployed | **Unverified / not claimed.**' ) && false !== strpos( $release, 'Production release/deployment: **NO / UNVERIFIED**' ),
     'R10 ledger proves review before correction' => false !== strpos( $ledger, 'No R10 correction was started while the review remained open') && false !== strpos( $ledger, 'R10-D1') && false !== strpos( $ledger, 'R10-D2'),
-    'historical T25 R1 no longer enforces T25 current' => false !== strpos( $historical_t25_r1, 'packaged readme identifies T26 current sequence' ) && false === strpos( $historical_t25_r1, "'packaged readme identifies T25 current sequence'" ),
+    'historical T25 R1 no longer enforces T25 current' => false !== strpos( $historical_t25_r1, 'packaged readme identifies T26 historical sequence' ) && false === strpos( $historical_t25_r1, "'packaged readme identifies T25 current sequence'" ),
     'historical T25 R10 no longer enforces T25 current' => false !== strpos( $historical_t25_r10, 'T25 no longer current in README' ) && false === strpos( $historical_t25_r10, "'README identifies T25 current'" ),
     'T26 R10 regression bound into aggregate suite' => false !== strpos( $runner, "'t26-r10-release-currentness-regressions.php'" ),
 );
