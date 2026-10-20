@@ -35,7 +35,7 @@ final class WCA_File14_Optin_Booking_Aggregate_V1 {
             $fail['reason'] = 'privacy_or_owner_attestation_missing'; return $fail;
         }
         $d = $input['day_utc'];
-        if ( ! is_string( $d ) || ! preg_match( '/^\\d{4}-\\d{2}-\\d{2}$/D', $d ) ) { return $fail; }
+        if ( ! is_string( $d ) || ! preg_match( '/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/D', $d ) ) { return $fail; }
         $parts = explode( '-', $d );
         if ( ! checkdate( (int) $parts[1], (int) $parts[2], (int) $parts[0] ) ) { return $fail; }
         $v = $input['optin_count'];
