@@ -4,6 +4,9 @@
  * THIS DOES NOT COUNT BOOKINGS, TRACK SENSITIVE REST TRAFFIC, OR
  * AUTHORIZE FILE14 TO RECEIVE HEALTH/BOOKING INFORMATION.
  * A valid shape proves neither opt-in nor ability to erase a contribution.
+ * Native AppointmentRequested.v1 means a committed REQUEST, never a booked
+ * consultation or a completed clinical visit. A minimum number of booking
+ * requests does not prove a minimum number of DISTINCT consented persons.
  */
 defined( 'ABSPATH' ) || exit;
 final class WCA_File14_Optin_Booking_Aggregate_V1 {
@@ -16,7 +19,7 @@ final class WCA_File14_Optin_Booking_Aggregate_V1 {
         if ( ! is_array( $input ) ) { return $fail; }
         // Closed schema. Never pass public_ref, appointment_id, patient/doctor
         // or clinical information to an aggregate consumer.
-        $keys = array( 'contract','owner','stage','day_utc','optin_count',
+        $keys = array( 'contract','owner','stage','day_utc','optin_count','distinct_consented_subjects',
             'minimum_cohort','purpose','gpc_excluded','minor_excluded',
             'consent_revocable','erasure_reconcilable','producer_source' );
         $actual = array_keys( $input );
@@ -25,7 +28,7 @@ final class WCA_File14_Optin_Booking_Aggregate_V1 {
         if ( $actual !== $keys ) { $fail['reason'] = 'unknown_or_sensitive_fields'; return $fail; }
         if ( self::CONTRACT !== $input['contract']
             || 'file08' !== $input['owner']
-            || 'booking_started' !== $input['stage']
+            || 'appointment_requested' !== $input['stage']
             || 'conversion_analytics' !== $input['purpose']
             || true !== $input['gpc_excluded']
             || true !== $input['minor_excluded']
@@ -39,7 +42,9 @@ final class WCA_File14_Optin_Booking_Aggregate_V1 {
         $parts = explode( '-', $d );
         if ( ! checkdate( (int) $parts[1], (int) $parts[2], (int) $parts[0] ) ) { return $fail; }
         $v = $input['optin_count'];
-        if ( ! is_int( $v ) || $v < self::MIN_COHORT || $v > 100000000 ) {
+        $unique = $input['distinct_consented_subjects'];
+        if ( ! is_int( $v ) || ! is_int( $unique ) || $v < self::MIN_COHORT
+            || $unique < self::MIN_COHORT || $unique > $v || $v > 100000000 ) {
             $fail['reason'] = 'cohort_not_publishable'; return $fail;
         }
         if ( ! is_string( $input['producer_source'] )
