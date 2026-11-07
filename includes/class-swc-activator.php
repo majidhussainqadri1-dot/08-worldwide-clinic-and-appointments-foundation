@@ -11,9 +11,16 @@ final class SWC_Activator {
 	const DB_VERSION = '3.1.0';
 
 	public static function dependencies_ready() {
+		// The current File 09 publishes GDO_Membership_Adapter, not the
+		// retired GDO_Helpers class. Require current canonical File 00 and
+		// File 02 professional reauthentication health; never fake authority.
 		return class_exists( 'SPD_Helpers' )
 			&& class_exists( 'SDD_Helpers' )
-			&& class_exists( 'GDO_Helpers' )
+			&& class_exists( 'GDO_Membership_Adapter' )
+			&& is_callable( array( 'GDO_Membership_Adapter', 'available' ) )
+			&& GDO_Membership_Adapter::available()
+			&& is_callable( array( 'GDO_Membership_Adapter', 'authentication_available' ) )
+			&& GDO_Membership_Adapter::authentication_available()
 			&& function_exists( 'smc_user_status' )
 			&& function_exists( 'smc_is_founder' );
 	}
