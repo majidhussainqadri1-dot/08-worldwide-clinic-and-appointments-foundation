@@ -31,6 +31,8 @@ jobs:
         run: php tests/file09-current-dependency-gate.php
       - name: MariaDB decimal default padding and schema fail-closed regression
         run: php tests/mariadb-decimal-default-regression.php
+      - name: WordPress pre-init rewrite migration negative-path gate
+        run: php tests/file08-preinit-rewrite-regression.php
       - name: JavaScript syntax
         run: |
           node --check assets/js/clinic.js
