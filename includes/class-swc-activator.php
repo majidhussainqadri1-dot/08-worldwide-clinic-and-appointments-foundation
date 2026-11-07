@@ -76,7 +76,9 @@ final class SWC_Activator {
 			return;
 		}
 		self::register_type();
-		WCA_Routes::register();
+		// The canonical WCA_Plugin::boot() registers WCA_Routes::hooks()
+		// on WordPress init. Do not call add_rewrite_rule from plugins_loaded:
+		// wp_rewrite is not initialized there, which pauses migration.
 		WCA_Schema::maybe_upgrade();
 		WCA_Outbox::schedule();
 		if ( self::DB_VERSION !== (string) get_option( 'swc_db_version', '' ) ) {
