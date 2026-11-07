@@ -27,6 +27,8 @@ jobs:
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
       - name: Master-plan, security and state tests
         run: php tests/run-all.php
+      - name: Current File09 real dependency contract, retired helper rejection
+        run: php tests/file09-current-dependency-gate.php
       - name: JavaScript syntax
         run: |
           node --check assets/js/clinic.js
