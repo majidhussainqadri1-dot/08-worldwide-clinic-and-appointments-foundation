@@ -29,6 +29,8 @@ jobs:
         run: php tests/run-all.php
       - name: Current File09 real dependency contract, retired helper rejection
         run: php tests/file09-current-dependency-gate.php
+      - name: MariaDB decimal default padding and schema fail-closed regression
+        run: php tests/mariadb-decimal-default-regression.php
       - name: JavaScript syntax
         run: |
           node --check assets/js/clinic.js
