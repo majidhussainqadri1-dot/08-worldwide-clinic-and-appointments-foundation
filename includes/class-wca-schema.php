@@ -372,7 +372,13 @@ final class WCA_Schema {
 		foreach ( $definitions as $sql ) {
 			dbDelta( $sql );
 			$verified = self::verify_definition_sql( $sql );
-			if ( is_wp_error( $verified ) ) { throw new RuntimeException( $verified->get_error_message() ); }
+			if ( is_wp_error( $verified ) ) {
+				// Exact owned table/column identity makes fresh-install failures
+				// diagnosable without guessing at migration defaults.
+				$detail = (array) $verified->get_error_data();
+				$location = trim( sanitize_text_field( (string) ( $detail['table'] ?? '' ) ) . '.' . sanitize_key( (string) ( $detail['column'] ?? '' ) ), '.' );
+				throw new RuntimeException( $verified->get_error_message() . ( '' !== $location ? ' [' . $location . ']' : '' ) );
+			}
 		}
 
 		$missing = array();
@@ -461,7 +467,19 @@ final class WCA_Schema {
 			}
 			if ( $expected['has_default'] ) {
 				$actual_default = array_key_exists( 'Default', $actual ) ? $actual['Default'] : null;
-				if ( null === $expected['default'] ? null !== $actual_default : (string) $actual_default !== (string) $expected['default'] ) {
+				$defaults_match = null === $expected['default']
+					? null === $actual_default
+					: (string) $actual_default === (string) $expected['default'];
+				// MariaDB reports DECIMAL(24,6) DEFAULT 0 as 0.000000.
+				// Compare only canonical decimal text, never floats/loose PHP
+				// equality; unequal or malformed defaults still fail closed.
+				if ( ! $defaults_match && 0 === strpos( $expected['type'], 'decimal(' )
+					&& null !== $expected['default'] && null !== $actual_default ) {
+					$wanted = self::canonical_decimal_default( $expected['default'] );
+					$got = self::canonical_decimal_default( $actual_default );
+					$defaults_match = null !== $wanted && null !== $got && hash_equals( $wanted, $got );
+				}
+				if ( ! $defaults_match ) {
 					return new WP_Error( 'wca_schema_column_default_mismatch', __( 'File 08 schema verification found a column default mismatch.', 'worldwide-clinic-appointments' ), array( 'status' => 500, 'table' => sanitize_text_field( $table ), 'column' => $name ) );
 				}
 			}
@@ -505,6 +523,20 @@ final class WCA_Schema {
 			if ( preg_match( '/^`?([A-Za-z0-9_]+)`?(?:\(\d+\))?$/', $column, $match ) ) { $columns[] = strtolower( $match[1] ); }
 		}
 		return $columns;
+	}
+
+	/**
+	 * Canonicalize a SQL DECIMAL default as an exact string without precision
+	 * loss. Returns null for expressions, scientific notation or invalid data.
+	 */
+	private static function canonical_decimal_default( $value ) {
+		$text = trim( (string) $value );
+		if ( 1 !== preg_match( '/^(-?)([0-9]+)(?:\\.([0-9]+))?$/D', $text, $parts ) ) { return null; }
+		$integer = ltrim( $parts[2], '0' );
+		$integer = '' === $integer ? '0' : $integer;
+		$fraction = rtrim( $parts[3] ?? '', '0' );
+		$normalized = $integer . ( '' !== $fraction ? '.' . $fraction : '' );
+		return '-' === $parts[1] && '0' !== $normalized ? '-' . $normalized : $normalized;
 	}
 
 	private static function normalize_schema_type( $type ) {
