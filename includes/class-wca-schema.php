@@ -372,7 +372,13 @@ final class WCA_Schema {
 		foreach ( $definitions as $sql ) {
 			dbDelta( $sql );
 			$verified = self::verify_definition_sql( $sql );
-			if ( is_wp_error( $verified ) ) { throw new RuntimeException( $verified->get_error_message() ); }
+			if ( is_wp_error( $verified ) ) {
+				// Exact owned table/column identity makes fresh-install failures
+				// diagnosable without guessing at migration defaults.
+				$detail = (array) $verified->get_error_data();
+				$location = trim( sanitize_text_field( (string) ( $detail['table'] ?? '' ) ) . '.' . sanitize_key( (string) ( $detail['column'] ?? '' ) ), '.' );
+				throw new RuntimeException( $verified->get_error_message() . ( '' !== $location ? ' [' . $location . ']' : '' ) );
+			}
 		}
 
 		$missing = array();
