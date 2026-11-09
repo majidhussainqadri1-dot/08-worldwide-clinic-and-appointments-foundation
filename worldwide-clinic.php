@@ -68,11 +68,15 @@ $wca_files = array(
 	'includes/class-swc-admin.php',
 	'includes/class-swc-privacy.php',
 	'includes/class-swc-plugin.php',
+	'includes/class-wca-file26-connector.php',
 );
 foreach ( $wca_files as $wca_relative_file ) {
 	require_once WCA_DIR . $wca_relative_file;
 }
 unset( $wca_files, $wca_relative_file );
+
+// File08 owns public clinic eligibility; derivative Search stays PROPOSED and fail closed.
+WCA_File26_Connector::register();
 
 register_activation_hook( WCA_FILE, array( 'SWC_Activator', 'activate' ) );
 register_deactivation_hook( WCA_FILE, array( 'SWC_Activator', 'deactivate' ) );
