@@ -48,6 +48,8 @@ final class WP_Query {
 require dirname( __DIR__ ) . '/includes/class-wca-future24.php';
 
 $m = new ReflectionMethod( 'WCA_Future24', 'clinic_appointments_between_all' );
+// PHP 7.4 requires explicit accessibility; PHP 8.3 accepts the same call.
+$m->setAccessible( true );
 $assertions = 0;
 $check = static function ( $truth, $message ) use ( &$assertions ) {
     $assertions++;
