@@ -205,7 +205,7 @@ jobs:
           php tools/verify-candidate.php --artifact=/tmp/file08-ci-build --commit="$source_sha"
           unzip -q /tmp/file08-ci-build/*-candidate.zip -d /tmp/file08-ci-extracted
           test -f /tmp/file08-ci-extracted/08-worldwide-clinic-and-appointments/worldwide-clinic.php
-          mv /tmp/file08-ci-extracted/08-worldwide-clinic-and-appointments/. /tmp/file08-ci-wp/wp-content/plugins/worldwide-clinic-appointments/
+          cp -a /tmp/file08-ci-extracted/08-worldwide-clinic-and-appointments/. /tmp/file08-ci-wp/wp-content/plugins/worldwide-clinic-appointments/
           # File00 intentionally defers its secure migrations to a REAL admin_init.
           # Respect the owner lifecycle; never manufacture option/schema markers.
           php /tmp/file08-wp-cli.phar plugin activate sabri-membership-core --path=/tmp/file08-ci-wp --allow-root
