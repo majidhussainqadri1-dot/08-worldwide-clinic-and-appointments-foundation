@@ -102,9 +102,13 @@ jobs:
           retention-days: 30
 
   native_mysql:
-    name: Disposable real WordPress 7.1.4 and MariaDB (File00/02/03/07/09/08)
+    name: Disposable WP ${{ matrix.wordpress }} / MariaDB, six real File08 dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        wordpress: ['7.0.8', '7.1.4']
     permissions:
       contents: read
     services:
@@ -173,7 +177,7 @@ jobs:
           curl --fail --location --silent --show-error https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /tmp/file08-wp-cli.phar
           php /tmp/file08-wp-cli.phar --info
           mkdir -p /tmp/file08-ci-wp/wp-content/plugins
-          php /tmp/file08-wp-cli.phar core download --version=7.1.4 --path=/tmp/file08-ci-wp --allow-root --quiet
+          php /tmp/file08-wp-cli.phar core download --version=${{ matrix.wordpress }} --path=/tmp/file08-ci-wp --allow-root --quiet
           php /tmp/file08-wp-cli.phar config create --path=/tmp/file08-ci-wp --dbname=wordpress --dbuser=wordpress --dbpass=wp-ephemeral --dbhost=127.0.0.1:3306 --allow-root --quiet
           php /tmp/file08-wp-cli.phar core install --path=/tmp/file08-ci-wp --url=http://file08-ci.local --title='File08 Disposable CI' --admin_user=admin --admin_password=ci-ephemeral-long-password --admin_email=file08-ci-admin@example.test --skip-email --allow-root --quiet
           # File09 correctly refuses activation without versioned private keys.
