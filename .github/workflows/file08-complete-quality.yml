@@ -197,7 +197,15 @@ jobs:
           tar -C native-file03 -cf - --exclude=.git . | tar -C /tmp/file08-ci-wp/wp-content/plugins/sabri-profiles-doctors -xf -
           tar -C native-file07/doctors-directory -cf - . | tar -C /tmp/file08-ci-wp/wp-content/plugins/doctors-directory -xf -
           tar -C native-file09 -cf - --exclude=.git . | tar -C /tmp/file08-ci-wp/wp-content/plugins/global-doctor-onboarding -xf -
-          tar -C "$GITHUB_WORKSPACE" -cf - --exclude=.git --exclude=build --exclude=native-file00 --exclude=native-file02 --exclude=native-file03 --exclude=native-file07 --exclude=native-file09 . | tar -C /tmp/file08-ci-wp/wp-content/plugins/worldwide-clinic-appointments -xf -
+          # Test exact deterministic File08 plugin ZIP, not the repository source tree.
+          mkdir -p /tmp/file08-ci-build /tmp/file08-ci-extracted
+          source_sha=$(git rev-parse HEAD)
+          source_epoch=$(git show -s --format=%ct HEAD)
+          php tools/build-candidate.php --output-dir=/tmp/file08-ci-build --commit="$source_sha" --source-date-epoch="$source_epoch"
+          php tools/verify-candidate.php --artifact=/tmp/file08-ci-build --commit="$source_sha"
+          unzip -q /tmp/file08-ci-build/*-candidate.zip -d /tmp/file08-ci-extracted
+          test -f /tmp/file08-ci-extracted/08-worldwide-clinic-and-appointments/worldwide-clinic.php
+          mv /tmp/file08-ci-extracted/08-worldwide-clinic-and-appointments/. /tmp/file08-ci-wp/wp-content/plugins/worldwide-clinic-appointments/
           # File00 intentionally defers its secure migrations to a REAL admin_init.
           # Respect the owner lifecycle; never manufacture option/schema markers.
           php /tmp/file08-wp-cli.phar plugin activate sabri-membership-core --path=/tmp/file08-ci-wp --allow-root
@@ -211,4 +219,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          php /tmp/file08-wp-cli.phar eval-file /tmp/file08-ci-wp/wp-content/plugins/worldwide-clinic-appointments/tests/v121-real-wordpress-mariadb.php --path=/tmp/file08-ci-wp --allow-root
+          php /tmp/file08-wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/v121-real-wordpress-mariadb.php" --path=/tmp/file08-ci-wp --allow-root
