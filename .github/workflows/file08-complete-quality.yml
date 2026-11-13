@@ -176,6 +176,13 @@ jobs:
           php /tmp/file08-wp-cli.phar core download --version=7.1.4 --path=/tmp/file08-ci-wp --allow-root --quiet
           php /tmp/file08-wp-cli.phar config create --path=/tmp/file08-ci-wp --dbname=wordpress --dbuser=wordpress --dbpass=wp-ephemeral --dbhost=127.0.0.1:3306 --allow-root --quiet
           php /tmp/file08-wp-cli.phar core install --path=/tmp/file08-ci-wp --url=http://file08-ci.local --title='File08 Disposable CI' --admin_user=admin --admin_password=ci-ephemeral-long-password --admin_email=file08-ci-admin@example.test --skip-email --allow-root --quiet
+          # File09 correctly refuses activation without versioned private keys.
+          # Generate REAL but disposable keys in this isolated CI wp-config; do not bypass cryptography.
+          gdo_ring=$(php -r 'echo json_encode(array("active"=>"ci-v1","keys"=>array("ci-v1"=>base64_encode(random_bytes(32)))));')
+          gdo_signing=$(php -r 'echo bin2hex(random_bytes(32));')
+          php /tmp/file08-wp-cli.phar config set GDO_KEYRING "$gdo_ring" --path=/tmp/file08-ci-wp --allow-root --quiet
+          php /tmp/file08-wp-cli.phar config set GDO_CLAIM_SIGNING_KEY "$gdo_signing" --path=/tmp/file08-ci-wp --allow-root --quiet
+          unset gdo_ring gdo_signing
           mkdir -p /tmp/file08-ci-wp/wp-content/plugins/{sabri-membership-core,sabri-authentication,sabri-profiles-doctors,doctors-directory,global-doctor-onboarding,worldwide-clinic-appointments}
           tar -C native-file00/source/sabri-membership-core -cf - . | tar -C /tmp/file08-ci-wp/wp-content/plugins/sabri-membership-core -xf -
           tar -C native-file02 -cf - --exclude=.git . | tar -C /tmp/file08-ci-wp/wp-content/plugins/sabri-authentication -xf -
