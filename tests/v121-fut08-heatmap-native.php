@@ -4,6 +4,19 @@
  * simulate actual class method behavior with DB errors, malformed override
  * and valid projected capacity. Fail-first source fixtures against frozen main; NOT live/Hostinger evidence.
  */
+// PHP 8.2+ emits deprecation diagnostics for the legacy test-only WP_Error
+// stub's dynamic fields. Supply explicit fields in this isolated fixture.
+// This does not alter runtime WordPress WP_Error or suppress diagnostics.
+if ( ! class_exists( 'WP_Error' ) ) {
+    class WP_Error {
+        public $code;
+        public $message;
+        public $data;
+        public function __construct( $code = '', $message = '', $data = null ) {
+            $this->code = $code; $this->message = $message; $this->data = $data;
+        }
+    }
+}
 require __DIR__ . '/bootstrap.php';
 if ( ! defined( 'ARRAY_A' ) ) { define( 'ARRAY_A', 'ARRAY_A' ); }
 if ( ! function_exists( 'sanitize_text_field' ) ) { function sanitize_text_field( $v ) { return trim(strip_tags((string)$v)); } }
