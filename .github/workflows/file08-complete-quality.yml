@@ -220,3 +220,27 @@ jobs:
         run: |
           set -euo pipefail
           php /tmp/file08-wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/v121-real-wordpress-mariadb.php" --path=/tmp/file08-ci-wp --allow-root
+      - name: Verify read-only freeze on exact disposable deployed package and installed schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          php /tmp/file08-wp-cli.phar eval-file "$GITHUB_WORKSPACE/tools/file08-live-reality-freeze.php" --path=/tmp/file08-ci-wp --allow-root > /tmp/file08-freeze.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/file08-freeze.json', encoding='utf-8') as f:
+              s = json.load(f)
+          assert s['audit_contract'] == 'sabri.file08.live-reality-freeze.v1'
+          assert s['read_only'] and s['patient_rows_collected'] is False and s['secrets_collected'] is False
+          assert s['site_host'] == 'file08-ci.local'
+          assert s['wp_core_version'] == '${{ matrix.wordpress }}'
+          assert s['loaded_runtime_version'] == '1.2.16'
+          assert len(s['installed_entry_sha256']) == 64
+          assert s['plugin_tree']['complete'] and len(s['plugin_tree']['sha256']) == 64
+          assert s['plugins']['File08']['active'] is True
+          assert all(s['plugins'][f]['active'] for f in ('File00','File02','File03','File07','File09'))
+          assert s['db_schema_options']['wca_db_version'] == s['declared_wca_schema']
+          assert not s['runtime_migration_failure_marker']
+          assert all(row['exists'] is True and not row['metadata_read_failed'] for row in s['wca_tables'].values())
+          assert not s['deployment_parity_confirmed'] and not s['live_retested']
+          print('PASS: private read-only File08 host parity snapshot on isolated CI package')
+          PY
