@@ -52,6 +52,8 @@ foreach ( array( 'clinics', 'branches', 'services', 'availability', 'outbox' ) a
 $check( isset( WCA_Contracts::functional_requirements()['F08-FR-005'] ),
     'canonical owner contract includes booking demand requirement' );
 
+// Use disposable administrator with the genuine native File08 private-post caps.
+wp_set_current_user( 1 );
 $clinic_id = 777;
 $when = '2026-11-20 12:00:00';
 $seeded = array();
