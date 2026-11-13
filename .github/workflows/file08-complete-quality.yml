@@ -182,6 +182,10 @@ jobs:
           gdo_signing=$(php -r 'echo bin2hex(random_bytes(32));')
           php /tmp/file08-wp-cli.phar config set GDO_KEYRING "$gdo_ring" --path=/tmp/file08-ci-wp --allow-root --quiet
           php /tmp/file08-wp-cli.phar config set GDO_CLAIM_SIGNING_KEY "$gdo_signing" --path=/tmp/file08-ci-wp --allow-root --quiet
+          # File09 requires credential storage outside WordPress public content/uploads.
+          mkdir -p /tmp/file08-ci-private
+          chmod 0700 /tmp/file08-ci-private
+          php /tmp/file08-wp-cli.phar config set GDO_PRIVATE_STORAGE_DIR /tmp/file08-ci-private --path=/tmp/file08-ci-wp --allow-root --quiet
           unset gdo_ring gdo_signing
           mkdir -p /tmp/file08-ci-wp/wp-content/plugins/{sabri-membership-core,sabri-authentication,sabri-profiles-doctors,doctors-directory,global-doctor-onboarding,worldwide-clinic-appointments}
           tar -C native-file00/source/sabri-membership-core -cf - . | tar -C /tmp/file08-ci-wp/wp-content/plugins/sabri-membership-core -xf -
