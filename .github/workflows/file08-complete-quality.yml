@@ -183,7 +183,11 @@ jobs:
           tar -C native-file07/doctors-directory -cf - . | tar -C /tmp/file08-ci-wp/wp-content/plugins/doctors-directory -xf -
           tar -C native-file09 -cf - --exclude=.git . | tar -C /tmp/file08-ci-wp/wp-content/plugins/global-doctor-onboarding -xf -
           tar -C "$GITHUB_WORKSPACE" -cf - --exclude=.git --exclude=build --exclude=native-file00 --exclude=native-file02 --exclude=native-file03 --exclude=native-file07 --exclude=native-file09 . | tar -C /tmp/file08-ci-wp/wp-content/plugins/worldwide-clinic-appointments -xf -
-          for name in sabri-membership-core sabri-authentication sabri-profiles-doctors global-doctor-onboarding doctors-directory worldwide-clinic-appointments; do
+          # File00 intentionally defers its secure migrations to a REAL admin_init.
+          # Respect the owner lifecycle; never manufacture option/schema markers.
+          php /tmp/file08-wp-cli.phar plugin activate sabri-membership-core --path=/tmp/file08-ci-wp --allow-root
+          php /tmp/file08-wp-cli.phar eval 'wp_set_current_user(1); do_action("admin_init"); if ((string)get_option("smc_db_version","") !== SMC_DB_VERSION) { fwrite(STDERR,"FILE00_BOOTSTRAP_NOT_READY ".wp_json_encode(get_option("smc_activation_bootstrap_state_v2",array()))."\\n"); exit(12); } echo "File00 real admin deferred migration complete: ".SMC_DB_VERSION."\\n";' --path=/tmp/file08-ci-wp --allow-root
+          for name in sabri-authentication sabri-profiles-doctors global-doctor-onboarding doctors-directory worldwide-clinic-appointments; do
             php /tmp/file08-wp-cli.phar plugin activate "$name" --path=/tmp/file08-ci-wp --allow-root
           done
       - name: Verify exact native six-plugin WordPress/MariaDB runtime and incomplete-page fault
