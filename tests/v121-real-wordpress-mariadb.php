@@ -51,6 +51,22 @@ foreach ( array( 'clinics', 'branches', 'services', 'availability', 'outbox' ) a
 }
 $check( isset( WCA_Contracts::functional_requirements()['F08-FR-005'] ),
     'canonical owner contract includes booking demand requirement' );
+$check( count( WCA_Contracts::functional_requirements() ) === 18
+    && count( WCA_Contracts::nonfunctional_requirements() ) === 10
+    && count( WCA_Contracts::future_requirements() ) === 24,
+    'actual WP runtime publishes exactly 18 FR + 10 NFR + 24 Future24 IDs' );
+$check( (string) get_option( WCA_Schema::OPTION_DB_VERSION, '' ) === WCA_Contracts::SCHEMA_VERSION,
+    'canonical WCA migration option reflects verified installed schema' );
+$check( (string) get_option( WCA_Future24::SCHEMA_OPTION, '' ) === WCA_Future24::SCHEMA_VERSION,
+    'Future24 migration option reflects verified installed schema' );
+$check( (string) get_option( WCA_Continuity::SCHEMA_OPTION, '' ) === WCA_Continuity::SCHEMA_VERSION,
+    'continuity migration option reflects verified installed schema' );
+$check( (string) get_option( 'swc_db_version', '' ) === SWC_Activator::DB_VERSION,
+    'legacy schema option is separate and current, not mistaken for canonical WCA schema' );
+// An unauthenticated visitor must not receive private clinic heatmap information.
+wp_set_current_user( 0 );
+$not_allowed = WCA_Future24::heatmap( 777, 7, 0 );
+$check( is_wp_error( $not_allowed ), 'unauthenticated visitor cannot read manager-only capacity heatmap' );
 
 // Use disposable administrator with the genuine native File08 private-post caps.
 wp_set_current_user( 1 );
