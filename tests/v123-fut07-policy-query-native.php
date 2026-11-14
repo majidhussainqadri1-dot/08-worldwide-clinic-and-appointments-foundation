@@ -34,8 +34,10 @@ final class WCA_Service {
 }
 final class SWC_Helpers {
     const TYPE = 'swc_appointment';
-    public static function status( $id ) { return 'cancelled'; }
+    public static function status( $id ) { return 303 === (int) $id ? 'confirmed' : 'cancelled'; }
     public static function meta( $id, $key, $default = '' ) {
+        if ( 303 === (int) $id && 'preferred_at_utc' === $key ) { return '2026-11-24 23:30:00'; }
+        if ( 303 === (int) $id && 'appointment_end_utc' === $key ) { return '2026-11-25 00:10:00'; }
         if ( 'preferred_at_utc' === $key ) { return '2026-11-25 07:00:00'; }
         if ( 'appointment_end_utc' === $key ) { return '2026-11-25 07:30:00'; }
         return $default;
@@ -74,6 +76,11 @@ final class WP_Query {
             $this->posts = array( 1, 'oops' );
         } elseif ( self::$scenario === 'many-pages' ) {
             $this->posts = range( 1 + ( $page - 1 ) * 200, $page * 200 );
+        } elseif ( self::$scenario === 'cross-midnight' ) {
+            $start = (string) ( $args['meta_query'][1]['value'][0] ?? '' );
+            $end = (string) ( $args['meta_query'][1]['value'][1] ?? '' );
+            $this->posts = 1 === $page && $start <= '2026-11-24 23:30:00' && $end >= '2026-11-24 23:30:00'
+                ? array( 303 ) : array();
         } else {
             $this->posts = array();
         }
@@ -110,6 +117,14 @@ $run = static function ( $policy, $scenario ) use ( $m, $slot ) {
 };
 $check( true === $run( 'absent', 'valid-empty' ), 'no policy is not a failure' );
 $check( true === $run( 'valid', 'valid-empty' ), 'valid zero-conflict policy stays usable' );
+V123_Buffer_DB::$policy = 'valid';
+WP_Query::$scenario = 'cross-midnight';
+WP_Query::$calls = 0;
+$near_midnight = $slot;
+$near_midnight['start_utc'] = '2026-11-25 00:20:00';
+$near_midnight['end_utc'] = '2026-11-25 00:50:00';
+$check( false === $m->invoke( null, $near_midnight ),
+    '30-minute buffer must block an appointment that started previous UTC day and ends 10 minutes before the candidate' );
 $x = $run( 'db-error', 'valid-empty' );
 $check( is_wp_error( $x ) && 'wca_buffer_policy_read_failed' === $x->code, 'failed policy read has typed 503, not false-zero slot' );
 $x = $run( 'malformed-json', 'valid-empty' );
