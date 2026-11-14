@@ -28,3 +28,9 @@
 `FUT07-POL-01` DB query fail-open; `FUT07-POL-02` corrupt policy drops all constraints; `FUT07-POL-03` error propagation through both public APIs.
 
 Required terminal truth: Repository HEAD / Candidate SHA / Deployed Version / DB Version / Migration State / Live Verification Status.
+
+## Review B — additional UTC-midnight buffer discontinuity before correction
+
+A second independent code-path inspection of the same frozen method finds **FUT07-POL-04**, separate from policy read failures. Its appointment query binds `_swc_preferred_at_utc` to the calendar date of the candidate slot exclusively (`YYYY-MM-DD 00:00:00` through `23:59:59`). Appointments starting on the preceding UTC date but finishing shortly before a new-day slot, or next-day appointments shortly after a late-night slot, are not returned; therefore buffer/travel bounds can be silently bypassed at UTC midnight. A bounded three-UTC-date candidate window is necessary; calculate from the validated candidate start/end, expand by one UTC day either side, and keep page limit and fail-closed SQL guarantees. Native reproduction should include a prior-day appointment whose end is 10 minutes before the next day's slot and a 30-minute before buffer. This is source evidence, not a live incident.
+
+Do not confuse `FUT07-POL-04` with DST behavior; appointment times and SQL query values here are canonical UTC.
