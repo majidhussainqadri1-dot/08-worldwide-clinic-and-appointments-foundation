@@ -73,7 +73,7 @@ final class WCA_Frontend {
 	}
 
 	private static function booking( $clinic_ref ) {
-		if ( ! is_user_logged_in() ) { return self::notice( __( 'Sign in to book an appointment.', 'worldwide-clinic-appointments' ), 'warning' ); }
+		if ( ! is_user_logged_in() ) { return self::notice( __( 'Sign in to request an appointment.', 'worldwide-clinic-appointments' ), 'warning' ); }
 		$clinic = WCA_Service::public_clinic_projection( $clinic_ref );
 		if ( is_wp_error( $clinic ) ) { return self::notice( __( 'Clinic information is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
 		if ( ! $clinic ) { return self::notice( __( 'Clinic is unavailable.', 'worldwide-clinic-appointments' ), 'error' ); }
@@ -83,7 +83,8 @@ final class WCA_Frontend {
 		ob_start();
 		?>
 		<main class="wca-shell" aria-labelledby="wca-book-title" data-wca-booking data-clinic-ref="<?php echo esc_attr( $clinic['public_ref'] ); ?>" data-service-ref="<?php echo esc_attr( $service_ref ); ?>">
-			<h1 id="wca-book-title"><?php echo esc_html( sprintf( __( 'Book with %s', 'worldwide-clinic-appointments' ), $clinic['name'] ) ); ?></h1>
+			<h1 id="wca-book-title"><?php echo esc_html( sprintf( __( 'Request an appointment with %s', 'worldwide-clinic-appointments' ), $clinic['name'] ) ); ?></h1>
+			<p><?php esc_html_e( 'This is a request, not a confirmed appointment. A verified practitioner or authorized clinic staff must approve it before it is confirmed.', 'worldwide-clinic-appointments' ); ?></p>
 			<div class="wca-alert" role="alert"><strong><?php esc_html_e( 'Emergency warning:', 'worldwide-clinic-appointments' ); ?></strong> <?php esc_html_e( 'This booking service cannot provide emergency care. Contact local emergency services for urgent danger.', 'worldwide-clinic-appointments' ); ?></div>
 			<form class="wca-form" data-wca-booking-form novalidate>
 				<label><?php esc_html_e( 'Service and verified practitioner', 'worldwide-clinic-appointments' ); ?><select name="service_ref" required><?php foreach ( (array) $clinic['services'] as $service ) : ?><option value="<?php echo esc_attr( $service['public_ref'] ); ?>" data-practitioner-ref="<?php echo esc_attr( $service['practitioner_ref'] ); ?>" data-consultation-type="<?php echo esc_attr( $service['consultation_type'] ); ?>" <?php selected( $service_ref, $service['public_ref'] ); ?>><?php echo esc_html( $service['name'] ); ?></option><?php endforeach; ?></select></label>
