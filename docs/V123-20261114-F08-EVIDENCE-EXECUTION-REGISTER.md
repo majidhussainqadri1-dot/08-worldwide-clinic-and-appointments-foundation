@@ -2,7 +2,7 @@
 
 **Governing file:** Sabri-Website-Master-Plan-V12.3.docx, chapter 11, File08 pp.151–156; execution blueprint File-08-V12.3-Complete-Execution-Plan-2026-11-14.docx.
 **Exact baseline:** main `d086840f7e2ac0ed328006385f064e0e2fb58cb1`, candidate plugin 1.2.16, declared WCA schema 3.4.0. **Neither is deployed-state evidence.**
-**Candidates:** PR49 `1ad072db46f440fb91184aa8d9dec311a90ed705` (seven source defect groups; CI #43380112964 6 jobs green), PR50 V12.3 booking context/copy (separate draft; CI status at release time must be checked anew).
+**Candidates:** PR49 `1ad072db46f440fb91184aa8d9dec311a90ed705` (seven source defect groups, CI #43380112964 6 jobs green), PR50 `bec3b6204a93559c2db2bbc45c65e85c9f1e237f` (two source UI groups, full source CI #43617456113 success), PR51 FUT07 (four source groups including midnight adjacency, CI final source SHA requires verification), and **PR53** integrated draft after exact blob parity checks; NOT merged or deployed.
 **Live reality freeze attempt:** WordPress.com/Jetpack reports site_disconnected; WPVibe site has no approved connection, connect attempt failed with HTTP 530. No live plugin tree, DB, wp_options, migrations, logs, dependencies or checksum obtained. HTTP 530 is a symptom, NOT root cause. No production source or deployment actions authorized by this document.
 
 ## Evidence law
@@ -80,15 +80,21 @@
 | SD-07 | Incomplete paginated appointments on a failed second WP_Query page; unsafe downstream FUT08/10/17 projections | PR49 (combined from PR48) | No | No |
 | V123-UI-01 | Service/date/timezone changes fail to invalidate an outstanding slot search and stale slot buttons | PR50, executable Node fixture | No | No |
 | V123-UI-02 | Public booking page used the headline “Book with” while submission only creates a pending appointment request | PR50, request-truth source regression | No | No |
+| FUT07-POL-01 | A first/later failed WordPress appointment page can silently bypass active buffer policy | PR51/PR53, native SQL failures | No | No |
+| FUT07-POL-02 | Malformed active FUT07 policy JSON or limits silently disables policy | PR51/PR53, native policy integrity regression | No | No |
+| FUT07-POL-03 | Error objects require explicit propagation through holds and REST slot projections; pagination needs an upper bound | PR51/PR53, native REST/hold and 250-page regressions | No | No |
+| FUT07-POL-04 | Query's same-day UTC appointment constraint omits a prior-day appointment ending shortly before candidate midnight slot | PR51/PR53, native cross-midnight fixture | No | No |
 
-**Total frozen source findings = 9 distinct groups. Corrections authored in two unmerged drafts = 9; integrated into main = 0; Staging-confirmed = 0; Live-resolved = 0.** Do not infer a universe-wide “only 9 defects” from these scoped findings.
+**Total frozen source findings = 13 distinct groups. Source corrections authored in PR49/PR50/PR51 and composed in PR53 = 13; integrated into main = 0; Staging-confirmed = 0; Live-resolved = 0.** Do not infer a universe-wide “only 9 defects” from these scoped findings.
 
-## 32 open pull requests — individual exact-main ancestry and disposition
+## 34 open pull requests — individual exact-main ancestry and disposition
 
-Current GitHub open PR search: **32** after opening PR50. Historical snapshot of 31 open PRs belonged to the preceding planning stage. This table is a decision register, **not** an approval or automatic closure instruction.
+Current GitHub open PR search: **34** after opening PR53. Separate Issue #52 concerns the File07↔File08 public clinic discovery owner contract; it is not a pull request. Historical snapshot of 31 open PRs belonged to the preceding planning stage. This table is a decision register, **not** an approval or automatic closure instruction.
 
 | PR | Current evidence against main | Decision / next gate |
 |---|---|---|
+| #53 | Integrated V12.3 source candidate, exactly preserved PR49/PR51 FUT07 and PR50 UI blobs | Primary consolidated source QA; keep Draft; Hostinger staging/live blocked |
+| #51 | Four FUT07 policy/SQL/midnight source groups; depends on #49 | Keep Draft and retain native fail-first chain; final-head CI needed |
 | #50 | V12.3 UI/UX source patch; three native JS cases; separate PR | Keep Draft; full exact-HEAD CI, 2 reviews, combine carefully with PR49 |
 | #49 | Ahead 25 / behind 0; 12 files; prior run #43380112964 6/6 success | Primary seven-source-defect integration candidate; full V12.3, staging and owner review before merge |
 | #48 | Ahead 5 / behind 0; 4 files | Superseded candidate by #49, preserve fail-first provenance; no blanket closure |
