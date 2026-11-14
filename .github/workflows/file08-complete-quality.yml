@@ -21,6 +21,12 @@ jobs:
         php: ['7.4', '8.3']
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: '${{ github.event.pull_request.head.sha || github.sha }}'
+          persist-credentials: false
+      - name: Prove exact source HEAD before source tests
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha || github.sha }}'
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '${{ matrix.php }}', coverage: none, extensions: zip}
       - name: PHP syntax
@@ -60,6 +66,12 @@ jobs:
     needs: quality
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: '${{ github.event.pull_request.head.sha || github.sha }}'
+          persist-credentials: false
+      - name: Prove exact source HEAD before source tests
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha || github.sha }}'
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none, extensions: zip}
       - name: T28 forty whole-suite passes (source QA, not staging)
@@ -69,10 +81,13 @@ jobs:
     name: Reproducible candidate package
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [quality, forty_rounds]
+    needs: [quality, forty_rounds, native_mysql]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.event.pull_request.head.sha || github.sha }}'}
+      - name: Prove exact source HEAD before deterministic package
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha || github.sha }}'
       - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc
         with: {php-version: '8.3', coverage: none, extensions: zip}
       - id: source
@@ -100,3 +115,151 @@ jobs:
           path: build/a/
           if-no-files-found: error
           retention-days: 30
+
+  native_mysql:
+    name: Disposable WP ${{ matrix.wordpress }} / MariaDB, six real File08 dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        wordpress: ['7.0.8', '7.1.4']
+    permissions:
+      contents: read
+    services:
+      mysql:
+        image: mariadb:10.11
+        env:
+          MARIADB_DATABASE: wordpress
+          MARIADB_USER: wordpress
+          MARIADB_PASSWORD: wp-ephemeral
+          MARIADB_ROOT_PASSWORD: root-ephemeral
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: '${{ github.event.pull_request.head.sha || github.sha }}'
+          persist-credentials: false
+      - name: Prove exact source HEAD before native package build
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha || github.sha }}'
+      - uses: shivammathur/setup-php@fc14643b0a99ee9db10a3c025a33d76544fa3761
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: mysqli,mbstring,curl,zip,openssl
+      - name: Exact-source File00 membership
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: majidhussainqadri1-dot/00-sabri-membership-core
+          ref: 2fa7c022ee9cd1b65432e900579512f304532442
+          path: native-file00
+          persist-credentials: false
+      - name: Exact-source File02 authentication
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: majidhussainqadri1-dot/02-sabri-authentication
+          ref: 224c39bcb8c28f77504c7348dbad41226753c7e8
+          path: native-file02
+          persist-credentials: false
+      - name: Exact-source File03 profiles
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: majidhussainqadri1-dot/03-sabri-profiles-and-doctors
+          ref: bf317e5521ec79f9f16d21353f402571fcd4f84c
+          path: native-file03
+          persist-credentials: false
+      - name: Exact-source File07 directory
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: majidhussainqadri1-dot/07-doctors-directory-and-discovery
+          ref: 2f4a89707724fd2b9946600afe10ddab27ec3c2d
+          path: native-file07
+          persist-credentials: false
+      - name: Exact-source File09 doctor verification
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: majidhussainqadri1-dot/09-global-doctor-onboarding-and-verification-completion
+          ref: 13153e4bb5c98e449f638a2c24ec2f1c05083afc
+          path: native-file09
+          persist-credentials: false
+      - name: Install disposable WP 7.1.4 and six real source plugins (no production data)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /tmp/file08-wp-cli.phar
+          php /tmp/file08-wp-cli.phar --info
+          mkdir -p /tmp/file08-ci-wp/wp-content/plugins
+          php /tmp/file08-wp-cli.phar core download --version=${{ matrix.wordpress }} --path=/tmp/file08-ci-wp --allow-root --quiet
+          php /tmp/file08-wp-cli.phar config create --path=/tmp/file08-ci-wp --dbname=wordpress --dbuser=wordpress --dbpass=wp-ephemeral --dbhost=127.0.0.1:3306 --allow-root --quiet
+          php /tmp/file08-wp-cli.phar core install --path=/tmp/file08-ci-wp --url=http://file08-ci.local --title='File08 Disposable CI' --admin_user=admin --admin_password=ci-ephemeral-long-password --admin_email=file08-ci-admin@example.test --skip-email --allow-root --quiet
+          # File09 correctly refuses activation without versioned private keys.
+          # Generate REAL but disposable keys in this isolated CI wp-config; do not bypass cryptography.
+          gdo_ring=$(php -r 'echo json_encode(array("active"=>"ci-v1","keys"=>array("ci-v1"=>base64_encode(random_bytes(32)))));')
+          gdo_signing=$(php -r 'echo bin2hex(random_bytes(32));')
+          php /tmp/file08-wp-cli.phar config set GDO_KEYRING "$gdo_ring" --path=/tmp/file08-ci-wp --allow-root --quiet
+          php /tmp/file08-wp-cli.phar config set GDO_CLAIM_SIGNING_KEY "$gdo_signing" --path=/tmp/file08-ci-wp --allow-root --quiet
+          # File09 requires credential storage outside WordPress public content/uploads.
+          mkdir -p /tmp/file08-ci-private
+          chmod 0700 /tmp/file08-ci-private
+          php /tmp/file08-wp-cli.phar config set GDO_PRIVATE_STORAGE_DIR /tmp/file08-ci-private --path=/tmp/file08-ci-wp --allow-root --quiet
+          unset gdo_ring gdo_signing
+          mkdir -p /tmp/file08-ci-wp/wp-content/plugins/{sabri-membership-core,sabri-authentication,sabri-profiles-doctors,doctors-directory,global-doctor-onboarding,worldwide-clinic-appointments}
+          tar -C native-file00/source/sabri-membership-core -cf - . | tar -C /tmp/file08-ci-wp/wp-content/plugins/sabri-membership-core -xf -
+          tar -C native-file02 -cf - --exclude=.git . | tar -C /tmp/file08-ci-wp/wp-content/plugins/sabri-authentication -xf -
+          tar -C native-file03 -cf - --exclude=.git . | tar -C /tmp/file08-ci-wp/wp-content/plugins/sabri-profiles-doctors -xf -
+          tar -C native-file07/doctors-directory -cf - . | tar -C /tmp/file08-ci-wp/wp-content/plugins/doctors-directory -xf -
+          tar -C native-file09 -cf - --exclude=.git . | tar -C /tmp/file08-ci-wp/wp-content/plugins/global-doctor-onboarding -xf -
+          # Test exact deterministic File08 plugin ZIP, not the repository source tree.
+          mkdir -p /tmp/file08-ci-build /tmp/file08-ci-extracted
+          source_sha=$(git rev-parse HEAD)
+          source_epoch=$(git show -s --format=%ct HEAD)
+          php tools/build-candidate.php --output-dir=/tmp/file08-ci-build --commit="$source_sha" --source-date-epoch="$source_epoch"
+          php tools/verify-candidate.php --artifact=/tmp/file08-ci-build --commit="$source_sha"
+          unzip -q /tmp/file08-ci-build/*-candidate.zip -d /tmp/file08-ci-extracted
+          test -f /tmp/file08-ci-extracted/08-worldwide-clinic-and-appointments/worldwide-clinic.php
+          cp -a /tmp/file08-ci-extracted/08-worldwide-clinic-and-appointments/. /tmp/file08-ci-wp/wp-content/plugins/worldwide-clinic-appointments/
+          # File00 intentionally defers its secure migrations to a REAL admin_init.
+          # Respect the owner lifecycle; never manufacture option/schema markers.
+          php /tmp/file08-wp-cli.phar plugin activate sabri-membership-core --path=/tmp/file08-ci-wp --allow-root
+          php /tmp/file08-wp-cli.phar eval 'wp_set_current_user(1); do_action("admin_init"); if ((string)get_option("smc_db_version","") !== SMC_DB_VERSION) { fwrite(STDERR,"FILE00_BOOTSTRAP_NOT_READY ".wp_json_encode(get_option("smc_activation_bootstrap_state_v2",array()))."\\n"); exit(12); } echo "File00 real admin deferred migration complete: ".SMC_DB_VERSION."\\n";' --path=/tmp/file08-ci-wp --allow-root
+          for name in sabri-authentication sabri-profiles-doctors global-doctor-onboarding doctors-directory worldwide-clinic-appointments; do
+            php /tmp/file08-wp-cli.phar plugin activate "$name" --path=/tmp/file08-ci-wp --allow-root
+          done
+      - name: Verify exact native six-plugin WordPress/MariaDB runtime and incomplete-page fault
+        env:
+          FILE08_CI_EPHEMERAL_DB: yes
+        shell: bash
+        run: |
+          set -euo pipefail
+          php /tmp/file08-wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/v121-real-wordpress-mariadb.php" --path=/tmp/file08-ci-wp --allow-root
+      - name: Verify read-only freeze on exact disposable deployed package and installed schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          php /tmp/file08-wp-cli.phar eval-file "$GITHUB_WORKSPACE/tools/file08-live-reality-freeze.php" --path=/tmp/file08-ci-wp --allow-root > /tmp/file08-freeze.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/file08-freeze.json', encoding='utf-8') as f:
+              s = json.load(f)
+          assert s['audit_contract'] == 'sabri.file08.live-reality-freeze.v1'
+          assert s['read_only'] and s['patient_rows_collected'] is False and s['secrets_collected'] is False
+          assert s['site_host'] == 'file08-ci.local'
+          assert s['wp_core_version'] == '${{ matrix.wordpress }}'
+          assert s['loaded_runtime_version'] == '1.2.16'
+          assert len(s['installed_entry_sha256']) == 64
+          assert s['plugin_tree']['complete'] and len(s['plugin_tree']['sha256']) == 64
+          assert s['plugins']['File08']['active'] is True
+          assert all(s['plugins'][f]['active'] for f in ('File00','File02','File03','File07','File09'))
+          assert s['db_schema_options']['wca_db_version'] == s['declared_wca_schema']
+          assert not s['runtime_migration_failure_marker']
+          assert all(row['exists'] is True and not row['metadata_read_failed'] for row in s['wca_tables'].values())
+          assert not s['deployment_parity_confirmed'] and not s['live_retested']
+          print('PASS: private read-only File08 host parity snapshot on isolated CI package')
+          PY
