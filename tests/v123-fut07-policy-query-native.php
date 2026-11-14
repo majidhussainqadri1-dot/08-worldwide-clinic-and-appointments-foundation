@@ -3,6 +3,15 @@
  * V12.3 FUT07 native method regression — REAL WCA_Future24 runtime code.
  * WordPress WP_Query/DB edge behavior is simulated; NOT Staging/Live.
  */
+// Declare native test WP_Error fields explicitly for PHP 8.2+ diagnostic-clean CI.
+if ( ! class_exists( 'WP_Error' ) ) {
+    class WP_Error {
+        public $code; public $message; public $data;
+        public function __construct( $code = '', $message = '', $data = null ) {
+            $this->code = $code; $this->message = $message; $this->data = $data;
+        }
+    }
+}
 require __DIR__ . '/bootstrap.php';
 if ( ! defined( 'ARRAY_A' ) ) { define( 'ARRAY_A', 'ARRAY_A' ); }
 if ( ! defined( 'DAY_IN_SECONDS' ) ) { define( 'DAY_IN_SECONDS', 86400 ); }
