@@ -1221,8 +1221,12 @@ self::release_semantic_lock( $lock );
 		$start = self::utc( isset( $slot['start_utc'] ) ? $slot['start_utc'] : '' );
 		$end = self::utc( isset( $slot['end_utc'] ) ? $slot['end_utc'] : '' );
 		if ( ! $doctor_id || ! $start || ! $end ) { return false; }
-		$day_start = substr( $start, 0, 10 ) . ' 00:00:00';
-		$day_end = substr( $start, 0, 10 ) . ' 23:59:59';
+		// A buffer/travel rule must include appointments that begin on the
+		// preceding UTC date but overlap this candidate's new-day boundary.
+		// Also include next-day starts for late-evening candidates. The
+		// expanded bounded scan remains subject to page and DB-error guards.
+		$day_start = gmdate( 'Y-m-d 00:00:00', strtotime( $start . ' UTC' ) - DAY_IN_SECONDS );
+		$day_end = gmdate( 'Y-m-d 23:59:59', strtotime( $end . ' UTC' ) + DAY_IN_SECONDS );
 		$near = 0;
 		$slot_branch = strtolower( sanitize_text_field( isset( $slot['branch_ref'] ) ? $slot['branch_ref'] : '' ) );
 		$page = 1;
