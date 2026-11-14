@@ -81,12 +81,15 @@
 		var holdGeneration = 0;
 
 		function invalidateSelection() {
+			// A filter change invalidates BOTH outstanding searches and slot holds.
+			// Never display previously fetched times under a new service/date/timezone.
+			searchGeneration += 1;
 			holdGeneration += 1;
 			selectedHold = null;
 			appointmentRequestKey = null;
-			Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) {
-				item.setAttribute('aria-pressed', 'false');
-			});
+			slotsNode.replaceChildren();
+			searchButton.disabled = false;
+			setStatus(root, '', false);
 		}
 
 		var tz = form.elements.timezone;
@@ -111,8 +114,8 @@
 		});
 
 		searchButton.addEventListener('click', async function () {
-			var generation = ++searchGeneration;
 			invalidateSelection();
+			var generation = ++searchGeneration;
 			searchButton.disabled = true;
 			setStatus(root, (runtime.i18n && runtime.i18n.loading) || 'Loading…', false);
 			slotsNode.replaceChildren();

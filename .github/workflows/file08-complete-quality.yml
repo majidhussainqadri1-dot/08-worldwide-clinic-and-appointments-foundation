@@ -38,6 +38,8 @@ jobs:
           node --check assets/js/clinic.js
           node --check assets/js/continuity.js
           node --check assets/js/future24.js
+      - name: V12.3 booking filter-concurrency native JavaScript regression
+        run: node tests/v123-stale-slot-ui-native.js
       - name: Repository hygiene
         shell: bash
         run: |
