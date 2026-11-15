@@ -1,0 +1,13 @@
+# File08 V12.3 — Future24 migration read failure can falsely commit schema version (P01/P10)
+
+**Exact base:** Draft PR60 SHA `e241562bb7ee24fcd27de360382c7ac41ef944de` (CI run #43671467058, 7/7 green), default main `d086840f7e2ac0ed328006385f064e0e2fb58cb1`. Neither equals verified Hostinger Live. Master Plan V12.3 F08-NFR-007 (migration/rollback) and F08-FUT-23 (private clinical episode chain).
+
+**Frozen source root cause before coding:** `WCA_Future24::install_schema()` includes a bounded page-by-ID migration to backfill `subject_user_id` from patient appointment context for legacy `F08-FUT-23` episodes. It only throws when `$legacy_episodes === null && $wpdb->last_error !== ''`. On SQL failure `$wpdb->get_results()` may return `[]` with fresh `$wpdb->last_error`; the migration loop then sees no rows and **writes Future24's schema-version option as current** without verifying the unprocessed private records. With invalid `false`, `(array) false` creates a fabricated row and can error. There is no reset of prior `last_error` just before this query. This is a **source migration integrity risk**, not a proved Hostinger migration failure.
+
+**Smallest correction:** Clear `$wpdb->last_error` directly before each episode page fetch, then throw if not an array **or** current SQL error is nonempty. Iterate verified array only. Preserve existing transaction behavior and version-marker writer so it will be invoked only after successful complete migration; do not modify schema SQL, episode decisions, schema version string, payment or clinical data.
+
+**Fail-first acceptance:** native PHP invokes actual `install_schema` with stubbed verified schema and DB; scenarios: no rows, stale previous last_error but current valid empty, first SQL page returns [] + error, second page returns [] + error after exactly 200 records, invalid non-array row set. All failure scenarios must prevent `update_option_strict` schema version writer. Full PHP7.4/8.3 and 3 WordPress/MariaDB disposable tests plus 40 source rounds and deterministic candidate ZIP on exact HEAD. No live install.
+
+**Release block:** Installed Hostinger plugin, checksum, DB version, migration markers, episode rows, logs and dependency parity remain unavailable; Jetpack `site_disconnected`, WPVibe unconnected/HTTP530. Do not attribute a live symptom to this code until live parity. **Exact deployed code ابھی unverified ہے؛ repository-based diagnosis provisional ہے۔**
+
+Prior 20 scoped defect families; this is 1 new **migration integrity** family (#21 candidate only after tests); main fixes 0 / staging verified 0 / live resolved 0. Two AI source reviews do not replace two independent human reviews.

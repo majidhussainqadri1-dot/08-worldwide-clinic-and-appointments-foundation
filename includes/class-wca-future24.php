@@ -118,9 +118,16 @@ final class WCA_Future24 {
 
 		$cursor = 0;
 		do {
+			// A failed SQL page can return an empty array while last_error is set.
+			// Never stamp the Future24 schema version until every privacy episode
+			// page has been read, backfilled and validated successfully.
+			$wpdb->last_error = '';
 			$legacy_episodes = $wpdb->get_results( $wpdb->prepare( "SELECT id,appointment_id FROM {$table} WHERE feature_id='F08-FUT-23' AND subject_user_id=0 AND appointment_id>0 AND id>%d ORDER BY id ASC LIMIT 200", $cursor ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $legacy_episodes && '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'File 08 Future24 episode privacy migration could not read legacy rows.' ); }
-			foreach ( (array) $legacy_episodes as $legacy_episode ) {
+			if ( ! is_array( $legacy_episodes ) || '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'File 08 Future24 episode privacy migration could not read legacy rows.' ); }
+			foreach ( $legacy_episodes as $legacy_episode ) {
+				if ( ! is_array( $legacy_episode ) || ! isset( $legacy_episode['id'], $legacy_episode['appointment_id'] ) ) {
+					throw new RuntimeException( 'File 08 Future24 episode privacy migration returned an invalid legacy record.' );
+				}
 				$episode_id = absint( $legacy_episode['id'] );
 				$appointment_id = absint( $legacy_episode['appointment_id'] );
 				$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
@@ -130,7 +137,7 @@ final class WCA_Future24 {
 				}
 				$cursor = max( $cursor, $episode_id );
 			}
-		} while ( 200 === count( (array) $legacy_episodes ) );
+		} while ( 200 === count( $legacy_episodes ) );
 
 		$written = SWC_Helpers::update_option_strict( self::SCHEMA_OPTION, self::SCHEMA_VERSION, 'wca_future24_schema_version_write' );
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 Future24 schema version could not be persisted.' ); }
@@ -525,14 +532,17 @@ final class WCA_Future24 {
 		$cursor = 0;
 		$batch = 100;
 		do {
+			$wpdb->last_error = '';
 			$rows_raw = $wpdb->get_results( $wpdb->prepare(
 				"SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) AND id>%d ORDER BY id ASC LIMIT %d",
 				absint( $clinic_id ), WCA_Repository::now(), $cursor, $batch
 			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'wca_waitlist_candidate_read_failed' ); }
-			$rows = (array) $rows_raw;
+			if ( ! is_array( $rows_raw ) || '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'wca_waitlist_candidate_read_failed' ); }
+			$rows = $rows_raw;
 			foreach ( $rows as $row ) {
-				$cursor = max( $cursor, absint( $row['id'] ?? 0 ) );
+				$next_id = is_array( $row ) ? absint( $row['id'] ?? 0 ) : 0;
+				if ( $next_id <= $cursor ) { throw new RuntimeException( 'wca_waitlist_candidate_read_failed' ); }
+				$cursor = $next_id;
 				yield $row;
 			}
 		} while ( count( $rows ) === $batch );
@@ -1145,7 +1155,9 @@ self::release_semantic_lock( $lock );
 			'start_utc' => sanitize_text_field( isset( $data['start_utc'] ) ? $data['start_utc'] : '' ),
 			'end_utc' => sanitize_text_field( isset( $data['end_utc'] ) ? $data['end_utc'] : '' ),
 		);
-		if ( ! self::slot_allowed_by_policy( $slot ) ) {
+		$policy_check = self::slot_allowed_by_policy( $slot );
+		if ( is_wp_error( $policy_check ) ) { return $policy_check; }
+		if ( ! $policy_check ) {
 			return new WP_Error( 'wca_future24_slot_policy', __( 'The selected time is unavailable under the current clinic buffer, travel, or continuous-consultation policy.', 'worldwide-clinic-appointments' ), array( 'status' => 409 ) );
 		}
 		$external = self::external_busy_conflict( $slot['practitioner_ref'], $slot['start_utc'], $slot['end_utc'] );
@@ -1160,8 +1172,10 @@ self::release_semantic_lock( $lock );
 		}
 		$data = method_exists( $response, 'get_data' ) ? $response->get_data() : null;
 		if ( ! is_array( $data ) || empty( $data['slots'] ) || ! is_array( $data['slots'] ) ) { return $response; }
+		$policy_slots = self::apply_slot_policies( $data['slots'] );
+		if ( is_wp_error( $policy_slots ) ) { return $policy_slots; }
 		$filtered = array(); $external_degraded = false;
-		foreach ( self::apply_slot_policies( $data['slots'] ) as $slot ) { $external=self::external_busy_conflict( $slot['practitioner_ref'] ?? '', $slot['start_utc'] ?? '', $slot['end_utc'] ?? '' ); if(is_wp_error($external)){ $external_degraded=true; break; } if(!$external){$filtered[]=$slot;} }
+		foreach ( $policy_slots as $slot ) { $external=self::external_busy_conflict( $slot['practitioner_ref'] ?? '', $slot['start_utc'] ?? '', $slot['end_utc'] ?? '' ); if(is_wp_error($external)){ $external_degraded=true; break; } if(!$external){$filtered[]=$slot;} }
 		$data['slots'] = $external_degraded ? array() : array_values( $filtered );
 		$data['future24_policy_applied'] = true;
 		$data['external_calendar_filter_applied'] = true;
@@ -1173,7 +1187,9 @@ self::release_semantic_lock( $lock );
 	private static function apply_slot_policies( $slots ) {
 		$out = array();
 		foreach ( (array) $slots as $slot ) {
-			if ( self::slot_allowed_by_policy( $slot ) ) { $out[] = $slot; }
+			$allowed = self::slot_allowed_by_policy( $slot );
+			if ( is_wp_error( $allowed ) ) { return $allowed; }
+			if ( $allowed ) { $out[] = $slot; }
 		}
 		return array_values( $out );
 	}
@@ -1183,27 +1199,50 @@ self::release_semantic_lock( $lock );
 		$clinic = WCA_Repository::get_clinic( isset( $slot['clinic_ref'] ) ? $slot['clinic_ref'] : '', true );
 		if ( ! $clinic ) { return false; }
 		$table = self::tables()['records'];
+		// A failed policy lookup is not the same thing as no active policy.
+		$wpdb->last_error = '';
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT payload_json FROM {$table} WHERE feature_id='F08-FUT-07' AND clinic_id=%d AND status='policy_active' ORDER BY id DESC LIMIT 1", absint( $clinic['id'] ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( null === $row && '' !== (string) $wpdb->last_error ) { return false; }
-		if ( ! $row ) { return true; }
+		if ( '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_buffer_policy_read_failed', __( 'The clinic scheduling policy could not be verified.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		if ( null === $row ) { return true; }
+		if ( ! is_array( $row ) || ! isset( $row['payload_json'] ) ) {
+			return new WP_Error( 'wca_buffer_policy_corrupt', __( 'Stored clinic scheduling policy is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		$policy = json_decode( (string) $row['payload_json'], true );
-		$policy = is_array( $policy ) ? $policy : array();
-		$before = min( 240, absint( isset( $policy['buffer_before'] ) ? $policy['buffer_before'] : 0 ) );
-		$after = min( 240, absint( isset( $policy['buffer_after'] ) ? $policy['buffer_after'] : 0 ) );
-		$travel = min( 480, absint( isset( $policy['travel_gap_minutes'] ) ? $policy['travel_gap_minutes'] : 0 ) );
-		$maximum = min( 30, absint( isset( $policy['max_continuous_consultations'] ) ? $policy['max_continuous_consultations'] : 0 ) );
+		if ( ! is_array( $policy ) ) {
+			return new WP_Error( 'wca_buffer_policy_corrupt', __( 'Stored clinic scheduling policy cannot be decoded.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$required = array( 'buffer_before', 'buffer_after', 'travel_gap_minutes', 'max_continuous_consultations' );
+		foreach ( $required as $key ) {
+			if ( ! array_key_exists( $key, $policy ) ) {
+				return new WP_Error( 'wca_buffer_policy_corrupt', __( 'Stored clinic scheduling policy is incomplete.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+		}
+		$before = WCA_Service::strict_int( $policy['buffer_before'], 0, 240 );
+		$after = WCA_Service::strict_int( $policy['buffer_after'], 0, 240 );
+		$travel = WCA_Service::strict_int( $policy['travel_gap_minutes'], 0, 480 );
+		$maximum = WCA_Service::strict_int( $policy['max_continuous_consultations'], 0, 30 );
+		if ( null === $before || null === $after || null === $travel || null === $maximum ) {
+			return new WP_Error( 'wca_buffer_policy_corrupt', __( 'Stored clinic scheduling policy has invalid numeric limits.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 		if ( ! $before && ! $after && ! $travel && ! $maximum ) { return true; }
 		$doctor_id = WCA_Plan_Guard::practitioner_id( isset( $slot['practitioner_ref'] ) ? $slot['practitioner_ref'] : '' );
 		$start = self::utc( isset( $slot['start_utc'] ) ? $slot['start_utc'] : '' );
 		$end = self::utc( isset( $slot['end_utc'] ) ? $slot['end_utc'] : '' );
 		if ( ! $doctor_id || ! $start || ! $end ) { return false; }
-		$day_start = substr( $start, 0, 10 ) . ' 00:00:00';
-		$day_end = substr( $start, 0, 10 ) . ' 23:59:59';
+		// A buffer/travel rule must include appointments that begin on the
+		// preceding UTC date but overlap this candidate's new-day boundary.
+		// Also include next-day starts for late-evening candidates. The
+		// expanded bounded scan remains subject to page and DB-error guards.
+		$day_start = gmdate( 'Y-m-d 00:00:00', strtotime( $start . ' UTC' ) - DAY_IN_SECONDS );
+		$day_end = gmdate( 'Y-m-d 23:59:59', strtotime( $end . ' UTC' ) + DAY_IN_SECONDS );
 		$near = 0;
 		$slot_branch = strtolower( sanitize_text_field( isset( $slot['branch_ref'] ) ? $slot['branch_ref'] : '' ) );
 		$page = 1;
 		$batch = 200;
 		do {
+			$wpdb->last_error = '';
 			$q = new WP_Query( array(
 				'post_type' => SWC_Helpers::TYPE,
 				'post_status' => array( 'private', 'publish' ),
@@ -1218,7 +1257,22 @@ self::release_semantic_lock( $lock );
 					array( 'key' => '_swc_preferred_at_utc', 'value' => array( $day_start, $day_end ), 'compare' => 'BETWEEN', 'type' => 'DATETIME' ),
 				),
 			) );
-			$ids = array_map( 'absint', (array) $q->posts );
+			// WP_Query may return [] on a failed database page. Never advertise
+			// an available slot if any page of the relevant schedule is unreadable.
+			if ( ! isset( $q->posts ) || ! is_array( $q->posts ) || '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_buffer_policy_appointment_read_failed', __( 'Existing consultations could not be checked for a safe scheduling buffer.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$ids = array();
+			foreach ( $q->posts as $candidate ) {
+				if ( ! is_int( $candidate ) && ( ! is_string( $candidate ) || ! ctype_digit( $candidate ) ) ) {
+					return new WP_Error( 'wca_buffer_policy_appointment_invalid_id', __( 'Existing consultation reference is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$appointment_id = absint( $candidate );
+				if ( ! $appointment_id ) {
+					return new WP_Error( 'wca_buffer_policy_appointment_invalid_id', __( 'Existing consultation reference is invalid.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$ids[] = $appointment_id;
+			}
 			foreach ( $ids as $appointment_id ) {
 				$status = SWC_Helpers::status( $appointment_id );
 				if ( in_array( $status, array( 'declined','cancelled','no_show' ), true ) ) { continue; }
@@ -1244,13 +1298,36 @@ self::release_semantic_lock( $lock );
 					}
 				}
 			}
+			if ( count( $ids ) === $batch && $page >= 250 ) {
+				return new WP_Error( 'wca_buffer_policy_appointment_page_limit', __( 'The appointment set is too large for a safe synchronous policy check.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
 			$page++;
 		} while ( count( $ids ) === $batch );
 
 		return ! $maximum || $near < $maximum;
 	}
 
-	/* FUT-08 */
+	/* FUT-08 — controlled source-only reconciliation from T44–T47 */
+	private static function heatmap_interval_overlaps( DateTimeImmutable $slot, DateTimeImmutable $slot_end, $start_hm, $end_hm ) {
+		$tz = $slot->getTimezone()->getName();
+		$date = $slot->format( 'Y-m-d' );
+		if ( ! WCA_Service::valid_hhmm( $start_hm ) || ! WCA_Service::valid_hhmm( $end_hm ) || $end_hm <= $start_hm ) {
+			return new WP_Error( 'wca_heatmap_interval_corrupt', __( 'A stored availability break or closure has invalid local time bounds.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$from_utc = SWC_Helpers::to_utc( $date, $start_hm, $tz );
+		$to_utc = SWC_Helpers::to_utc( $date, $end_hm, $tz );
+		if ( ! $from_utc || ! $to_utc ) {
+			return new WP_Error( 'wca_heatmap_interval_corrupt', __( 'Stored availability interval has ambiguous or nonexistent daylight-saving local time.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		$utc = new DateTimeZone( 'UTC' );
+		$from = DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $from_utc, $utc );
+		$to = DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $to_utc, $utc );
+		if ( ! $from || ! $to || $to <= $from ) {
+			return new WP_Error( 'wca_heatmap_interval_corrupt', __( 'Stored availability break or closure cannot be projected.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
+		return $slot < $to && $slot_end > $from;
+	}
+
 	public static function heatmap( $clinic_id, $days = 30, $actor = 0 ) {
 		global $wpdb;
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
@@ -1264,6 +1341,7 @@ self::release_semantic_lock( $lock );
 		$from = $window_start->format( 'Y-m-d H:i:s' );
 		$to = $window_end->format( 'Y-m-d H:i:s' );
 		$ids = self::clinic_appointments_between_all( $clinic_id, $from, $to );
+		if ( is_wp_error( $ids ) ) { return $ids; }
 
 		$map = array();
 		for ( $i = 0; $i < $days; $i++ ) {
@@ -1277,8 +1355,13 @@ self::release_semantic_lock( $lock );
 		}
 
 		$rules_table = WCA_Schema::tables()['availability'];
+		// A failed WordPress availability read can return an empty array. Never
+		// misrepresent a database error as a clinic having zero capacity.
+		$wpdb->last_error = '';
 		$rules = $wpdb->get_results( $wpdb->prepare( "SELECT id,rrule_json,breaks_json,exceptions_json,capacity,status,timezone FROM {$rules_table} WHERE clinic_id=%d AND status='active' ORDER BY id ASC", absint( $clinic_id ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( null === $rules ) { return new WP_Error( 'wca_heatmap_rules_query', __( 'Availability capacity could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		if ( ! is_array( $rules ) || '' !== (string) $wpdb->last_error ) {
+			return new WP_Error( 'wca_heatmap_rules_read_failed', __( 'Availability capacity is temporarily unverifiable; no heatmap has been fabricated.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+		}
 
 		foreach ( (array) $rules as $rule ) {
 			$timezone = (string) ( $rule['timezone'] ?? '' );
@@ -1306,26 +1389,88 @@ self::release_semantic_lock( $lock );
 				$local_date = $cursor_date->format( 'Y-m-d' );
 				if ( ( $effective_from && $local_date < $effective_from ) || ( $effective_until && $local_date > $effective_until ) ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
 				$weekday = strtolower( $cursor_date->format( 'l' ) );
-				if ( ! in_array( $weekday, (array) ( $rrule['days'] ?? array() ), true ) ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
+				// Day eligibility is checked AFTER explicit 'open' exceptions, exactly as canonical slot discovery does.
 
-				$day_start = $start_h; $day_end = $end_h; $day_capacity = $capacity; $closed = false;
+				$day_start = $start_h; $day_end = $end_h; $day_capacity = $capacity; $closed = false; $partial_closed = array(); $open_override = false;
 				foreach ( $exceptions as $exception ) {
 					if ( ! is_array( $exception ) || (string) ( $exception['date'] ?? '' ) !== $local_date ) { continue; }
 					$type = sanitize_key( $exception['type'] ?? '' );
-					if ( 'closed' === $type ) { $closed = true; break; }
-					if ( 'capacity' === $type ) { $override = WCA_Service::strict_int( $exception['capacity'] ?? null, 0, 50 ); if ( null !== $override ) { $day_capacity = $override; } }
-					if ( 'open' === $type && WCA_Service::valid_hhmm( $exception['start'] ?? '' ) && WCA_Service::valid_hhmm( $exception['end'] ?? '' ) && $exception['end'] > $exception['start'] ) { $day_start=(string)$exception['start']; $day_end=(string)$exception['end']; }
+					if ( 'closed' === $type ) {
+						$closed_from = (string) ( $exception['start'] ?? '' );
+						$closed_to = (string) ( $exception['end'] ?? '' );
+						if ( '' === $closed_from && '' === $closed_to ) { $closed = true; break; }
+						if ( ! WCA_Service::valid_hhmm( $closed_from ) || ! WCA_Service::valid_hhmm( $closed_to ) || $closed_to <= $closed_from ) {
+							return new WP_Error( 'wca_heatmap_interval_corrupt', __( 'A stored bounded closure has invalid local time bounds.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+						}
+						$partial_closed[] = array( 'start' => $closed_from, 'end' => $closed_to );
+						continue;
+					}
+					if ( 'capacity' === $type ) {
+						$override = WCA_Service::strict_int( $exception['capacity'] ?? null, 0, 50 );
+						if ( null === $override ) {
+							return new WP_Error( 'wca_heatmap_exception_capacity_corrupt', __( 'An active capacity exception contains an invalid override; the heatmap cannot be calculated reliably.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+						}
+						$day_capacity = $override;
+					}
+					if ( 'open' === $type ) {
+						// A deliberate paired-empty override preserves canonical base hours.
+						// Missing/malformed/inverted stored bounds must never silently
+						// fall back while presenting an apparently healthy heatmap.
+						$open_from = $exception['start'] ?? null;
+						$open_to = $exception['end'] ?? null;
+						if ( '' === $open_from && '' === $open_to ) {
+							$open_override = true;
+						} elseif ( ! is_string( $open_from ) || ! is_string( $open_to )
+							|| ! WCA_Service::valid_hhmm( $open_from ) || ! WCA_Service::valid_hhmm( $open_to ) || $open_to <= $open_from ) {
+							return new WP_Error( 'wca_heatmap_open_exception_corrupt', __( 'A stored date-specific opening has invalid local time boundaries.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+						} else {
+							$open_override = true;
+							$day_start = $open_from;
+							$day_end = $open_to;
+						}
+					}
 				}
-				if ( $closed || 0 === $day_capacity ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
+				if ( ( ! in_array( $weekday, (array) ( $rrule['days'] ?? array() ), true ) && ! $open_override )
+					|| $closed || 0 === $day_capacity ) { $cursor_date=$cursor_date->modify('+1 day'); continue; }
 
 				$slot = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_start, $tz );
 				$end = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $local_date . ' ' . $day_end, $tz );
+				// PHP normalizes nonexistent wall-time boundaries in DST spring gaps.
+				// Do not silently count those slots as if they were requested hours.
+				if ( $slot && $slot->format( 'Y-m-d H:i' ) !== $local_date . ' ' . $day_start ) {
+					return new WP_Error( 'wca_heatmap_local_time', __( 'Stored rule starts at a nonexistent local time.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				if ( $end && $end->format( 'Y-m-d H:i' ) !== $local_date . ' ' . $day_end ) {
+					return new WP_Error( 'wca_heatmap_local_time', __( 'Stored rule ends at a nonexistent local time.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
 				if ( ! $slot || ! $end || $end <= $slot ) { return new WP_Error( 'wca_heatmap_local_time', __( 'Availability local-time projection failed safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-				while ( $slot < $end ) {
-					$slot_hm = $slot->format( 'H:i' ); $in_break = false;
-					foreach ( $breaks as $break ) { if ( is_array( $break ) && WCA_Service::valid_hhmm( $break['start'] ?? '' ) && WCA_Service::valid_hhmm( $break['end'] ?? '' ) && $slot_hm >= $break['start'] && $slot_hm < $break['end'] ) { $in_break=true; break; } }
+				while ( $slot->modify( '+' . $interval . ' minutes' ) <= $end ) {
+					$slot_end = $slot->modify( '+' . $interval . ' minutes' );
+					// The File08 booking owner refuses ambiguous/repeated DST wall times.
+					// Apply identical validity to both ends of this capacity slot;
+					// an unbookable projected interval must not inflate the heatmap.
+					$slot_start_utc = SWC_Helpers::to_utc( $slot->format( 'Y-m-d' ), $slot->format( 'H:i' ), $timezone );
+					$slot_end_utc = SWC_Helpers::to_utc( $slot_end->format( 'Y-m-d' ), $slot_end->format( 'H:i' ), $timezone );
+					if ( ! $slot_start_utc || ! $slot_end_utc || $slot_end_utc <= $slot_start_utc ) {
+						$slot = $slot_end;
+						continue;
+					}
+					$in_break = false;
+					foreach ( $breaks as $break ) {
+						if ( ! is_array( $break ) ) { return new WP_Error( 'wca_heatmap_interval_corrupt', __( 'Stored break must be a structured local interval.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+						$overlap = self::heatmap_interval_overlaps( $slot, $slot_end, $break['start'] ?? null, $break['end'] ?? null );
+						if ( is_wp_error( $overlap ) ) { return $overlap; }
+						if ( $overlap ) { $in_break = true; break; }
+					}
+					if ( ! $in_break ) {
+						foreach ( $partial_closed as $closure ) {
+							$overlap = self::heatmap_interval_overlaps( $slot, $slot_end, $closure['start'], $closure['end'] );
+							if ( is_wp_error( $overlap ) ) { return $overlap; }
+							if ( $overlap ) { $in_break = true; break; }
+						}
+					}
 					if ( ! $in_break ) { $utc_day = $slot->setTimezone( $utc )->format( 'Y-m-d' ); if ( isset( $map[$utc_day] ) ) { $map[$utc_day]['configured_capacity'] += $day_capacity; } }
-					$slot = $slot->modify( '+' . $interval . ' minutes' );
+					$slot = $slot_end;
 				}
 				$cursor_date = $cursor_date->modify( '+1 day' );
 			}
@@ -1377,6 +1522,7 @@ self::release_semantic_lock( $lock );
 		$clinic = self::require_clinic_manager( $clinic_id, $actor );
 		if ( is_wp_error( $clinic ) ) { return $clinic; }
 		$ids = self::clinic_appointments_between_all( $clinic_id, gmdate( 'Y-m-d H:i:s', time() - 365 * DAY_IN_SECONDS ), gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ) );
+		if ( is_wp_error( $ids ) ) { return $ids; }
 		$total = 0; $no_show = 0;
 		foreach ( $ids as $id ) { $status = SWC_Helpers::status( $id ); if ( in_array( $status, array( 'completed', 'no_show' ), true ) ) { $total++; if ( 'no_show' === $status ) { $no_show++; } } }
 		if ( $total < self::MIN_FORECAST_N ) { return array( 'contract' => 'wca.no-show-forecast', 'version' => self::CONTRACT_VERSION, 'suppressed' => true, 'minimum_sample' => self::MIN_FORECAST_N, 'patient_scoring' => false ); }
@@ -1411,13 +1557,19 @@ self::release_semantic_lock( $lock );
 		$cursor = 0;
 		$batch = 100;
 		do {
+			$wpdb->last_error = '';
 			$rows_raw = $wpdb->get_results( $wpdb->prepare(
 				"SELECT {$columns} FROM {$table} WHERE feature_id=%s AND clinic_id=%d AND status=%s AND id>%d ORDER BY id ASC LIMIT %d",
 				$feature_id, absint( $clinic_id ), $status, $cursor, $batch
 			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			$rows = (array) $rows_raw;
-			foreach ( $rows as $row ) { $cursor = max( $cursor, absint( $row['id'] ?? 0 ) ); $out[] = $row; }
+			if ( ! is_array( $rows_raw ) || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$rows = $rows_raw;
+			foreach ( $rows as $row ) {
+				$next_id = is_array( $row ) ? absint( $row['id'] ?? 0 ) : 0;
+				if ( $next_id <= $cursor ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+				$cursor = $next_id;
+				$out[] = $row;
+			}
 		} while ( count( $rows ) === $batch );
 		return $out;
 	}
@@ -1657,7 +1809,9 @@ self::release_semantic_lock( $lock );
 		}
 		$effective_start=gmdate('Y-m-d H:i:s',max($start_ts,$now));
 		$affected=array();
-		foreach(self::clinic_appointments_between_all($clinic_id,$effective_start,$end) as $appointment_id){
+		$affected_rows=self::clinic_appointments_between_all($clinic_id,$effective_start,$end);
+		if(is_wp_error($affected_rows)){return $affected_rows;}
+		foreach($affected_rows as $appointment_id){
 			if(!in_array(SWC_Helpers::status($appointment_id),array('requested','confirmed','reschedule_pending'),true)){continue;}
 			$scheduled=self::utc(SWC_Helpers::meta($appointment_id,'preferred_at_utc',''));
 			if(!$scheduled||strtotime($scheduled.' UTC')<$now){continue;}
@@ -1973,10 +2127,12 @@ self::release_semantic_lock( $lock );
 
 	/** Return the complete affected appointment set in bounded pages; no silent fixed-count truncation. */
 	private static function clinic_appointments_between_all( $clinic_id, $from, $to ) {
+		global $wpdb;
 		$out = array();
 		$page = 1;
 		$batch = 200;
 		do {
+			$wpdb->last_error = '';
 			$q = new WP_Query( array(
 				'post_type' => SWC_Helpers::TYPE,
 				'post_status' => array( 'private','publish' ),
@@ -1991,8 +2147,26 @@ self::release_semantic_lock( $lock );
 					array( 'key' => '_swc_preferred_at_utc', 'value' => array( self::utc( $from ), self::utc( $to ) ), 'compare' => 'BETWEEN', 'type' => 'DATETIME' ),
 				),
 			) );
-			$ids = array_map( 'absint', (array) $q->posts );
+			// Never treat a failed/malformed WordPress page as a complete affected set.
+			if ( ! isset( $q->posts ) || ! is_array( $q->posts ) || '' !== (string) $wpdb->last_error ) {
+				return new WP_Error( 'wca_disruption_appointment_page_read_failed', __( 'Current clinic appointments could not be enumerated completely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
+			$ids = array();
+			foreach ( $q->posts as $candidate ) {
+				if ( ! is_int( $candidate ) && ( ! is_string( $candidate ) || ! ctype_digit( $candidate ) ) ) {
+					return new WP_Error( 'wca_disruption_appointment_page_invalid', __( 'Current clinic appointments contained an invalid reference.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$id = absint( $candidate );
+				if ( ! $id ) {
+					return new WP_Error( 'wca_disruption_appointment_page_invalid', __( 'Current clinic appointments contained an invalid reference.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+				}
+				$ids[] = $id;
+			}
 			$out = array_merge( $out, $ids );
+			// An operationally oversized enumeration must stop explicitly, not truncate.
+			if ( count( $ids ) === $batch && $page >= 250 ) {
+				return new WP_Error( 'wca_disruption_appointment_page_limit', __( 'The clinic appointment set is too large for a safe synchronous projection.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) );
+			}
 			$page++;
 		} while ( count( $ids ) === $batch );
 		return array_values( array_unique( $out ) );

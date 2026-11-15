@@ -49,12 +49,14 @@ final class WCA_Frontend {
 			</header>
 			<section aria-labelledby="wca-services-title">
 				<h2 id="wca-services-title"><?php esc_html_e( 'Services', 'worldwide-clinic-appointments' ); ?></h2>
+				<p><?php esc_html_e( 'Platform commission is 0%. Consult the displayed clinic service fee, range, tax and cancellation terms before sending an appointment request.', 'worldwide-clinic-appointments' ); ?></p>
 				<div class="wca-grid">
 					<?php foreach ( (array) $clinic['services'] as $service ) : ?>
 						<article class="wca-card">
 							<h3><?php echo esc_html( $service['name'] ); ?></h3>
 							<p><?php echo esc_html( sprintf( __( '%1$d minutes · %2$s', 'worldwide-clinic-appointments' ), absint( $service['duration_minutes'] ), self::consultation_type_label( $service['consultation_type'] ?? '' ) ) ); ?></p>
-							<p class="wca-price"><?php echo esc_html( self::money( $service['fee_minor'], $service['currency'] ) ); ?></p>
+							<p class="wca-price"><?php echo esc_html( self::service_fee_label( $service ) ); ?></p>
+							<?php echo self::service_terms_markup( $service, $clinic['policies'] ?? array() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes all rendered text. ?>
 							<a class="wca-button" href="<?php echo esc_url( home_url( '/appointments/book/' . rawurlencode( $clinic['public_ref'] ) . '/?service=' . rawurlencode( $service['public_ref'] ) ) ); ?>"><?php esc_html_e( 'Choose appointment', 'worldwide-clinic-appointments' ); ?></a>
 						</article>
 					<?php endforeach; ?>
@@ -73,20 +75,37 @@ final class WCA_Frontend {
 	}
 
 	private static function booking( $clinic_ref ) {
-		if ( ! is_user_logged_in() ) { return self::notice( __( 'Sign in to book an appointment.', 'worldwide-clinic-appointments' ), 'warning' ); }
+		if ( ! is_user_logged_in() ) { return self::notice( __( 'Sign in to request an appointment.', 'worldwide-clinic-appointments' ), 'warning' ); }
 		$clinic = WCA_Service::public_clinic_projection( $clinic_ref );
 		if ( is_wp_error( $clinic ) ) { return self::notice( __( 'Clinic information is temporarily unavailable. Please try again.', 'worldwide-clinic-appointments' ), 'error' ); }
 		if ( ! $clinic ) { return self::notice( __( 'Clinic is unavailable.', 'worldwide-clinic-appointments' ), 'error' ); }
 		$service_ref = sanitize_text_field( wp_unslash( $_GET['service'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only route choice.
+		$services = (array) ( $clinic['services'] ?? array() );
+		if ( ! $services ) { return self::notice( __( 'No verified appointment services are currently available for this clinic.', 'worldwide-clinic-appointments' ), 'warning' ); }
+		$selected_service_ref = (string) ( $services[0]['public_ref'] ?? '' );
+		foreach ( $services as $service ) {
+			if ( $service_ref === (string) ( $service['public_ref'] ?? '' ) ) { $selected_service_ref = $service_ref; break; }
+		}
 		$default_timezone = wp_timezone_string();
 		if ( ! WCA_Service::valid_timezone( $default_timezone ) ) { $default_timezone = 'UTC'; }
 		ob_start();
 		?>
 		<main class="wca-shell" aria-labelledby="wca-book-title" data-wca-booking data-clinic-ref="<?php echo esc_attr( $clinic['public_ref'] ); ?>" data-service-ref="<?php echo esc_attr( $service_ref ); ?>">
-			<h1 id="wca-book-title"><?php echo esc_html( sprintf( __( 'Book with %s', 'worldwide-clinic-appointments' ), $clinic['name'] ) ); ?></h1>
+			<h1 id="wca-book-title"><?php echo esc_html( sprintf( __( 'Request an appointment with %s', 'worldwide-clinic-appointments' ), $clinic['name'] ) ); ?></h1>
+			<p><?php esc_html_e( 'This is a request, not a confirmed appointment. A verified practitioner or authorized clinic staff must approve it before it is confirmed.', 'worldwide-clinic-appointments' ); ?></p>
 			<div class="wca-alert" role="alert"><strong><?php esc_html_e( 'Emergency warning:', 'worldwide-clinic-appointments' ); ?></strong> <?php esc_html_e( 'This booking service cannot provide emergency care. Contact local emergency services for urgent danger.', 'worldwide-clinic-appointments' ); ?></div>
 			<form class="wca-form" data-wca-booking-form novalidate>
-				<label><?php esc_html_e( 'Service and verified practitioner', 'worldwide-clinic-appointments' ); ?><select name="service_ref" required><?php foreach ( (array) $clinic['services'] as $service ) : ?><option value="<?php echo esc_attr( $service['public_ref'] ); ?>" data-practitioner-ref="<?php echo esc_attr( $service['practitioner_ref'] ); ?>" data-consultation-type="<?php echo esc_attr( $service['consultation_type'] ); ?>" <?php selected( $service_ref, $service['public_ref'] ); ?>><?php echo esc_html( $service['name'] ); ?></option><?php endforeach; ?></select></label>
+				<label><?php esc_html_e( 'Service and verified practitioner', 'worldwide-clinic-appointments' ); ?><select name="service_ref" required><?php foreach ( $services as $service ) : ?><option value="<?php echo esc_attr( $service['public_ref'] ); ?>" data-practitioner-ref="<?php echo esc_attr( $service['practitioner_ref'] ); ?>" data-consultation-type="<?php echo esc_attr( $service['consultation_type'] ); ?>" <?php selected( $selected_service_ref, $service['public_ref'] ); ?>><?php echo esc_html( sprintf( __( '%1$s · %2$d minutes · %3$s · %4$s', 'worldwide-clinic-appointments' ), $service['name'], absint( $service['duration_minutes'] ), self::consultation_type_label( $service['consultation_type'] ), self::service_fee_label( $service ) ) ); ?></option><?php endforeach; ?></select></label>
+				<section class="wca-booking-terms" aria-labelledby="wca-booking-terms-title">
+					<h2 id="wca-booking-terms-title"><?php esc_html_e( 'Service fees and appointment terms', 'worldwide-clinic-appointments' ); ?></h2>
+					<p><?php esc_html_e( 'Platform commission is 0%. Service fees, applicable taxes and any refund or cancellation conditions belong to the stated clinic service; this request is not a payment or confirmed booking.', 'worldwide-clinic-appointments' ); ?></p>
+					<?php foreach ( $services as $service ) : ?>
+						<details class="wca-card wca-service-terms" data-wca-service-terms-ref="<?php echo esc_attr( $service['public_ref'] ); ?>" <?php if ( $selected_service_ref === (string) $service['public_ref'] ) { echo 'open'; } ?>>
+							<summary><?php echo esc_html( $service['name'] . ' — ' . self::service_fee_label( $service ) ); ?></summary>
+							<?php echo self::service_terms_markup( $service, $clinic['policies'] ?? array() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized helper. ?>
+						</details>
+					<?php endforeach; ?>
+				</section>
 				<label><?php esc_html_e( 'Date from', 'worldwide-clinic-appointments' ); ?><input name="date_from" type="date" required value="<?php echo esc_attr( wp_date( 'Y-m-d' ) ); ?>"></label>
 				<label><?php esc_html_e( 'Your time zone', 'worldwide-clinic-appointments' ); ?><input name="timezone" required value="<?php echo esc_attr( $default_timezone ); ?>"></label>
 				<button class="wca-button" type="button" data-wca-search-slots><?php esc_html_e( 'Find available times', 'worldwide-clinic-appointments' ); ?></button>
@@ -212,12 +231,40 @@ final class WCA_Frontend {
 		return $labels[ $status ] ?? __( 'Appointment status unavailable', 'worldwide-clinic-appointments' );
 	}
 
+	/** Format the exact public fee or an explicitly bounded range without inventing taxes. */
+	private static function service_fee_label( $service ) {
+		$currency = (string) ( $service['currency'] ?? '' );
+		$fee = absint( $service['fee_minor'] ?? 0 );
+		$max = absint( $service['fee_max_minor'] ?? 0 );
+		$from = self::money( $fee, $currency );
+		return $max > $fee ? sprintf( __( '%1$s to %2$s', 'worldwide-clinic-appointments' ), $from, self::money( $max, $currency ) ) : $from;
+	}
+
+	/** Safe, public-only service terms. Unpublished terms must not be fabricated. */
+	private static function service_terms_markup( $service, $clinic_policies = array() ) {
+		$clinic_policies = is_array( $clinic_policies ) ? $clinic_policies : array();
+		$keys = array(
+			'tax_policy' => array( 'tax', __( 'Tax information', 'worldwide-clinic-appointments' ) ),
+			'refund_policy' => array( 'refund', __( 'Refund policy', 'worldwide-clinic-appointments' ) ),
+			'cancellation_policy' => array( 'cancellation', __( 'Cancellation policy', 'worldwide-clinic-appointments' ) ),
+		);
+		$items = '';
+		foreach ( $keys as $field => $details ) {
+			$value = trim( (string) ( $service[ $field ] ?? '' ) );
+			if ( '' === $value ) { $value = trim( (string) ( $clinic_policies[ $details[0] ] ?? '' ) ); }
+			if ( '' !== $value ) { $items .= '<dt>' . esc_html( $details[1] ) . '</dt><dd>' . esc_html( $value ) . '</dd>'; }
+		}
+		if ( '' === $items ) { return '<p>' . esc_html( __( 'Tax, refund and cancellation terms are not published for this service; check with the clinic before requesting.', 'worldwide-clinic-appointments' ) ) . '</p>'; }
+		return '<dl class="wca-terms-list">' . $items . '</dl>';
+	}
+
 	private static function consultation_type_label( $type ) {
 		$type = sanitize_key( str_replace( '-', '_', (string) $type ) );
 		$labels = array(
 			'online'    => __( 'Online', 'worldwide-clinic-appointments' ),
 			'in_person' => __( 'In person', 'worldwide-clinic-appointments' ),
 			'hybrid'    => __( 'Hybrid', 'worldwide-clinic-appointments' ),
+			'home_visit'=> __( 'Home visit', 'worldwide-clinic-appointments' ),
 		);
 		return $labels[ $type ] ?? __( 'Consultation type unavailable', 'worldwide-clinic-appointments' );
 	}
