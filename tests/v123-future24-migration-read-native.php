@@ -8,7 +8,7 @@ set_error_handler( static function ( $level, $msg ) {
     if ( error_reporting() & $level ) { throw new ErrorException( $msg, 0, $level ); }
     return false;
 } );
-defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
+defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/fixtures/v123-future24-upgrade/' );
 defined( 'ARRAY_A' ) || define( 'ARRAY_A', 'ARRAY_A' );
 function __( $text, $domain = '' ) { return $text; }
 function absint( $v ) { return abs( (int) $v ); }
