@@ -13,9 +13,18 @@ function element() {
   const handlers = new Map();
   return {
     handlers, dataset: {}, disabled: false, textContent: '', classList: classes(),
-    addEventListener(name, fn) { handlers.set(name, fn); },
+    addEventListener(name, fn) {
+      if (!handlers.has(name)) handlers.set(name, []);
+      handlers.get(name).push(fn);
+    },
     setAttribute() {}, focus() {},
-    trigger(name, event) { const fn = handlers.get(name); assert.ok(fn, 'missing ' + name + ' handler'); return fn(event); }
+    trigger(name, event) {
+      const fns = handlers.get(name);
+      assert.ok(fns && fns.length, 'missing ' + name + ' handler');
+      let result;
+      for (const fn of fns) result = fn(event);
+      return result;
+    }
   };
 }
 const slotsNode = Object.assign(element(), {
