@@ -532,14 +532,17 @@ final class WCA_Future24 {
 		$cursor = 0;
 		$batch = 100;
 		do {
+			$wpdb->last_error = '';
 			$rows_raw = $wpdb->get_results( $wpdb->prepare(
 				"SELECT * FROM {$table} WHERE feature_id='F08-FUT-01' AND clinic_id=%d AND status='waiting' AND (expires_at IS NULL OR expires_at>%s) AND id>%d ORDER BY id ASC LIMIT %d",
 				absint( $clinic_id ), WCA_Repository::now(), $cursor, $batch
 			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'wca_waitlist_candidate_read_failed' ); }
-			$rows = (array) $rows_raw;
+			if ( ! is_array( $rows_raw ) || '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'wca_waitlist_candidate_read_failed' ); }
+			$rows = $rows_raw;
 			foreach ( $rows as $row ) {
-				$cursor = max( $cursor, absint( $row['id'] ?? 0 ) );
+				$next_id = is_array( $row ) ? absint( $row['id'] ?? 0 ) : 0;
+				if ( $next_id <= $cursor ) { throw new RuntimeException( 'wca_waitlist_candidate_read_failed' ); }
+				$cursor = $next_id;
 				yield $row;
 			}
 		} while ( count( $rows ) === $batch );
@@ -1554,13 +1557,19 @@ self::release_semantic_lock( $lock );
 		$cursor = 0;
 		$batch = 100;
 		do {
+			$wpdb->last_error = '';
 			$rows_raw = $wpdb->get_results( $wpdb->prepare(
 				"SELECT {$columns} FROM {$table} WHERE feature_id=%s AND clinic_id=%d AND status=%s AND id>%d ORDER BY id ASC LIMIT %d",
 				$feature_id, absint( $clinic_id ), $status, $cursor, $batch
 			), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-			$rows = (array) $rows_raw;
-			foreach ( $rows as $row ) { $cursor = max( $cursor, absint( $row['id'] ?? 0 ) ); $out[] = $row; }
+			if ( ! is_array( $rows_raw ) || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+			$rows = $rows_raw;
+			foreach ( $rows as $row ) {
+				$next_id = is_array( $row ) ? absint( $row['id'] ?? 0 ) : 0;
+				if ( $next_id <= $cursor ) { return new WP_Error( 'wca_future24_policy_read_failed', __( 'Current Future24 policy data could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+				$cursor = $next_id;
+				$out[] = $row;
+			}
 		} while ( count( $rows ) === $batch );
 		return $out;
 	}
