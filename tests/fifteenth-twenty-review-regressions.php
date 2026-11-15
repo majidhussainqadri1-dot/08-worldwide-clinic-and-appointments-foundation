@@ -54,7 +54,9 @@ t15h('R7 strict guardian helper result','includes/class-wca-authorization.php','
 t15h('R7 strict step-up helper result','includes/class-wca-authorization.php','$step_result = smc_step_up_is_valid');
 t15h('R7 versioned age claim failure is authoritative','includes/class-wca-central-governance.php','wca_age_claim_invalid_provider_response');
 t15h('R7 doctor Founder result strict','includes/class-swc-doctor-authority.php','$founder_raw = function_exists');
-t15h('R7 File09 verified result strict','includes/class-swc-doctor-authority.php','$verified_raw = gdo_user_is_verified');
+t15h('R7 File09 verified owner projection strict','includes/class-swc-doctor-authority.php',"GDO_Integration_Contracts::projection( \$user_id, 'file08' )");
+t15h('R7 File09 current claim ACK strict','includes/class-swc-doctor-authority.php',"'accepted' !== sanitize_key");
+t15h('R7 File09 never grants clinical authority','includes/class-swc-doctor-authority.php',"false !== \$projection['clinical_authorization']");
 
 t15h('R8 opaque payment preserves idempotency header','includes/class-wca-opaque-api.php',"set_header( 'Idempotency-Key'");
 t15h('R8 stale idempotency precheck read failure','includes/class-wca-second-ten-review-hardening.php','wca_stale_idempotency_read_failed');
