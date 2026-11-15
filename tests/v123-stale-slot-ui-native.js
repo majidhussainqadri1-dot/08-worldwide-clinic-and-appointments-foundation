@@ -46,8 +46,16 @@ const form = Object.assign(element(), {
   reportValidity() { return true; },
   reset() {}
 });
+const servicePanels = [
+  {dataset: {wcaServiceTermsRef: 'svc-1'}, open: false},
+  {dataset: {wcaServiceTermsRef: 'svc-2'}, open: false}
+];
 const root = Object.assign(element(), {
   dataset: {clinicRef: 'clinic-1'},
+  querySelectorAll(selector) {
+    assert.equal(selector, '[data-wca-service-terms-ref]');
+    return servicePanels;
+  },
   querySelector(selector) {
     return ({
       '[data-wca-booking-form]': form, '[data-wca-search-slots]': searchButton,
@@ -78,9 +86,13 @@ const slot = id => ({
   start_utc:'2026-11-25 10:00:00', end_utc:'2026-11-25 10:30:00'
 });
 (async () => {
+  assert.equal(servicePanels[0].open, true, 'selected service terms visible initially');
+  assert.equal(servicePanels[1].open, false, 'other service terms collapsed initially');
   searchButton.trigger('click');
   assert.equal(calls.length, 1, 'first availability query sent');
   serviceField.value = 'svc-2'; serviceField.trigger('change');
+  assert.equal(servicePanels[0].open, false, 'old service terms collapse after change');
+  assert.equal(servicePanels[1].open, true, 'new service fees and policies are visible');
   calls[0].resolve(response({slots:[slot('old-service-slot')]}));
   await tick();
   assert.equal(slotsNode.children.length, 0, 'late response for old service must never render');
@@ -106,5 +118,5 @@ const slot = id => ({
   await form.trigger('submit', {preventDefault() {}});
   assert.equal(calls.length, 4, 'late hold cannot be submitted after filter change');
   assert.match(statusNode.textContent, /Choose and reserve an available time first/);
-  process.stdout.write('PASS: 3 stale-search / stale-filter / late-hold UI regressions.\n');
+  process.stdout.write('PASS: 5 stale-search / changed-service-terms / late-hold UI regressions.\n');
 })().catch(err => { console.error(err); process.exitCode = 1; });
