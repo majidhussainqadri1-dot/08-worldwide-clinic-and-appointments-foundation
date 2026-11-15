@@ -73,4 +73,25 @@ foreach ( $cases as $label => $case ) {
         }
     }
 }
+
+// Exercise the real WCA_Service repository-read wrapper as used by public projections.
+// A SQL outage must remain WP_Error, not become a "no services" success.
+function is_wp_error( $thing ) { return $thing instanceof WP_Error; }
+require dirname( __DIR__ ) . '/includes/class-wca-service.php';
+$repo_method = new ReflectionMethod( 'WCA_Service', 'repository_read' );
+$repo_method->setAccessible( true );
+foreach ( array( 'sql_empty', 'valid_empty' ) as $mode ) {
+    V123_Collection_DB::$mode = $mode;
+    $value = $repo_method->invoke( null, static function () {
+        return WCA_Repository::list_services( 77, false );
+    } );
+    if ( 'sql_empty' === $mode ) {
+        $assert( $value instanceof WP_Error && 'wca_service_list_read_failed' === $value->code,
+            'public service projection wrapper returns typed SQL failure' );
+    } else {
+        $assert( is_array( $value ) && array() === $value,
+            'public service projection wrapper preserves valid empty set' );
+    }
+}
+
 echo "PASS: {$checks} V12.3 actual repository collection-read source assertions; NOT staging or Live.\n";
