@@ -81,12 +81,15 @@
 		var holdGeneration = 0;
 
 		function invalidateSelection() {
+			// A filter change invalidates BOTH outstanding searches and slot holds.
+			// Never display previously fetched times under a new service/date/timezone.
+			searchGeneration += 1;
 			holdGeneration += 1;
 			selectedHold = null;
 			appointmentRequestKey = null;
-			Array.prototype.forEach.call(slotsNode.querySelectorAll('.wca-slot'), function (item) {
-				item.setAttribute('aria-pressed', 'false');
-			});
+			slotsNode.replaceChildren();
+			searchButton.disabled = false;
+			setStatus(root, '', false);
 		}
 
 		var tz = form.elements.timezone;
@@ -109,10 +112,22 @@
 			var field = form.elements[name];
 			if (field) field.addEventListener('change', invalidateSelection);
 		});
+		// Keep the displayed fee and terms aligned with the service currently
+		// being requested. With JavaScript unavailable, every native <details>
+		// remains readable and no policy is concealed from the visitor.
+		function syncServiceTerms() {
+			var panels = root.querySelectorAll ? root.querySelectorAll('[data-wca-service-terms-ref]') : [];
+			var selected = query(form, 'service_ref');
+			Array.prototype.forEach.call(panels, function (panel) {
+				panel.open = String(panel.dataset.wcaServiceTermsRef || '') === selected;
+			});
+		}
+		if (form.elements.service_ref) form.elements.service_ref.addEventListener('change', syncServiceTerms);
+		syncServiceTerms();
 
 		searchButton.addEventListener('click', async function () {
-			var generation = ++searchGeneration;
 			invalidateSelection();
+			var generation = ++searchGeneration;
 			searchButton.disabled = true;
 			setStatus(root, (runtime.i18n && runtime.i18n.loading) || 'Loading…', false);
 			slotsNode.replaceChildren();
