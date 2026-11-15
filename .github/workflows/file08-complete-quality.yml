@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: majidhussainqadri1-dot/09-global-doctor-onboarding-and-verification-completion
-          ref: 8f52f87a6d82fc89c6c78b7da80b474dff916d97
+          ref: 500371845a555ef7ad3b2e2710a2a3c7628fde8b
           path: .external/file09
           persist-credentials: false
       - name: Set up PHP 8.3
@@ -167,7 +167,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: majidhussainqadri1-dot/09-global-doctor-onboarding-and-verification-completion
-          ref: 8f52f87a6d82fc89c6c78b7da80b474dff916d97
+          ref: 500371845a555ef7ad3b2e2710a2a3c7628fde8b
           path: .external/file09
           persist-credentials: false
       - name: PHP 8.3 WordPress extensions
