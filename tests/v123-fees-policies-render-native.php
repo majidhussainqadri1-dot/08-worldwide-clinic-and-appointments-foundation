@@ -56,7 +56,20 @@ function v123_render( $method, $ref ) {
 $_GET['service'] = 'svc-1';
 $clinic = v123_render( 'clinic', 'clinic-001' );
 $booking = v123_render( 'booking', 'clinic-001' );
+$terms_method = new ReflectionMethod( 'WCA_Frontend', 'service_terms_markup' );
+$terms_method->setAccessible( true );
+$attack = $terms_method->invoke( null, array(
+    'tax_policy' => '<script>alert(1)</script>',
+    'refund_policy' => '',
+    'cancellation_policy' => '',
+), array( 'refund' => 'Refund terms <img src=x onerror=alert(2)>', 'cancellation' => '' ) );
+$unpublished = $terms_method->invoke( null, array(
+    'tax_policy' => '', 'refund_policy' => '', 'cancellation_policy' => '',
+), array() );
 $checks = array(
+    'public service terms escape untrusted stored markup' => false === strpos( $attack, '<script>' ) && false !== strpos( $attack, '&lt;script&gt;' ),
+    'public clinic fallback terms also escape markup' => false === strpos( $attack, '<img ' ) && false !== strpos( $attack, '&lt;img' ),
+    'missing all terms never implies a no-refund policy' => false !== strpos( $unpublished, 'not published' ),
     'clinic renders fee minimum' => false !== strpos( $clinic, 'PKR 50.00' ),
     'clinic renders upper fee bound' => false !== strpos( $clinic, 'PKR 85.00' ),
     'clinic reveals service tax policy' => false !== strpos( $clinic, 'Tax included' ),
