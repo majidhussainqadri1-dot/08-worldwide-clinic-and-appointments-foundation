@@ -21,7 +21,7 @@
 - **File08 source findings:** previous 13 grouped defects from PR53 + current 3 grouped FR002/UX findings = **16**.
 - **Authored corrective source in draft #54:** 16/16 scoped findings, subject to **final exact SHA** CI and human review. This is not a claim of zero defects throughout all File08 code or all 54 runtime requirements.
 - **Merged into current main:** 0. **Hostinger staging-approved:** 0. **Live-resolved:** 0.
-- **Separate integration observation:** Issue #55, **26 transient File00 pre-migration SQL log lines in each of 3 ephemeral WordPress jobs (78 combined)**; post-migration File08 native tests passed. This is not a confirmed File08 bug or Live failure. File00 owner root cause and remediation pending.
+- **Separate integration observation:** Issue #55, **25 File00 pre-migration SQL missing-table logs per disposable WordPress job (75 combined), plus 1 deliberate File08 negative SQL fault-injection log per job (3 combined; 78 raw total)**; post-migration File08 native tests passed. This is not a confirmed File08 bug or Live failure. File00 owner root cause and remediation pending.
 - **PR governance:** 35 open PRs. No bulk merges/closures, history preserved.
 - **Test matrix previously green:** run #43664921679 at SHA 1c504ea1999d56309c930d57de22ad0dccafc187, 7/7 jobs; all later changes need a new matching run.
 - **Cross-cutting acceptance:** M01–M12 mapped 12/12, QA15–QA24 mapped 10/10, operational true staging acceptance 0/10.
