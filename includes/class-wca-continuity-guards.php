@@ -127,6 +127,7 @@ final class WCA_Continuity_Guards {
 			}
 		}
 		$table = WCA_Schema::tables()['consents'];
+		$wpdb->last_error = '';
 		$rows_raw = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT scope,status,terms_version,granted_at,revoked_at FROM {$table} WHERE appointment_id=%d ORDER BY id ASC",
@@ -134,8 +135,8 @@ final class WCA_Continuity_Guards {
 			),
 			ARRAY_A
 		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_consent_state_read_failed', __( 'Current consent state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
-		$rows = (array) $rows_raw;
+		if ( ! is_array( $rows_raw ) || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'wca_consent_state_read_failed', __( 'Current consent state could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 503 ) ); }
+		$rows = is_array( $rows_raw ) ? $rows_raw : array();
 		$scopes = array( 'appointment_processing', 'teleconsult', 'recording', 'messaging', 'privacy_notice', 'followup' );
 		$state  = array();
 		foreach ( $scopes as $scope ) {
@@ -227,14 +228,15 @@ final class WCA_Continuity_Guards {
 			$cursor = absint( get_transient( $cursor_key ) );
 			$table  = $config['table'];
 			$field  = $config['field'];
+			$wpdb->last_error = '';
 			$rows_raw = $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT id,public_ref,appointment_id FROM {$table} WHERE {$field}=%d AND id>%d ORDER BY id ASC LIMIT %d",
 					$user_id, $cursor, self::ERASE_BATCH
 				), ARRAY_A
 			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $rows_raw && '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Continuity privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; $rows_raw = array(); }
-			$rows = (array) $rows_raw;
+			if ( ! is_array( $rows_raw ) || '' !== (string) $wpdb->last_error ) { $messages[] = __( 'Continuity privacy erasure could not read the affected record set safely and will retry.', 'worldwide-clinic-appointments' ); $done = false; $rows_raw = array(); }
+			$rows = is_array( $rows_raw ) ? $rows_raw : array();
 
 			$last_id = $cursor;
 			foreach ( $rows as $row ) {

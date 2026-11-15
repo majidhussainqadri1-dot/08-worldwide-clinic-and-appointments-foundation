@@ -5,3 +5,14 @@
 @media(prefers-reduced-motion:reduce){.wca-shell *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 @media(forced-colors:active){.wca-card,.wca-hero,.wca-alert,.wca-button,.wca-slot{forced-color-adjust:auto;border:1px solid CanvasText;box-shadow:none}.wca-button,.wca-slot{color:ButtonText!important;background:ButtonFace}}
 @media print{.wca-button,.wca-actions,.wca-form{display:none!important}.wca-card,.wca-hero{box-shadow:none;border:1px solid #000}.wca-shell{width:100%;margin:0}}
+
+/* V12.3 FR002: readable, keyboard-accessible public service fee and terms. */
+.wca-booking-terms{padding:clamp(16px,3vw,26px);border:1px solid var(--wca-line);border-radius:var(--wca-radius);background:var(--wca-green-soft)}
+.wca-booking-terms h2{margin-block:0 .7em}
+.wca-service-terms{margin-block:12px;padding:14px 18px;box-shadow:none;background:var(--wca-surface)}
+.wca-service-terms summary{cursor:pointer;line-height:1.55;font-weight:700;color:var(--wca-green-dark);overflow-wrap:anywhere}
+.wca-service-terms summary:focus-visible{outline:3px solid var(--wca-green);outline-offset:4px;border-radius:4px}
+.wca-terms-list{display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,3fr);gap:8px 14px;margin:14px 0 0}
+.wca-terms-list dt{font-weight:700;color:var(--wca-ink)}
+.wca-terms-list dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:600px){.wca-terms-list{grid-template-columns:1fr;gap:4px}.wca-terms-list dd{margin-bottom:9px}.wca-service-terms{padding:12px}}

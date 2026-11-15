@@ -158,10 +158,13 @@ final class SWC_Admin {
 	}
 
 	private function audit_timeline( $id ) {
-		$rows = SWC_Helpers::audit_rows( $id );
+		// A failed audit query is not the same thing as zero historic events.
+		$rows = SWC_Helpers::audit_rows_strict( $id );
 		?>
 		<details class="swc-audit"><summary><?php esc_html_e( 'Audit history', 'worldwide-clinic-appointments' ); ?></summary>
-			<?php if ( $rows ) : ?><ol>
+			<?php if ( is_wp_error( $rows ) ) : ?>
+				<p class="notice notice-error" role="alert"><?php esc_html_e( 'Audit history is temporarily unavailable. Please retry or consult System Check.', 'worldwide-clinic-appointments' ); ?></p>
+			<?php elseif ( $rows ) : ?><ol>
 				<?php foreach ( $rows as $row ) : ?>
 					<li><strong><?php echo esc_html( $row->event ? $row->event : $row->action ); ?></strong> — <?php echo esc_html( $row->created_at ); ?> UTC<br><small><?php echo esc_html( trim( $row->old_status . ' → ' . $row->new_status, ' →' ) ); ?><?php echo $row->reason ? ' · ' . esc_html( $row->reason ) : ''; ?></small></li>
 				<?php endforeach; ?>
