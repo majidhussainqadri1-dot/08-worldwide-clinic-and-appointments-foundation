@@ -112,6 +112,18 @@
 			var field = form.elements[name];
 			if (field) field.addEventListener('change', invalidateSelection);
 		});
+		// Keep the displayed fee and terms aligned with the service currently
+		// being requested. With JavaScript unavailable, every native <details>
+		// remains readable and no policy is concealed from the visitor.
+		function syncServiceTerms() {
+			var panels = root.querySelectorAll ? root.querySelectorAll('[data-wca-service-terms-ref]') : [];
+			var selected = query(form, 'service_ref');
+			Array.prototype.forEach.call(panels, function (panel) {
+				panel.open = String(panel.dataset.wcaServiceTermsRef || '') === selected;
+			});
+		}
+		if (form.elements.service_ref) form.elements.service_ref.addEventListener('change', syncServiceTerms);
+		syncServiceTerms();
 
 		searchButton.addEventListener('click', async function () {
 			invalidateSelection();
