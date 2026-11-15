@@ -10,9 +10,11 @@ defined( 'ABSPATH' ) || exit;
 final class SWC_Doctor_Authority {
 	const FILE_00_MIN_VERSION = '1.2.4';
 	const FILE_00_MAX_VERSION = '1.3.0';
-	const FILE_00_CONTRACT    = '1.1.2';
-	const FILE_09_MIN_VERSION = '1.1.0';
-	const FILE_09_MAX_VERSION = '1.2.0';
+	const FILE_00_CONTRACT    = '1.2.3';
+	const FILE_09_MIN_VERSION = '1.3.0';
+	const FILE_09_MAX_VERSION = '1.4.0';
+	const FILE_09_PUBLIC_CONTRACT = '1.1.0';
+	const FILE_09_PUBLIC_CONTRACT_MAX = '2.0.0';
 
 	/**
 	 * Determine whether a user is an authoritative clinic practitioner.
@@ -74,6 +76,7 @@ final class SWC_Doctor_Authority {
 			'file_00_runtime_range'  => '>=' . self::FILE_00_MIN_VERSION . ' <' . self::FILE_00_MAX_VERSION,
 			'file_00_contract'       => self::FILE_00_CONTRACT,
 			'file_09_runtime_range'  => '>=' . self::FILE_09_MIN_VERSION . ' <' . self::FILE_09_MAX_VERSION,
+			'file_09_public_contract'=> '>=' . self::FILE_09_PUBLIC_CONTRACT . ' <' . self::FILE_09_PUBLIC_CONTRACT_MAX,
 			'local_role_inference'   => false,
 			'local_meta_inference'   => false,
 			'fail_closed'            => true,
@@ -97,28 +100,63 @@ final class SWC_Doctor_Authority {
 	}
 
 	private static function file_09_verified( $user_id ) {
+		// The File09 plugin header alone is not an authorization contract.
+		// Use the current owner-published, versioned File08 projection instead
+		// of stitching together legacy application and snapshot helpers.
 		if ( ! defined( 'GDO_VERSION' )
 			|| ! self::version_in_range( (string) GDO_VERSION, self::FILE_09_MIN_VERSION, self::FILE_09_MAX_VERSION )
-			|| ! function_exists( 'gdo_get_verification_decision' )
-			|| ! function_exists( 'gdo_get_approved_snapshot' )
-			|| ! function_exists( 'gdo_user_is_verified' )
+			|| ! class_exists( 'GDO_Integration_Contracts' )
+			|| ! is_callable( array( 'GDO_Integration_Contracts', 'projection' ) )
+			|| ! defined( 'GDO_Integration_Contracts::VERSION' )
+			|| ! self::version_in_range(
+				(string) constant( 'GDO_Integration_Contracts::VERSION' ),
+				self::FILE_09_PUBLIC_CONTRACT,
+				self::FILE_09_PUBLIC_CONTRACT_MAX
+			)
 		) {
 			return false;
 		}
-
 		try {
-			$decision = gdo_get_verification_decision( $user_id );
-			$snapshot = gdo_get_approved_snapshot( $user_id );
-			$verified_raw = gdo_user_is_verified( $user_id );
-			$verified = true === $verified_raw || 1 === $verified_raw || '1' === $verified_raw;
+			$projection = GDO_Integration_Contracts::projection( $user_id, 'file08' );
 		} catch ( Throwable $e ) {
 			return false;
 		}
-		if ( ! is_array( $decision ) || ! is_array( $snapshot ) || empty( $snapshot ) || ! $verified ) {
+		if ( ! is_array( $projection )
+			|| absint( $projection['user_id'] ?? 0 ) !== absint( $user_id )
+			|| 'file09' !== sanitize_key( (string) ( $projection['source_of_truth'] ?? '' ) )
+			|| 'file08' !== sanitize_key( (string) ( $projection['consumer'] ?? '' ) )
+			|| 'gdo.file08.clinic-eligibility' !== (string) ( $projection['contract'] ?? '' )
+			|| ! self::version_in_range(
+				(string) ( $projection['version'] ?? '' ),
+				self::FILE_09_PUBLIC_CONTRACT,
+				self::FILE_09_PUBLIC_CONTRACT_MAX
+			)
+			|| empty( $projection['verified'] )
+			|| empty( $projection['eligible'] )
+			|| empty( $projection['authorization_rechecked'] )
+			|| 'accepted' !== sanitize_key( (string) ( $projection['claim_status'] ?? '' ) )
+			|| absint( $projection['claim_version'] ?? 0 ) < 1
+			|| ! array_key_exists( 'clinical_authorization', $projection )
+			|| false !== $projection['clinical_authorization']
+		) {
 			return false;
 		}
-		$state = sanitize_key( (string) ( $decision['state'] ?? '' ) );
-		return ! empty( $decision['verified'] ) && in_array( $state, array( 'verified', 'approved' ), true );
+		$state = sanitize_key( (string) ( $projection['state'] ?? '' ) );
+		if ( ! in_array( $state, array( 'verified', 'reinstated', 'renewal_due' ), true ) ) {
+			return false;
+		}
+		// The owner projects a YYYY-MM-DD UTC validity date. Never infer an
+		// active credential from a malformed, past or unparseable date.
+		$valid_until = (string) ( $projection['verified_until'] ?? '' );
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/D', $valid_until ) ) {
+			return false;
+		}
+		$date = DateTimeImmutable::createFromFormat( '!Y-m-d', $valid_until, new DateTimeZone( 'UTC' ) );
+		$errors = DateTimeImmutable::getLastErrors();
+		return $date
+			&& ( false === $errors || ( 0 === (int) $errors['warning_count'] && 0 === (int) $errors['error_count'] ) )
+			&& $date->format( 'Y-m-d' ) === $valid_until
+			&& $date->setTime( 23, 59, 59 )->getTimestamp() > time();
 	}
 
 	private static function file_03_not_blocked( $user_id ) {
