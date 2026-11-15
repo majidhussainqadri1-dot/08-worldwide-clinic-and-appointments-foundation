@@ -5,10 +5,16 @@
  * Not Hostinger staging/live acceptance. No real user/evidence data.
  */
 defined('ABSPATH') || exit;
-if (!defined('WP_CLI') || !WP_CLI
- || wp_get_environment_type()!=='staging'
- || (string)get_option('siteurl')!=='http://file08-p05.local') {
- fwrite(STDERR,"FAIL: cross-owner test refuses non-ephemeral WP-CLI environment\n");
+$f08_ci_wp_cli = defined('WP_CLI') && WP_CLI;
+$f08_ci_environment = function_exists('wp_get_environment_type') ? wp_get_environment_type() : 'unavailable';
+$f08_ci_siteurl = (string)get_option('siteurl','');
+if (!$f08_ci_wp_cli || $f08_ci_environment !== 'staging'
+ || rtrim($f08_ci_siteurl,'/') !== 'http://file08-p05.local') {
+ fwrite(STDERR, 'FAIL: cross-owner test refuses non-ephemeral WP-CLI environment; '
+     .'wp_cli='.($f08_ci_wp_cli?'true':'false')
+     .', environment='.$f08_ci_environment
+     .', expected_site_match='.(rtrim($f08_ci_siteurl,'/')==='http://file08-p05.local'?'true':'false')
+     ."\n");
  exit(90);
 }
 function file08_p05_check($ok,$label) {
