@@ -241,6 +241,13 @@ jobs:
         run: |
           set -euo pipefail
           php /tmp/file08-wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/v121-real-wordpress-mariadb.php" --path=/tmp/file08-ci-wp --allow-root
+      - name: V12.3 actual MariaDB three-clinic-services and commission integrity
+        env:
+          FILE08_CI_EPHEMERAL_DB: yes
+        shell: bash
+        run: |
+          set -euo pipefail
+          php /tmp/file08-wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/v123-real-wordpress-services.php" --path=/tmp/file08-ci-wp --allow-root
       - name: Verify read-only freeze on exact disposable deployed package and installed schema
         shell: bash
         run: |
