@@ -4,7 +4,7 @@ function t16h($label,$path,$needle){global $root,$pass,$fail;$s=file_get_content
 function t16n($label,$path,$needle){global $root,$pass,$fail;$s=file_get_contents($root.'/'.$path);if(is_string($s)&&false===strpos($s,$needle)){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' forbidden needle present: '.$needle;}}
 function t16order($label,$path,$first,$second){global $root,$pass,$fail;$s=file_get_contents($root.'/'.$path);$a=is_string($s)?strpos($s,$first):false;$b=is_string($s)?strpos($s,$second):false;if(false!==$a&&false!==$b&&$a<$b){echo 'PASS '.(++$pass).': '.$label."\n";}else{$fail[]=$label.' order invariant failed';}}
 
-t16h('R1 continuity batch read fails closed','includes/class-wca-continuity-secure.php','null === $rows_raw && \'\' !== (string) $wpdb->last_error');
+t16h('R1 continuity batch read fails closed','includes/class-wca-continuity-secure.php','! is_array( $rows_raw ) || \'\' !== (string) $wpdb->last_error');
 t16h('R1 continuity zero-delete readback fails closed','includes/class-wca-continuity-secure.php','null === $still_exists && \'\' !== (string) $wpdb->last_error');
 t16h('R1 continuity completion read fails closed','includes/class-wca-continuity-secure.php','null === $more && \'\' !== (string) $wpdb->last_error');
 t16h('R1 continuity guardian readback fails closed','includes/class-wca-continuity-secure.php','null === $guardian_remaining && \'\' !== (string) $wpdb->last_error');
