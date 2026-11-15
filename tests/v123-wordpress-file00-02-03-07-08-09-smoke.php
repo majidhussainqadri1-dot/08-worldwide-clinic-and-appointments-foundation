@@ -9,11 +9,11 @@ $f08_ci_wp_cli = defined('WP_CLI') && WP_CLI;
 $f08_ci_environment = function_exists('wp_get_environment_type') ? wp_get_environment_type() : 'unavailable';
 $f08_ci_siteurl = (string)get_option('siteurl','');
 if (!$f08_ci_wp_cli || $f08_ci_environment !== 'staging'
- || rtrim($f08_ci_siteurl,'/') !== 'http://file08-p05.local') {
+ || rtrim($f08_ci_siteurl,'/') !== 'http://file08-p05.local/file08-wordpress') {
  fwrite(STDERR, 'FAIL: cross-owner test refuses non-ephemeral WP-CLI environment; '
      .'wp_cli='.($f08_ci_wp_cli?'true':'false')
      .', environment='.$f08_ci_environment
-     .', expected_site_match='.(rtrim($f08_ci_siteurl,'/')==='http://file08-p05.local'?'true':'false')
+     .', expected_site_match='.(rtrim($f08_ci_siteurl,'/')==='http://file08-p05.local/file08-wordpress'?'true':'false')
      .', site_scheme='.(parse_url($f08_ci_siteurl, PHP_URL_SCHEME) ?: 'none')
      .', site_host_matches_ci='.(parse_url($f08_ci_siteurl,PHP_URL_HOST)==='file08-p05.local'?'true':'false')
      .', site_path='.(parse_url($f08_ci_siteurl,PHP_URL_PATH) ?: '/')
