@@ -125,7 +125,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        wordpress: ['7.0.8', '7.1.4']
+        wordpress: ['7.0.1', '7.0.8', '7.1.4']
     permissions:
       contents: read
     services:
@@ -191,7 +191,7 @@ jobs:
           ref: 13153e4bb5c98e449f638a2c24ec2f1c05083afc
           path: native-file09
           persist-credentials: false
-      - name: Install disposable WP 7.1.4 and six real source plugins (no production data)
+      - name: Install disposable matrix WordPress and six real source plugins (no production data)
         shell: bash
         run: |
           set -euo pipefail
