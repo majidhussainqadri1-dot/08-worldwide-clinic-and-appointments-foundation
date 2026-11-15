@@ -49,6 +49,7 @@ final class WCA_Frontend {
 			</header>
 			<section aria-labelledby="wca-services-title">
 				<h2 id="wca-services-title"><?php esc_html_e( 'Services', 'worldwide-clinic-appointments' ); ?></h2>
+				<p><?php esc_html_e( 'Platform commission is 0%. Consult the displayed clinic service fee, range, tax and cancellation terms before sending an appointment request.', 'worldwide-clinic-appointments' ); ?></p>
 				<div class="wca-grid">
 					<?php foreach ( (array) $clinic['services'] as $service ) : ?>
 						<article class="wca-card">
