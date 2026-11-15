@@ -118,9 +118,16 @@ final class WCA_Future24 {
 
 		$cursor = 0;
 		do {
+			// A failed SQL page can return an empty array while last_error is set.
+			// Never stamp the Future24 schema version until every privacy episode
+			// page has been read, backfilled and validated successfully.
+			$wpdb->last_error = '';
 			$legacy_episodes = $wpdb->get_results( $wpdb->prepare( "SELECT id,appointment_id FROM {$table} WHERE feature_id='F08-FUT-23' AND subject_user_id=0 AND appointment_id>0 AND id>%d ORDER BY id ASC LIMIT 200", $cursor ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			if ( null === $legacy_episodes && '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'File 08 Future24 episode privacy migration could not read legacy rows.' ); }
-			foreach ( (array) $legacy_episodes as $legacy_episode ) {
+			if ( ! is_array( $legacy_episodes ) || '' !== (string) $wpdb->last_error ) { throw new RuntimeException( 'File 08 Future24 episode privacy migration could not read legacy rows.' ); }
+			foreach ( $legacy_episodes as $legacy_episode ) {
+				if ( ! is_array( $legacy_episode ) || ! isset( $legacy_episode['id'], $legacy_episode['appointment_id'] ) ) {
+					throw new RuntimeException( 'File 08 Future24 episode privacy migration returned an invalid legacy record.' );
+				}
 				$episode_id = absint( $legacy_episode['id'] );
 				$appointment_id = absint( $legacy_episode['appointment_id'] );
 				$patient_id = absint( SWC_Helpers::meta( $appointment_id, 'patient_user_id', get_post_field( 'post_author', $appointment_id ) ) );
@@ -130,7 +137,7 @@ final class WCA_Future24 {
 				}
 				$cursor = max( $cursor, $episode_id );
 			}
-		} while ( 200 === count( (array) $legacy_episodes ) );
+		} while ( 200 === count( $legacy_episodes ) );
 
 		$written = SWC_Helpers::update_option_strict( self::SCHEMA_OPTION, self::SCHEMA_VERSION, 'wca_future24_schema_version_write' );
 		if ( is_wp_error( $written ) ) { throw new RuntimeException( 'File 08 Future24 schema version could not be persisted.' ); }
