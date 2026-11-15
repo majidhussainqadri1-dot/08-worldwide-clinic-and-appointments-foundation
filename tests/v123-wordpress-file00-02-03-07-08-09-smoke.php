@@ -14,6 +14,9 @@ if (!$f08_ci_wp_cli || $f08_ci_environment !== 'staging'
      .'wp_cli='.($f08_ci_wp_cli?'true':'false')
      .', environment='.$f08_ci_environment
      .', expected_site_match='.(rtrim($f08_ci_siteurl,'/')==='http://file08-p05.local'?'true':'false')
+     .', site_scheme='.(parse_url($f08_ci_siteurl, PHP_URL_SCHEME) ?: 'none')
+     .', site_host_matches_ci='.(parse_url($f08_ci_siteurl,PHP_URL_HOST)==='file08-p05.local'?'true':'false')
+     .', site_path='.(parse_url($f08_ci_siteurl,PHP_URL_PATH) ?: '/')
      ."\n");
  exit(90);
 }
