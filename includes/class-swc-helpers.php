@@ -694,14 +694,16 @@ final class SWC_Helpers {
 
 	public static function audit_rows_strict( $appointment_id ) {
 		global $wpdb;
+		// Privacy export cannot mistake a failed SQL [] for an empty audit history.
+		$wpdb->last_error = '';
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT * FROM {$wpdb->prefix}swc_audit_log WHERE appointment_id=%d ORDER BY id DESC",
 				absint( $appointment_id )
 			)
 		);
-		if ( null === $rows && '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_audit_read_failed', __( 'Appointment audit history could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
-		return (array) $rows;
+		if ( ! is_array( $rows ) || '' !== (string) $wpdb->last_error ) { return new WP_Error( 'swc_audit_read_failed', __( 'Appointment audit history could not be read safely.', 'worldwide-clinic-appointments' ), array( 'status' => 500 ) ); }
+		return $rows;
 	}
 
 	public static function audit_rows( $appointment_id ) {
