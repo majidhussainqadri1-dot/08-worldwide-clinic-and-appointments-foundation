@@ -72,7 +72,7 @@ jobs:
     env:
       FILE08_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       FILE00_SHA: 1fad051c86d530d558be3eb1890d3c6e67bce6e8
-      FILE09_SHA: 500371845a555ef7ad3b2e2710a2a3c7628fde8b
+      FILE09_SHA: 1903941f6dbbdf41d5ecf237861ec3d6336a38d0
     steps:
       - name: Checkout exact File08 candidate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: majidhussainqadri1-dot/09-global-doctor-onboarding-and-verification-completion
-          ref: 500371845a555ef7ad3b2e2710a2a3c7628fde8b
+          ref: 1903941f6dbbdf41d5ecf237861ec3d6336a38d0
           path: .external/file09
           persist-credentials: false
       - name: Set up PHP 8.3
@@ -128,7 +128,7 @@ jobs:
       FILE02_SHA: 224c39bcb8c28f77504c7348dbad41226753c7e8
       FILE03_SHA: bf317e5521ec79f9f16d21353f402571fcd4f84c
       FILE07_SHA: 8f9b567c08e9456daf31ebadf17b13bb307571f8
-      FILE09_SHA: 500371845a555ef7ad3b2e2710a2a3c7628fde8b
+      FILE09_SHA: 1903941f6dbbdf41d5ecf237861ec3d6336a38d0
     steps:
       - name: Exact File08 candidate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -167,7 +167,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: majidhussainqadri1-dot/09-global-doctor-onboarding-and-verification-completion
-          ref: 500371845a555ef7ad3b2e2710a2a3c7628fde8b
+          ref: 1903941f6dbbdf41d5ecf237861ec3d6336a38d0
           path: .external/file09
           persist-credentials: false
       - name: PHP 8.3 WordPress extensions
