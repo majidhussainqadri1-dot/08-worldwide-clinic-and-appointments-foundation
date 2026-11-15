@@ -385,7 +385,9 @@ final class WCA_Repository {
 	public static function list_services( $clinic_id, $public_only = true, $doctor_user_id = 0 ) {
 		global $wpdb;
 		$table  = WCA_Schema::tables()['services'];
-		$limit  = min( self::MAX_COLLECTION_ROWS, max( 1, absint( $limit ) ) );
+		// Service collection is intentionally bounded, but never defaulted to one
+		// by reading an uninitialized local variable.
+		$limit  = self::MAX_COLLECTION_ROWS;
 		$where  = array( 'clinic_id=%d' );
 		$params = array( absint( $clinic_id ) );
 		if ( $public_only ) { $where[] = "status='active'"; }
